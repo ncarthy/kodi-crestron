@@ -81,7 +81,7 @@ INTEGER_PARAMETER Broadcast_Port#;		 //the port that the XBMC sends broadcast pa
 UDP_SOCKET FbUdp[1024];  		// Feedback via UDP
 
 /////////////////////////// Global Variables
-INTEGER PlaySpeed;
+SIGNED_INTEGER PlaySpeed;
 
 /////////////////////////// Events
 PUSH Connect
@@ -125,7 +125,7 @@ SOCKETRECEIVE FbUdp
 	INTEGER iEvent;
 	INTEGER iEventLevel;
 	INTEGER F[2];				// used in parsing the string
-
+    STRING TempSpeed$[3];
 	Delay(5);					// let buffer fill up
 
 	Sbuffer = FbUdp.SocketRxBuf;
@@ -144,11 +144,16 @@ SOCKETRECEIVE FbUdp
 		print("XBMC-FB: iEvent = %u iEventLevel = %u\n", iEvent, iEventLevel);
 	}
 	Else If(Find("SpeedChanged", Sbuffer))
-	{
-		// Does not yet work. XBMC does not send this like it should.                
-		F[0] 		= atoi(mid(Sbuffer,     find("OnPlayBackSpeedChanged",sbuffer)+23    ,  find(";",sbuffer)-(find("OnPlayBackSpeedChanged",sbuffer)+23) ));
-		PlaySpeed 	= F[0];
-		MakeString(PlayingSpeed$,"%ux",PlaySpeed);
+	{                
+
+		TempSpeed$ 		= mid(Sbuffer,     find("OnPlayBackSpeedChanged",sbuffer)+23    ,  find(";",sbuffer)-(find("OnPlayBackSpeedChanged",sbuffer)+23) );
+
+		if (Find("-",TempSpeed$)) 
+			PlaySpeed 	= -(atoi(TempSpeed$));
+		else
+			PlaySpeed 	= atoi(TempSpeed$);
+		
+		MakeString(PlayingSpeed$,"%dx",PlaySpeed);
 
 		PULSE(10, CheckMetadata); 
 	}
@@ -164,7 +169,7 @@ SOCKETRECEIVE FbUdp
 		StopFb		= 0; 
 		PlayFb		= 1; 
 		PlaySpeed	= 1; 
-		Makestring(PlayingSpeed$, "%ux", PlaySpeed);
+		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
 		PlayStatus$ = "Playing";
 		PULSE(10, CheckMetadata);
 	}
@@ -194,7 +199,7 @@ SOCKETRECEIVE FbUdp
 		PlayFb					= 1; 
 		PlaySpeed				= 1; 
 		PlayStatus$ = "Playing";
-		Makestring(PlayingSpeed$, "%ux", PlaySpeed);
+		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
 		Wait(100) 
 		{ 
 			PULSE(10, CheckMetadata);
