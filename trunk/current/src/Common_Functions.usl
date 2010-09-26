@@ -1,0 +1,236 @@
+/*******************************************************************************************
+  SIMPL+ Module Information
+  (Fill in comments below)
+*******************************************************************************************/
+/*
+Dealer Name:
+System Name: Common_Functions
+System Number: 0.1
+Programmer: Neil Carthy (arduino@scpgwiki.com)
+Comments:                                             
+    
+	***** License *****
+
+	This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+/*******************************************************************************************
+  Compiler Directives
+  (Uncomment and declare compiler directives as needed)
+*******************************************************************************************/
+#DEFAULT_NONVOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+
+/*
+    Remove leading and trailing whitespace and non-printable characters
+*/
+STRING_FUNCTION TRIM(STRING IN$)
+{
+	INTEGER I,J;		// loop variables    
+	INTEGER Length;		// length of input string
+	INTEGER B;			// byte value
+
+	Length = LEN(IN$);    
+    
+	// leading whitespace
+	FOR (I = 1 TO Length) 
+	{
+		B = BYTE(IN$,I);
+
+        IF ( B > 32 && B < 127)
+			BREAK;
+	}
+	I = I - 1;
+    
+	// trailing whitespace
+	FOR (J = 1 TO Length) 
+	{
+		B = BYTE(IN$,Length - J + 1);
+
+        IF ( B > 32 && B < 127)
+			BREAK;       
+	}
+	J = J - 1;   
+
+	IF (I)
+	{
+		IF (J)
+			RETURN (MID(IN$, I+1, Length - I - J ));			
+		ELSE
+			RETURN (RIGHT(IN$, Length - I));
+	}
+	ELSE
+	{
+		IF (J)
+			RETURN (LEFT(IN$, Length - J));
+			
+		ELSE
+			RETURN (IN$);
+	}
+
+}
+
+/* 
+	Remove the double quotes and whitespace at the start
+	and end of the given string.
+*/
+STRING_FUNCTION RemoveDoubleQuotesAndWhitespace(STRING IN$)
+{
+	INTEGER I,J;		// loop variables    
+	INTEGER Length;		// length of input string
+	INTEGER B;			// byte value
+
+	Length = LEN(IN$);    
+    
+	// leading whitespace
+	FOR (I = 1 TO Length) 
+	{
+		B = BYTE(IN$,I);
+
+        IF ( B > 32 && B < 127 && B != 34)
+			BREAK;
+	}
+	I = I - 1;
+    
+	// trailing whitespace
+	FOR (J = 1 TO Length) 
+	{
+		B = BYTE(IN$,Length - J + 1);
+
+        IF ( B > 32 && B < 127 && B != 34)
+			BREAK;       
+	}
+	J = J - 1;   
+
+	IF (I)
+	{
+		IF (J)
+			RETURN (MID(IN$, I+1, Length - I - J ));			
+		ELSE
+			RETURN (RIGHT(IN$, Length - I));
+	}
+	ELSE
+	{
+		IF (J)
+			RETURN (LEFT(IN$, Length - J));
+			
+		ELSE
+			RETURN (IN$);
+	}
+
+}
+
+/*
+     Convert a number of seconds into a readable time string
+*/
+STRING_FUNCTION ConvertToTime(INTEGER NumberOfSeconds)
+{
+	INTEGER hours;
+	INTEGER minutes;
+	INTEGER seconds;
+	INTEGER tmp;
+	STRING  OUT$[10];
+    
+	seconds = NumberOfSeconds MOD 3600;
+	hours = (NumberOfSeconds - seconds) / 3600;
+
+	tmp = seconds;    
+
+	seconds = tmp MOD 60;
+
+	minutes = (tmp - seconds) / 60;
+
+	IF ( hours > 0)
+        MAKESTRING(OUT$, "%02d:%02d:%02d", hours, minutes, seconds);
+	ELSE IF (minutes > 0)
+        MAKESTRING(OUT$, "%02d:%02d", minutes, seconds);
+	ELSE
+		MAKESTRING(OUT$, "00:%02d", seconds);
+
+	RETURN (OUT$);
+}
+           
+/*
+	Given a string representation of a floating point number, 
+	return a new string that is the number rounded to N places after the decimal point
+*/
+STRING_FUNCTION Round(STRING Number, INTEGER N)
+{
+	INTEGER DecimalPointIndex;
+	INTEGER NextNumber;				// The value of the digit N+1 places after the decimal point
+	INTEGER Length;
+	STRING Result$[100];
+	LONG_INTEGER BeforeDecimal, AfterDecimal;
+	INTEGER I;		
+    
+	//PRINT("Number: %s, N: %d", Number, N);
+
+	DecimalPointIndex = FIND(".", Number);
+	Length = LEN(Number);
+	//PRINT("DecimalPointIndex: %d, Length: %d", DecimalPointIndex, Length);
+
+	IF (DecimalPointIndex)
+	{
+		IF (DecimalPointIndex+N+1 <= Length) 		// Is the string long enough?
+		{
+            BeforeDecimal = AtoL(LEFT(Number,DecimalPointIndex-1));
+			AfterDecimal = AtoL(MID(Number, DecimalPointIndex+1, N));
+			
+			//PRINT("NextNumber: %s", MID(Number, DecimalPointIndex+N+1 ,1));
+        	NextNumber = AtoI(MID(Number, DecimalPointIndex+N+1 ,1));
+
+			IF (NextNumber > 4)
+			{
+				IF (N)
+					AfterDecimal = AfterDecimal + 1;
+				ELSE
+                    BeforeDecimal = BeforeDecimal+1;
+
+				IF (LEN(LtoA(AfterDecimal)) > N && N)
+				{
+                    MAKESTRING(Result$, "%ld.",BeforeDecimal+1);
+					FOR (I = 1 to N)
+					{
+						Result$ = Result$ + "0";
+					}
+				}
+				ELSE IF (N = 0)
+                    MAKESTRING(Result$, "%ld",BeforeDecimal);
+				ELSE
+                    MAKESTRING(Result$, "%ld.%ld",BeforeDecimal,AfterDecimal);
+
+				//PRINT("Result: %s", Result$);
+				RETURN (Result$);
+			}
+			ELSE
+			{
+				IF (N)
+					RETURN (LEFT(Number, DecimalPointIndex+N));
+				ELSE
+					RETURN (LEFT(Number, DecimalPointIndex-1));
+			}
+		}
+		ELSE
+		{
+			//Avoid case of string like "123."
+			IF (DecimalPointIndex = Length)
+				RETURN (LEFT(Number, Length-1));
+			ELSE
+				RETURN (LEFT(Number, DecimalPointIndex+N)); 
+		}
+	}
+	ELSE
+		RETURN (Number);
+}

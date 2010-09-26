@@ -1,0 +1,144 @@
+#DEFINE_CONSTANT BASE64_MASK 0x3F
+#DEFINE_CONSTANT BYTE1_MASK  0x03
+#DEFINE_CONSTANT BYTE2_MASK  0x0F
+#DEFINE_CONSTANT BYTE3_MASK  0xFC
+#DEFINE_CONSTANT BYTE1_RSHIFT 2
+#DEFINE_CONSTANT BYTE2_RSHIFT 4
+#DEFINE_CONSTANT BYTE3_RSHIFT 6
+#DEFINE_CONSTANT BYTE1_LSHIFT 4
+#DEFINE_CONSTANT BYTE2_LSHIFT 2
+
+String_Function GetBase64(String Process$) { 
+    INTEGER Byte1Rem;
+    INTEGER Byte2Rem;
+    INTEGER I, BYTE1, BYTE2, BYTE3, BYTE4, SKIP_BYTE3;
+    STRING Temp3$[57];
+
+	STRING BASE64_SUBST[64][1];
+	BASE64_SUBST[0] = "A";
+    BASE64_SUBST[1] = "B";
+    BASE64_SUBST[2] = "C";
+    BASE64_SUBST[3] = "D";
+    BASE64_SUBST[4] = "E";
+    BASE64_SUBST[5] = "F";
+    BASE64_SUBST[6] = "G";
+    BASE64_SUBST[7] = "H";
+    BASE64_SUBST[8] = "I";
+    BASE64_SUBST[9] = "J";
+    BASE64_SUBST[10] = "K";
+    BASE64_SUBST[11] = "L";
+    BASE64_SUBST[12] = "M";
+    BASE64_SUBST[13] = "N";
+    BASE64_SUBST[14] = "O";
+    BASE64_SUBST[15] = "P";
+    BASE64_SUBST[16] = "Q";
+    BASE64_SUBST[17] = "R";
+    BASE64_SUBST[18] = "S";
+    BASE64_SUBST[19] = "T";
+    BASE64_SUBST[20] = "U";
+    BASE64_SUBST[21] = "V";
+    BASE64_SUBST[22] = "W";
+    BASE64_SUBST[23] = "X";
+    BASE64_SUBST[24] = "Y";
+    BASE64_SUBST[25] = "Z";
+    BASE64_SUBST[26] = "a";
+    BASE64_SUBST[27] = "b";
+    BASE64_SUBST[28] = "c";
+    BASE64_SUBST[29] = "d";
+    BASE64_SUBST[30] = "e";
+    BASE64_SUBST[31] = "f";
+    BASE64_SUBST[32] = "g";
+    BASE64_SUBST[33] = "h";
+    BASE64_SUBST[34] = "i";
+    BASE64_SUBST[35] = "j";
+    BASE64_SUBST[36] = "k";
+    BASE64_SUBST[37] = "l";
+    BASE64_SUBST[38] = "m";
+    BASE64_SUBST[39] = "n";
+    BASE64_SUBST[40] = "o";
+    BASE64_SUBST[41] = "p";
+    BASE64_SUBST[42] = "q";
+    BASE64_SUBST[43] = "r";
+    BASE64_SUBST[44] = "s";
+    BASE64_SUBST[45] = "t";
+    BASE64_SUBST[46] = "u";
+    BASE64_SUBST[47] = "v";
+    BASE64_SUBST[48] = "w";
+    BASE64_SUBST[49] = "x";
+    BASE64_SUBST[50] = "y";
+    BASE64_SUBST[51] = "z";
+    BASE64_SUBST[52] = "0";
+    BASE64_SUBST[53] = "1";
+    BASE64_SUBST[54] = "2";
+    BASE64_SUBST[55] = "3";
+    BASE64_SUBST[56] = "4";
+    BASE64_SUBST[57] = "5";
+    BASE64_SUBST[58] = "6";
+    BASE64_SUBST[59] = "7";
+    BASE64_SUBST[60] = "8";
+    BASE64_SUBST[61] = "9";
+    BASE64_SUBST[62] = "+";
+    BASE64_SUBST[63] = "/";
+    BASE64_SUBST[64] = "=";
+
+    if(len(Process$) > 0)
+        {
+        BYTE1 = 0;
+        BYTE2 = 0;
+        BYTE3 = 0;
+        BYTE4 = 0;
+        SKIP_BYTE3 = 0;
+        IF(((LEN(PROCESS$)) MOD 3) <> 0)
+            {
+            DO
+                {
+                PROCESS$ = PROCESS$ + "=";
+                }
+            UNTIL((LEN(PROCESS$) MOD 3) = 0);
+            }
+        CLEARBUFFER(TEMP3$);
+        FOR (I = 1 TO (LEN(PROCESS$) / 3))
+            {
+            IF( BYTE(PROCESS$,1) <> 61)
+                {
+                Byte1Rem = (BYTE(PROCESS$,1) & BYTE1_MASK) << BYTE1_LSHIFT;
+                BYTE1 = GETC(PROCESS$) >> BYTE1_RSHIFT;    // GET BYTE AND SHIFT RIGHT TWO BITS TO GET IN CORRECT POSITION
+                BYTE1 = BYTE1 & BASE64_MASK;
+                }
+            ELSE
+                {
+                BYTE1 = 64;                        
+                }
+            IF( BYTE(PROCESS$,1) <> 61)
+                {
+                Byte2Rem = (BYTE(PROCESS$,1) & BYTE2_MASK) << BYTE2_LSHIFT;
+                BYTE2 = GETC(PROCESS$)>> BYTE2_RSHIFT;    // Shift and get bits 7,6,5,4 into correct position
+                BYTE2 = (BYTE2 | Byte1Rem) & BASE64_MASK;
+                }
+            ELSE
+                {
+                BYTE2 = Byte1Rem;
+                SKIP_BYTE3 = 1;
+                }            
+            IF(SKIP_BYTE3 = 0)
+                {    
+                BYTE3 = (BYTE(PROCESS$,1) & BYTE3_MASK) >> BYTE3_RSHIFT;
+                BYTE3 = BYTE3 | Byte2Rem;
+                }
+            ELSE 
+                BYTE3 = 64;
+            IF( BYTE(PROCESS$,1) <> 61)
+                {
+                BYTE4 = GETC(PROCESS$);
+                BYTE4 = BYTE4 & BASE64_MASK;
+                }
+            ELSE 
+                BYTE4 = 64;            
+            Temp3$ = TEMP3$ + BASE64_SUBST[BYTE1] + BASE64_SUBST[BYTE2] + BASE64_SUBST[BYTE3] + BASE64_SUBST[BYTE4];
+            }    
+        Return(Temp3$);
+        }
+    else
+        Return("");
+    } 
+
