@@ -5,14 +5,9 @@
 /*
 Dealer Name:
 System Name: XBMC
-System Number: 0.3 (EventServer)
+System Number: 1.0
 Programmer: Neil Carthy (arduino@scpgwiki.com)
 Comments:                                             
-
-	Some notes on usage:
-	-Set the Connect input HIGH before doing anything else.
-	-The progress percentage needs to be scaled to 0-FFFF in order to present
-		it on a TouchPanel slider. Use an Analog Scaler.
     
 	***** License *****
 
@@ -192,11 +187,7 @@ STRING_OUTPUT _SKIP_,Name$[10],
 DIGITAL_INPUT _SKIP_, _SKIP_,_SKIP_, _SKIP_,_SKIP_, _SKIP_;
 
 /* When HIGH connect to the XBMC webserver. */ 	
-DIGITAL_INPUT Connect;					//  Must be HIGH for anything to work!
-
-/* digital Inputs that provide feedback on current status */
-DIGITAL_INPUT  _SKIP_, Connecting_fb, Connected_fb, IsPlaying_fb;			
-DIGITAL_INPUT  IsVideo_fb, IsAudio_fb, IsSlideshow_fb, IsTvShow_fb; 
+DIGITAL_INPUT Connect,_SKIP_;					//  Must be HIGH for anything to work!
 
 /* Browse functionality */
 DIGITAL_INPUT _SKIP_,List_UnWatchedOnly,
@@ -293,6 +284,67 @@ INTEGER PlaylistIDs[100];						   // The songids/movieids etc. of the current pl
 STRING List_Plot$[10][1024];						   // An internal store of the Plot (which is a long string)
 												   // done this way to circumvent limitation on length of
 												   // indirect text to VT-Pro-e programs
+
+/*
+  	Set the video outputs to appropiate state depending on current status
+*/
+Function SetVideoStatus(INTEGER Status)
+{
+
+	if (Status = ON)
+	{
+		ActivePlayer = ACTIVEPLAYER_VIDEO;
+		IsPlaying = ON;
+		IsVideo	  = ON;
+		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (video)", ActivePlayer); #ENDIF
+		IF (ISTvShow)
+			Currently_Playing_Type = TYPE_SERIES;
+		ELSE
+			Currently_Playing_Type = TYPE_MOVIE;
+	}
+	else
+	{
+		ActivePlayer = ActivePlayer & 251; // switch off the 3rd bit
+	}
+}
+
+/*
+  	Set the audio outputs to appropiate state depending on current status
+*/
+Function SetAudioStatus(INTEGER Status)
+{
+	if (Status = ON)
+	{
+		IsPlaying = ON;
+		IsAudio   = ON;
+		ActivePlayer = ACTIVEPLAYER_AUDIO;
+		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (audio)", ActivePlayer); #ENDIF
+		Currently_Playing_Type = TYPE_AUDIO; 
+	}
+	else
+	{
+		ActivePlayer = ActivePlayer & 254; // switch off the 1st bit
+	}
+}
+  
+/*
+  	Set the picture outputs to appropiate state depending on current status
+*/
+Function SetSlideShowStatus(INTEGER Status)
+{
+	if (Status = ON)
+	{
+		ActivePlayer 	= 2;
+		IsPlaying 		= ON;
+		IsSlideshow 	= ON;
+		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (slideshow)", ActivePlayer); #ENDIF
+		Currently_Playing_Type = TYPE_PICTURES; //Pictures
+	}
+	else
+	{
+		ActivePlayer = ActivePlayer & 253; // switch off the 2nd bit
+	}
+}
 
 /*******************************************************************************************
   XBMC Response logic
@@ -468,7 +520,7 @@ FUNCTION Initialize_Outputs()
 	CurrentSeason$ = "";				// TV Show season
 	CurrentEpisode$ = "";				// TV Show episode
 	CurrentFirstAired$ = "";			// TV Show first aired date
-	CurrentPlot$ = "";			// shortened version of plot
+	CurrentPlot$ = "";					// shortened version of plot
 	CurrentTrackNumber$ = "";			// The track number				
 	CurrentArtist$ = "";			    // The artist of the current track
 	CurrentAlbum$ = "";			        // The album of the current track
@@ -516,10 +568,14 @@ FUNCTION GetActivePlayersFromResponse(STRING Response$)
 	Value = TRIM(Value);
 
 	IF (Value = "true")
-		IsAudio = ON;
+	{
+		SetAudioStatus(ON);
+	}
 	ELSE
-		IsAudio = OFF;
-       
+	{
+		SetAudioStatus(OFF);
+    }                
+    
 	Ind[0] = 0; Ind[1] = 0;
 	Ind[0] = FIND(":", Response$, FIND("picture", Response$)) + 1;
 	Ind[1] = FIND(",", Response$, Ind[0]) - 1;
@@ -529,9 +585,9 @@ FUNCTION GetActivePlayersFromResponse(STRING Response$)
 		Value = TRIM(Value);
 
 		IF (Value = "true")
-			IsSlideshow = ON;
+			SetSlideShowStatus(ON);
 		ELSE
-			IsSlideshow = OFF;
+			SetSlideShowStatus(OFF);
        }
 
 	Ind[0] = 0; Ind[1] = 0;
@@ -543,12 +599,20 @@ FUNCTION GetActivePlayersFromResponse(STRING Response$)
 		Value = MID(Response$, Ind[0], Ind[1]-Ind[0]+1);
 		Value = TRIM(Value);
 
-		IF (Value = "true")
-			IsVideo = ON;
+		IF (Value = "true") 
+			SetVideoStatus(ON);
 		ELSE
-			IsVideo = OFF;
+			SetVideoStatus(OFF);
 	}
-
+	
+	IF (!ActivePlayer) 
+	{
+		IsPlaying 				= OFF;
+		IsSlideshow 			= OFF;
+		IsVideo	  				= OFF;
+		IsAudio   				= OFF;
+		Currently_Playing_Type 	= TYPE_NONE;
+	}
 }
 
 /*
@@ -620,11 +684,9 @@ FUNCTION UpdateOutputsFromBrowseList(STRING Array$)
 		Ind[0] = Find("\x22", Array$, ItemStart);
 		i=0; j=0;
 
-		//PRINT("ItemStart: %d, ItemEnd: %d, Ind[0]: %d", ItemStart, ItemEnd, Ind[0]);
 		ItemEnd = Find("},\x0A", Array$, ItemStart);
 		IF (ItemEnd=0) ItemEnd = LEN(Array$);
 
-        //PRINT("ItemStart: %d, ItemEnd: %d", ItemStart, ItemEnd);
 		// Parse the JSON items list into an array of Info & Categories
 		While(Ind[0])
 		{
@@ -675,7 +737,7 @@ FUNCTION UpdateOutputsFromBrowseList(STRING Array$)
 			ELSE IF(Category[i] = "songid") List_IDs[ItemNumber] = AtoI(Info[i]);
 			ELSE IF(Category[i] = "season") 
 			{
-				List_IDs[ItemNumber] = AtoI(Info[i]);
+				IF (List_CurrentScreen != TV_EPISODE_LIST) List_IDs[ItemNumber] = AtoI(Info[i]);
 				SeasonOrAlbumName$[ItemNumber] = "Season " + Info[i];
 			}
 			ELSE IF(Category[i] = "artist") SeriesOrArtistName$[ItemNumber] = Info[i];
@@ -840,7 +902,7 @@ FUNCTION GetMetadataFromResponse(STRING Response$)
 {
 	INTEGER ItemsArrayBookends[2];	//Start and end of the items list
 	INTEGER ListItemBookends[2];	//Start and end of an item in the items list
-	STRING Item$[1000];				//A single item
+	STRING Item$[16384];			//A single item
 
 	// Assumption:
 	// The first item in the array contains details of the track that's currently playing
@@ -1377,13 +1439,6 @@ FUNCTION GetCurrentPlaylistPositionAndInfoLabels()
 }
 
 /*
-	Retrieve current playlist
-*/
-FUNCTION GetMetadataOfCurrentPlaylist(INTEGER start, INTEGER end)
-{
-}
-
-/*
 	Retrieve current time & percentage progress through track
 */
 FUNCTION GetCurrentTime()
@@ -1560,7 +1615,7 @@ FUNCTION UpdateMetadata()
 }
 
 /*
-     Store in memory the id's of the 'Palay all' playlist
+     Store in memory the id's of the 'Play all' playlist
 */
 FUNCTION GetPlayAllPlaylist()
 {
@@ -1679,6 +1734,8 @@ FUNCTION Play()
     Delay(JSON_DELAY);
 	UpdateMetadata();
 }
+
+
  
 /********************************************************************************
 *
@@ -1746,7 +1803,7 @@ PUSH ClearCurrentlyPlaying
 }
 PUSH Get_Time
 {
-	IF (IsPlaying_fb)
+	IF (IsPlaying)
 		CALL GetCurrentTime();
 } 
 push UpdateMovies
@@ -1767,7 +1824,7 @@ CHANGE Seek_Percentage
 	STRING Time$[10];
 	MAKESTRING(Time$, "%d", Seek_Percentage);
     
-	IF (IsPlaying_fb)
+	IF (IsPlaying)
 	{
 		IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
 			CALL SendJsonCommand (30, "AudioPlayer.SeekPercentage",Time$);
@@ -1782,7 +1839,7 @@ CHANGE Seek_Time
 	STRING Time$[10];
 	MAKESTRING(Time$, "%d", Seek_Time);
     
-	IF (IsPlaying_fb)
+	IF (IsPlaying)
 	{
 		IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
 			CALL SendJsonCommand (31, "AudioPlayer.SeekTime",Time$);
@@ -1829,114 +1886,18 @@ RELEASE Connect
 	CALL Initialize_Outputs();
 }
 
-PUSH IsVideo_fb
-{
-	ActivePlayer = ACTIVEPLAYER_VIDEO;
-	IsPlaying = ON;
-	#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (video)", ActivePlayer); #ENDIF
-	IF (ISTvShow_fb)
-		Currently_Playing_Type = TYPE_SERIES;
-	ELSE
-		Currently_Playing_Type = TYPE_MOVIE;
-}
-RELEASE IsVideo_fb
-{
-	ActivePlayer = ActivePlayer & 251; // switch off the 3rd bit
-	IF (!ActivePlayer) 
-	{
-		IsPlaying = OFF;
-		Currently_Playing_Type = TYPE_NONE;
-	}
-}
-PUSH IsAudio_fb
-{
-	ActivePlayer = ACTIVEPLAYER_AUDIO;
-	IsPlaying = ON;
-	#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (audio)", ActivePlayer); #ENDIF
-	Currently_Playing_Type = TYPE_AUDIO; 
-}
-RELEASE IsAudio_fb
-{
-	ActivePlayer = ActivePlayer & 254; // switch off the 1st bit
-	IF (!ActivePlayer) 
-	{
-		IsPlaying = OFF;
-		Currently_Playing_Type = TYPE_NONE;
-	}
-}
-PUSH IsSlideshow_fb
-{
-	ActivePlayer = 2;
-	IsPlaying = ON;
-	#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (slideshow)", ActivePlayer); #ENDIF
-	Currently_Playing_Type = TYPE_PICTURES; //Pictures
-}
-RELEASE IsSlideshow_fb
-{
-	ActivePlayer = ActivePlayer & 253; // switch off the 2nd bit
-	IF (!ActivePlayer) 
-	{
-		IsPlaying = OFF;
-		Currently_Playing_Type = TYPE_NONE;
-	}
-}
-PUSH IsTvShow_fb
-{
-    Currently_Playing_Type = TYPE_SERIES; // TV Show
-}
 /*
-  	I link IsPlaying directly to IsPlaying_fb
-
-	...thus when the IsPlaying wire is sent HIGH I have automatic 
-	metadata updates every few seconds
+  	Play the selected item
 */
-PUSH IsPlaying_fb
-{
-/*
-	INTEGER Counter;
-
-	Counter = 0;
-
-	WHILE (IsPlaying_fb)
-	{
-		// 1-sec wait        
-		DELAY(100);
-
-		// Ensure the release event is captured
-		PROCESSLOGIC();
-          
-		// Check again just in case
-		IF (IsPlaying_fb)	
-		{
-			// On the first loop and every fiftith loop
-			// after that call UpdateMetadata
-			IF ( Counter MOD 50 = 0)
-			{
-     			CALL UpdateMetadata();
-				DELAY(JSON_DELAY);
-
-				CALL GetCurrentTime();
-			}
-			ELSE
-				CALL GetCurrentTime();
-		}
-
-		Counter = (Counter + 1) MOD 50;
-	}
-*/    
-} 
-
-RELEASE IsPlaying_fb
-{
-	Currently_Playing_Type = TYPE_NONE;
-}
-
 CHANGE PlayItem
 {
-	#IF_DEFINED DEBUG Print("%s", "In Play()."); #ENDIF
+	//#IF_DEFINED DEBUG Print("%s", "In Play()."); #ENDIF
 	Play();
 }
 
+/*
+  	The given item has been selected from a list
+*/
 CHANGE SelectedItem
 {
 
@@ -2012,7 +1973,7 @@ CHANGE SelectedItem
 
 CHANGE PlotItem
 {
-	#IF_DEFINED DEBUG Print("PlotItem changed. Now value = %d", PlotItem); #ENDIF
+	//#IF_DEFINED DEBUG Print("PlotItem changed. Now value = %d", PlotItem); #ENDIF
 	SendPlotAsIndirectText(List_Plot$[PlotItem]);
 }
 
