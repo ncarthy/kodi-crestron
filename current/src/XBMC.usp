@@ -200,7 +200,8 @@ DIGITAL_INPUT _SKIP_,List_UnWatchedOnly,
 				List_Albums,
 				List_TVShows, 
 				List_Artists,
-				List_Songs;
+				List_Songs,
+				List_Exit_Details_Page;
 
 /* INPUTs for the remote commands */
 DIGITAL_INPUT _SKIP_, PlayNext, PlayPrev;
@@ -1979,6 +1980,7 @@ CHANGE PlotItem
 
 PUSH List_Back
 {
+	#IF_DEFINED DEBUG Print("List_CurrentScreen = %d", List_CurrentScreen); #ENDIF
 	SWITCH (List_CurrentScreen)
 	{
 		CASE (MOVIE_TITLE_LIST)					: 
@@ -1993,7 +1995,6 @@ PUSH List_Back
 		}
 		CASE (TV_EPISODE_LIST)  : 
 		{ 
-			TvShowDetails = OFF;
 			List_PageNumber = OldSeasonListPage;
 			List_CurrentScreen = TV_SEASON_LIST;
 		}
@@ -2138,7 +2139,11 @@ PUSH List_Songs
 	CALL RepopulateCurrentList();
 }
 
-
+PUSH List_Exit_Details_Page
+{
+	TvShowDetails = OFF;	
+   	MovieDetails = OFF;
+}
   
 ///////////// Initialization script
 Function Main()
