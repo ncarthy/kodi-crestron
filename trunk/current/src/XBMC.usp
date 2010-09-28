@@ -1894,6 +1894,9 @@ CHANGE PlayItem
 {
 	//#IF_DEFINED DEBUG Print("%s", "In Play()."); #ENDIF
 	Play();
+
+	MovieDetails = OFF;
+    TvShowDetails = OFF;
 }
 
 /*
