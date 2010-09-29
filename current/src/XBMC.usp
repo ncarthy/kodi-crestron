@@ -1732,7 +1732,7 @@ FUNCTION Play()
     Delay(JSON_DELAY);
 	MAKESTRING(Command$,"%s.Play",PlaylistType$);
 	SendJsonCommand(REQUESTID_PLAYLIST_PLAY, Command$, "");
-    Delay(JSON_DELAY);
+    Delay(300); // Wait 3 seconds before requesting metadata
 	UpdateMetadata();
 }
 
