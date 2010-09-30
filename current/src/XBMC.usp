@@ -44,6 +44,7 @@ Comments:
 /*****    DEFINE NEW CONSTANTS    *******/
 #DEFINE_CONSTANT DEBUG 1               
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
+#DEFINE_CONSTANT GATHER_TIMEOUT 500
                                                       
 /* Types of List */ 
 #DEFINE_CONSTANT MOVIE_TITLE_LIST					 1
@@ -1105,36 +1106,6 @@ FUNCTION ParseJSONError(INTEGER id, STRING Result$)
 {
 	Print("XBMC.usp: id:%d error:'%s'", id, LEFT(Result$,100));
 }
-
-
-/*
-  	Remove the given number of characters from the XBMC.SocketRxBuf 
-	and return them as a new string.
-	
-	Done this way because RemoveByLength seems to have a 255-character limitation
-*/
-STRING_FUNCTION RemoveCharactersFromBuffer(INTEGER ContentLength)
-{
- 	INTEGER I;				// loop variable
-	INTEGER NumberOfLoops;
-	INTEGER Remainder;
-	STRING Output$[16384];		
-	
-	Remainder = ContentLength MOD 255;
-	IF (Remainder = 0) Remainder = 255;
-	NumberOfLoops = (ContentLength - Remainder) /255 + 1;	
-
-	FOR ( I = 1 TO NumberOfLoops)
-	{
-     	IF (I = NumberOfLoops)
-			Output$ = Output$ + RemoveByLength(Remainder, XBMC.SocketRxBuf);
-		ELSE
-			Output$ = Output$ + RemoveByLength(255, XBMC.SocketRxBuf);
-	}
-
-	RETURN (Output$);
-	
-}
       
 /*
 	Determine request id
@@ -1249,18 +1220,12 @@ SOCKETRECEIVE XBMC
 		// The buffer content is at least one complete packet...
 		// ... so get rid of the HTTP header
 		Header$ = Remove("\n\n", XBMC.SocketRxBuf);
-		#IF_DEFINED DEBUG
-			//Print("Removed header from buffer: '%s'", LEFT(Header$,100));	
-		#ENDIF
         
 		// Process Data
 		IF (ContentLength > 0)
 		{
 			// remove only the HTTP payload, leaving any fragments of the next packet
-			IF (ContentLength > 255)
-                Response$ = RemoveCharactersFromBuffer(ContentLength);
-			ELSE
-				Response$ = RemoveByLength(ContentLength, XBMC.SocketRxBuf);
+			Response$ = GatherByLength(ContentLength, XBMC.SocketRxBuf, GATHER_TIMEOUT);  
             
 			// Process the HTTP payload, which is now in the Response$ variable
 			Ind[0] = FIND ("result", Response$);
