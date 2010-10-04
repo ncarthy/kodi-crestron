@@ -44,7 +44,7 @@ Comments:
 /*****    DEFINE NEW CONSTANTS    *******/
 #DEFINE_CONSTANT DEBUG 1               
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
-#DEFINE_CONSTANT GATHER_TIMEOUT 500
+#DEFINE_CONSTANT GATHER_TIMEOUT 1000
                                                       
 /* Types of List */ 
 #DEFINE_CONSTANT MOVIE_TITLE_LIST					 1
@@ -269,8 +269,8 @@ SIGNED_INTEGER ConnectionStatus;				   // Status of XBMC socket, used to determi
 STRING CoverArtInternal$[512];					   // Uri of coverart thumb. Stored internally so that
 												   // a comparison can be made. This is b'cos the TPS-6X
 												   // is easily overloaded by dynamic graphic calls.
-INTEGER Block[100]; 							   // lock/unlocked flags. When Block[X] = 1 then JSON requests
-												   // of id=X cannot be processed.
+INTEGER Block; 									   // lock/unlocked flags. When Block = 1 then JSON
+												   // requests cannot be processed.
 INTEGER HttpBlock;								   // Special semaphore for in-complete http packets
 INTEGER PlaylistPosition;						   // The (zero-based) number of the track in the current playlist
 INTEGER ActivePlayer;							   // 1 = audio, 2 = slideshow, 4 = video
@@ -286,6 +286,58 @@ INTEGER PlaylistIDs[100];						   // The songids/movieids etc. of the current pl
 STRING List_Plot$[10][1024];						   // An internal store of the Plot (which is a long string)
 												   // done this way to circumvent limitation on length of
 												   // indirect text to VT-Pro-e programs
+
+/*
+  	Close the connection and wait for status to show 'disconnected'
+*/        
+FUNCTION DisconnectFromXbmc()
+{
+	INTEGER count;
+	count = 0;
+    
+	Connected = OFF;
+	Connecting = OFF;
+
+	IF ( ConnectionStatus <> 5 )
+	{
+		Connecting = OFF;
+
+		// close the connection
+	    ConnectionStatus = SocketDisconnectClient (XBMC);
+	
+		// wait for the connection to be established
+		while( ( ConnectionStatus <> 5 ) && ( count < 10 ) )
+		{
+			delay( 20 );
+			count = count + 1;
+		}
+    } 
+
+}
+
+/*
+  	Establish a connection and wait for status to show 'connected'
+*/
+FUNCTION ConnectToXbmc()
+{
+	INTEGER count;
+	count = 0;
+    
+	IF ( ConnectionStatus <> 2 )
+	{
+		Connecting = ON;
+
+		// open the connection			// '1' = always attempt to reconnect.
+	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_Port$), 1);
+	
+		// wait for the connection to be established
+		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
+		{
+			delay( 20 );
+			count = count + 1;
+		}
+    } 
+}
 
 /*
   	Set the video outputs to appropiate state depending on current status
@@ -1252,7 +1304,7 @@ SOCKETRECEIVE XBMC
 					CALL ParseJSONResult(ID, Response$);  	
 					
 					// Release block on sending new requests with this id
-                 	Block[ID] = 0;
+                 	Block = 0;
 					#IF_DEFINED DEBUG Print("Release block %d", ID); #ENDIF
 				}
 			}
@@ -1278,7 +1330,7 @@ SOCKETRECEIVE XBMC
 						Print("XBMC.usp: id:%d error:'%s'", ID, LEFT(Response$,100));
 
 					// Release block on sending new requests
-					Block[ID] = 0;
+					Block = 0;
 				}
 				ELSE
 				{
@@ -1312,6 +1364,10 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 	STRING TEMP$[255];
 	STRING BASE64$[255];		// Base64 encoding of username and password
 	INTEGER Count;				// When reaches 30 then time-out
+    
+	// If the tcp socket is not connected then exit
+	IF (ConnectionStatus != 2)
+		RETURN;
 
     IF (LEN(Arguments) = 0)
 	{
@@ -1326,10 +1382,10 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 						,id ,Command, Arguments);
 	}
 
-	//Semaphore: blocks any other thread from sending requests with this id
-	// Only unset in SOCKETRECEIVE XBMC event upon receipt of a response with the same id or 
-	// if the request times out
-	IF (Block[id]) 
+	//Semaphore: blocks any other thread from sending requests
+	// Only unset in SOCKETRECEIVE XBMC event upon receipt of a response
+	#IF_DEFINED DEBUG Print("XBMC.usp: Block: %d", Block); #ENDIF
+	WHILE (Block) 
 	{	
 		DELAY(10);
 
@@ -1340,14 +1396,16 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 			//Count of 30 is about equal to 3 seconds
               
 			// lift the block
-            Block[id] = 0;
+            Block = 0;
 
-			#IF_DEFINED DEBUG Print("XBMC.usp: Timeout for request with id=%d", id); #ENDIF
+			DisconnectFromXbmc();
+			
+			ConnectToXbmc();
 	
 			RETURN;
 		}
 	}	
-	Block[id] = 1;
+	Block = 1;
 		
 	SOCKETSEND(XBMC, "POST /jsonrpc HTTP/1.1\n");
 	
@@ -1816,23 +1874,8 @@ CHANGE Seek_Time
 
 PUSH Connect
 {
-	INTEGER count;
-	count = 0;
-    
-	IF ( ConnectionStatus <> 2 )
-	{
-		Connecting = ON;
-
-		// open the connection			// '1' = always attempt to reconnect.
-	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_Port$), 1);
-	
-		// wait for the connection to be established
-		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
-		{
-			delay( 20 );
-			count = count + 1;
-		}
-    } 
+	// connect to XBMC
+	ConnectToXbmc();
   
 	CALL UpdateMetadata();
 
@@ -1840,15 +1883,8 @@ PUSH Connect
 RELEASE Connect
 {
  	// disconnect from XBMC
-    SIGNED_INTEGER status;
-    
-	status = SocketDisconnectClient (XBMC);
-    
-	// Reset all outputs to un-connected state.
-	Connecting = OFF;
-	Connected = OFF;
+	DisconnectFromXbmc();
 
-	DELAY(150);
 	CALL Initialize_Outputs();
 }
 
