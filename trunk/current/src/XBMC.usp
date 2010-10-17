@@ -269,9 +269,10 @@ SIGNED_INTEGER ConnectionStatus;				   // Status of XBMC socket, used to determi
 STRING CoverArtInternal$[512];					   // Uri of coverart thumb. Stored internally so that
 												   // a comparison can be made. This is b'cos the TPS-6X
 												   // is easily overloaded by dynamic graphic calls.
-INTEGER Block; 									   // lock/unlocked flags. When Block = 1 then JSON
+INTEGER Block; 									   // Lock/unlock flag. When Block = 1 then JSON
 												   // requests cannot be processed.
 INTEGER HttpBlock;								   // Special semaphore for in-complete http packets
+INTEGER Timeouts;								   // A count of timeouts sufferred due to Block=1.
 INTEGER PlaylistPosition;						   // The (zero-based) number of the track in the current playlist
 INTEGER ActivePlayer;							   // 1 = audio, 2 = slideshow, 4 = video
 
@@ -1384,9 +1385,15 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 
 	//Semaphore: blocks any other thread from sending requests
 	// Only unset in SOCKETRECEIVE XBMC event upon receipt of a response
-	#IF_DEFINED DEBUG Print("XBMC.usp: Block: %d", Block); #ENDIF
 	WHILE (Block) 
 	{	
+    	// If request is for time update then drop the request.
+		// these requests happen every 2-3 seconds so ok to discard.
+		IF (id = REQUESTID_GETTIME_SECONDS || id = REQUESTID_GETTIME_PERCENTAGE)
+		{
+			RETURN;
+		}
+	
 		DELAY(10);
 
 		// Simple timeout check.
