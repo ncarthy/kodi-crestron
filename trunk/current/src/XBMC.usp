@@ -480,7 +480,13 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
 {
 	STRING tmpCoverPath[512];
-	tmpCoverPath = "http://" + XBMC_IPAddr$ + ":"+ XBMC_Port$ + "/";
+	IF(LOGIN <> "0d" && PASSWORD <> "0d"){
+		tmpCoverPath = "http://" + LOGIN + ":" + PASSWORD + "@" + XBMC_IPAddr$ + ":"+ XBMC_Port$ + "/";
+	}
+	
+	ELSE{
+		tmpCoverPath = "http://" + XBMC_IPAddr$ + ":"+ XBMC_Port$ + "/";
+	}
 	IF (UseJPG)
 		tmpCoverPath = tmpCoverPath + "vfs:" + LEFT(uri$, LEN(uri$) - 4) + ".jpg";
 	ELSE
