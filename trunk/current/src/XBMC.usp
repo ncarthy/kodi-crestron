@@ -294,6 +294,7 @@ Function SetVideoStatus(INTEGER Status)
 	{
 		ActivePlayer = ACTIVEPLAYER_VIDEO;
 		PlayFb = ON;
+		IsPlaying = 1;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (video)", ActivePlayer); #ENDIF
 		IF (ISTvShow)
 			Currently_Playing_Type = TYPE_SERIES;
@@ -314,6 +315,7 @@ Function SetAudioStatus(INTEGER Status)
 	if (Status = ON)
 	{
 		PlayFb = ON;
+		IsPlaying = 1;
 		ActivePlayer = ACTIVEPLAYER_AUDIO;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (audio)", ActivePlayer); #ENDIF
 		Currently_Playing_Type = TYPE_AUDIO; 
@@ -333,6 +335,7 @@ Function SetSlideShowStatus(INTEGER Status)
 	{
 		ActivePlayer 	= 2;
 		PlayFb 			= ON;
+		IsPlaying 		= 1;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (slideshow)", ActivePlayer); #ENDIF
 		Currently_Playing_Type = TYPE_PICTURES; //Pictures
 	}
@@ -610,6 +613,7 @@ FUNCTION GetActivePlayersFromResponse(STRING Response$)
 		PauseFb = OFF;
 		StopFb = ON;
 		PlayFb = OFF;
+		IsPlaying = 0;
 		Currently_Playing_Type 	= TYPE_NONE;
 	}
 }
@@ -1022,7 +1026,8 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 	}
 	Else If(Find("SpeedChanged", Message$))
 	{                
-		TempSpeed$ 		= mid(Message$,     find("PlayBackSpeedChanged",Message$)+23    ,  find(";",Message$)-(find("OnPlayBackSpeedChanged",Message$)+23) );
+		PRINT ("Announcement: %s", Announcement$);
+		TempSpeed$ 		= mid(Message$,     find("PlaybackSpeedChanged",Message$)+23    ,  find(";",Message$)-(find("OnPlayBackSpeedChanged",Message$)+23) );
 
 		if (Find("-",TempSpeed$)) 
 			PlaySpeed 	= -(atoi(TempSpeed$));
@@ -1031,9 +1036,9 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		
 		MakeString(PlayingSpeed$,"%dx",PlaySpeed);
 
-		//PULSE(10, CheckMetadata); 
+		//CALL UpdateMetadata(); 
 	}	
-	Else If(Find("PlayBackStarted", Message$))
+	Else If(Find("PlaybackStarted", Message$))
 	{
 		PauseFb		= 0; 
 		StopFb		= 0; 
@@ -1041,28 +1046,28 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		PlaySpeed	= 1; 
 		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
 		PlayStatus$ = "Playing";
-		//PULSE(10, CheckMetadata);
+		//CALL UpdateMetadata();
 	}
-	Else If(Find("PlayBackPaused", Message$)) 
+	Else If(Find("PlaybackPaused", Message$)) 
 	{
 		StopFb			= 0; 
 		PlayFb			= 0; 
 		PauseFb			= 1; 
 		PlayingSpeed$ 	= ""; 
 		PlayStatus$ = "Paused";
-		//PULSE(10, CheckMetadata);
+		//CALL UpdateMetadata();
 	}
-	Else If(Find("PlayBackEnded", Message$))
+	Else If(Find("PlaybackEnded", Message$) || Find("PlaybackStopped", Message$))
 	{
 		PlayFb					= 0; 
 		PauseFb					= 0;
 		StopFb					= 1; 
 		PlayingSpeed$ 			= ""; 
 		PlayStatus$ = "Stopped";
-		//PULSE(10, CheckMetadata);
-		//Pulse(10, ClearCurrentlyPlaying);
+		//CALL UpdateMetadata();
+		CALL Initialize_Outputs();
 	}
-	Else If(Find("PlayBackResumed", Message$))
+	Else If(Find("PlaybackResumed", Message$))
 	{
 		PauseFb					= 0; 
 		StopFb					= 0; 
@@ -1072,26 +1077,13 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
 		Wait(100) 
 		{ 
-			//PULSE(10, CheckMetadata);
-			//Pulse(10, ClearCurrentlyPlaying); 
+			//CALL UpdateMetadata();
+			CALL Initialize_Outputs(); 
 		}
-	}
-	Else If(Find("PlayBackStopped", Message$))
-	{   
-		PauseFb					= 0; 
-		PlayFb					= 0; 
-		StopFb					= 1; 
-		PlaySpeed				= 0;                        
-		PlayStatus$ = "Stopped";
-		PlayingSpeed$ = ""; 
-		
-		//PULSE(10, CheckMetadata);
-		//Pulse(10, ClearCurrentlyPlaying);
-
 	}
 	Else If(Find("StartUp", Message$) > 0)
 	{
-		//Pulse(10, ClearCurrentlyPlaying);
+		CALL Initialize_Outputs();
 	}
 	Else
 		PRINT("XBMC.usp: Unknown announcement: %s\n", LEFT(Message$,200));
