@@ -38,13 +38,12 @@ Comments:
 #ENABLE_TRACE
 #OUTPUT_SHIFT 8			// Shift the outputs down 6 lines on the SIMPL window
 
-#USER_LIBRARY "base64"
 #USER_LIBRARY "Common_Functions"
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1               
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
-#DEFINE_CONSTANT GATHER_TIMEOUT 1000
+#DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds
                                                       
 /* Types of List */ 
 #DEFINE_CONSTANT MOVIE_TITLE_LIST					 1
@@ -102,13 +101,9 @@ Comments:
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
   (Uncomment and declare inputs and outputs as needed)
 *******************************************************************************************/
-DIGITAL_OUTPUT Connecting,	        	// HIGH when trying to establish a connection to XBMC
-			   Connected,				// HIGH when conenction established to XBMC
-			   IsPlaying,				// HIGH when something is playing
-			   IsVideo,					// HIGH when a movie is playing, LOW otherwise
-		       IsAudio,					// HIGH when music is playing, LOW otherwise
-			   IsSlideshow,				// HIGH when a slideshow is playing, LOW otherwise
-			   IsTvShow;				// HIGH when a TV Show is playing, LOW otherwise
+DIGITAL_OUTPUT PlayFb,					// HIGH when something is playing
+			   StopFb,					// HIGH when playback is stopped
+		       PauseFb;					// HIGH when playback is paused
 
 DIGITAL_OUTPUT _SKIP_, _SKIP_,
 				MovieDetails,
@@ -158,10 +153,14 @@ STRING_OUTPUT 	_SKIP_,
 				_SKIP_,
 				PlotSelected$,					// The plot of the selected movie or TV show
 				_SKIP_,							
-				IPAddress$,				// This is passed to XBMC-ES module (EventServer module)
+				IPAddress$,						// This is passed to XBMC-ES module (EventServer module)
 				_SKIP_,
-				List_Summary$;					// e.g. 7 to 12 of 15
-			
+				List_Summary$,					// e.g. 7 to 12 of 15
+				_SKIP_,
+				Tx$,							// Json Command to XBMC (delimited by "\n"			
+				_SKIP_,
+				PlayStatus$,					// 'Stopped', 'Playing', 'Paused'
+				PlayingSpeed$;                  // Speed of current audio/video playback (1x, 2x, 4x etc.)  
 
 ANALOG_OUTPUT   Position_Seconds, 
 				Duration_Seconds, 
@@ -218,37 +217,40 @@ ANALOG_INPUT Seek_Percentage, Seek_Time; 	// Seek to this %age, time.
 ANALOG_INPUT PlayItem, SelectedItem;
 ANALOG_INPUT PlotItem;						// The index of the plot array
 
-STRING_INPUT SearchCriteria$[256];
+STRING_INPUT _SKIP_, SearchCriteria$[256], _SKIP_;	
+BUFFER_INPUT Rx$[65534];					// The reply from XBMC
 
 ///////////////////////////// Parameters
 STRING_PARAMETER XBMC_IPAddr$[16];   //the ip of the XBMC server.
 STRING_PARAMETER XBMC_Port$[5];		 //the port that the XBMC server lives on
 INTEGER_PARAMETER StepAmount;		 // Only return this many results from database at a time
-INTEGER_PARAMETER UseJpgExtension;	 // Use '.jpg' as thumbnauil extension instead of '.tbn'
-STRING_PARAMETER LOGIN[30];
-STRING_PARAMETER PASSWORD[30];
+INTEGER_PARAMETER UseJpgExtension;	 // Use '.jpg' as thumbnail extension instead of '.tbn'
+STRING_PARAMETER LOGIN[30];			 // Username for http server (used to downlaod thumbnails) 
+STRING_PARAMETER PASSWORD[30];		 // Password for http server (used to downlaod thumbnails)
 
 /*******************************************************************************************
   Parameter Properties
   (Uncomment and declare parameter properties as needed)
 *******************************************************************************************/
 #BEGIN_PARAMETER_PROPERTIES XBMC_IPAddr$ 
-   propDefaultValue = "";  
-   propShortDescription = "The IP Address of the XBMC HTTP server.";
+    propDefaultValue = "";  
+    propShortDescription = "The IP Address of the XBMC HTTP server.";
 #END_PARAMETER_PROPERTIES
 #BEGIN_PARAMETER_PROPERTIES XBMC_Port$
    propDefaultValue = "";   
-   propShortDescription = "The port that the XBMC HTTP server is listening on.";
+   propShortDescription = "The port that the XBMC HTTP server is listening on. (NOT the tcp server)";
 #END_PARAMETER_PROPERTIES
 #BEGIN_PARAMETER_PROPERTIES StepAmount
 	propValidUnits = unitDecimal;
     propDefaultUnit = unitDecimal;
     propDefaultValue = 10d;
+    propShortDescription = "Only return this many results from database at a time.";
 #END_PARAMETER_PROPERTIES
 #BEGIN_PARAMETER_PROPERTIES UseJpgExtension
 	propValidUnits = unitDecimal;
     propDefaultUnit = unitDecimal;
     propDefaultValue = 0d;
+    propShortDescription = "Use jpg as thumbnail extension instead of tbn";
 #END_PARAMETER_PROPERTIES
 #BEGIN_PARAMETER_PROPERTIES LOGIN
    propDefaultValue = "xbmc";   
@@ -259,23 +261,12 @@ STRING_PARAMETER PASSWORD[30];
    propShortDescription = "Password for HTTP Basic Authentication. Set 0d if no password. Max 30 chars.";
 #END_PARAMETER_PROPERTIES
 
-
-/////////////////////////// Sockets
-TCP_CLIENT XBMC[16384];			// Socket for connecting to running XBMC
-
 /////////////////////////// Global Variables
-SIGNED_INTEGER ConnectionStatus;				   // Status of XBMC socket, used to determine if 
-												   // the Connect event needs to reconnect or do nothing.
 STRING CoverArtInternal$[512];					   // Uri of coverart thumb. Stored internally so that
 												   // a comparison can be made. This is b'cos the TPS-6X
 												   // is easily overloaded by dynamic graphic calls.
-INTEGER Block; 									   // Lock/unlock flag. When Block = 1 then JSON
-												   // requests cannot be processed.
-INTEGER HttpBlock;								   // Special semaphore for in-complete http packets
-INTEGER Timeouts;								   // A count of timeouts sufferred due to Block=1.
 INTEGER PlaylistPosition;						   // The (zero-based) number of the track in the current playlist
 INTEGER ActivePlayer;							   // 1 = audio, 2 = slideshow, 4 = video
-
 INTEGER List_PageNumber;						   // The (zero-based) current page number of the list;
 INTEGER List_Total;								   // The total number of items in the current browse list
 STRING List_Filename$[10][1024];				   // The filenames of all the items in the current list
@@ -287,58 +278,11 @@ INTEGER PlaylistIDs[100];						   // The songids/movieids etc. of the current pl
 STRING List_Plot$[10][1024];						   // An internal store of the Plot (which is a long string)
 												   // done this way to circumvent limitation on length of
 												   // indirect text to VT-Pro-e programs
-
-/*
-  	Close the connection and wait for status to show 'disconnected'
-*/        
-FUNCTION DisconnectFromXbmc()
-{
-	INTEGER count;
-	count = 0;
-    
-	Connected = OFF;
-	Connecting = OFF;
-
-	IF ( ConnectionStatus <> 5 )
-	{
-		Connecting = OFF;
-
-		// close the connection
-	    ConnectionStatus = SocketDisconnectClient (XBMC);
-	
-		// wait for the connection to be established
-		while( ( ConnectionStatus <> 5 ) && ( count < 10 ) )
-		{
-			delay( 20 );
-			count = count + 1;
-		}
-    } 
-
-}
-
-/*
-  	Establish a connection and wait for status to show 'connected'
-*/
-FUNCTION ConnectToXbmc()
-{
-	INTEGER count;
-	count = 0;
-    
-	IF ( ConnectionStatus <> 2 )
-	{
-		Connecting = ON;
-
-		// open the connection			// '1' = always attempt to reconnect.
-	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_Port$), 1);
-	
-		// wait for the connection to be established
-		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
-		{
-			delay( 20 );
-			count = count + 1;
-		}
-    } 
-}
+INTEGER TCPBlocker;					// Semaphore for incomplete JSON packets. A packet is not complete
+									// until we receive the '<EOF>' tag.
+SIGNED_INTEGER PlaySpeed;			// Speed of current audio/video playback (1x, 2x, 4x etc.)
+INTEGER IsTvShow;
+INTEGER IsPlaying;
 
 /*
   	Set the video outputs to appropiate state depending on current status
@@ -349,8 +293,7 @@ Function SetVideoStatus(INTEGER Status)
 	if (Status = ON)
 	{
 		ActivePlayer = ACTIVEPLAYER_VIDEO;
-		IsPlaying = ON;
-		IsVideo	  = ON;
+		PlayFb = ON;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (video)", ActivePlayer); #ENDIF
 		IF (ISTvShow)
 			Currently_Playing_Type = TYPE_SERIES;
@@ -370,8 +313,7 @@ Function SetAudioStatus(INTEGER Status)
 {
 	if (Status = ON)
 	{
-		IsPlaying = ON;
-		IsAudio   = ON;
+		PlayFb = ON;
 		ActivePlayer = ACTIVEPLAYER_AUDIO;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (audio)", ActivePlayer); #ENDIF
 		Currently_Playing_Type = TYPE_AUDIO; 
@@ -390,8 +332,7 @@ Function SetSlideShowStatus(INTEGER Status)
 	if (Status = ON)
 	{
 		ActivePlayer 	= 2;
-		IsPlaying 		= ON;
-		IsSlideshow 	= ON;
+		PlayFb 			= ON;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (slideshow)", ActivePlayer); #ENDIF
 		Currently_Playing_Type = TYPE_PICTURES; //Pictures
 	}
@@ -482,8 +423,7 @@ STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
 	STRING tmpCoverPath[512];
 	IF(LOGIN <> "0d" && PASSWORD <> "0d"){
 		tmpCoverPath = "http://" + LOGIN + ":" + PASSWORD + "@" + XBMC_IPAddr$ + ":"+ XBMC_Port$ + "/";
-	}
-	
+	}	
 	ELSE{
 		tmpCoverPath = "http://" + XBMC_IPAddr$ + ":"+ XBMC_Port$ + "/";
 	}
@@ -603,10 +543,9 @@ FUNCTION Initialize_Outputs()
 	ActivePlayer = ACTIVEPLAYER_NONE;
 	ISTvShow = 0;
 
-	IsVideo = OFF;
-	IsAudio = OFF;
-	IsSlideshow = OFF;
-	IsPlaying = OFF;
+	PauseFb = OFF;
+	StopFb = ON;
+	PlayFb = OFF;
 
 	CoverArtInternal$ = "";
 }
@@ -668,10 +607,9 @@ FUNCTION GetActivePlayersFromResponse(STRING Response$)
 	
 	IF (!ActivePlayer) 
 	{
-		IsPlaying 				= OFF;
-		IsSlideshow 			= OFF;
-		IsVideo	  				= OFF;
-		IsAudio   				= OFF;
+		PauseFb = OFF;
+		StopFb = ON;
+		PlayFb = OFF;
 		Currently_Playing_Type 	= TYPE_NONE;
 	}
 }
@@ -1060,6 +998,106 @@ INTEGER_FUNCTION GetListTotalFromResponse(STRING Result$)
 }
 
 /*
+
+*/
+FUNCTION ParseAnnouncementMessage(STRING Announcement$)
+{
+	INTEGER Ind[2];			//Index variables used to parse the response 
+    STRING Message$[100];
+	STRING TempSpeed$[3];
+	
+	Ind[0] = FIND("message", Announcement$);
+	Ind[1] = FIND(":", Announcement$, Ind[0]) + 1;
+	Ind[2] = FIND(",", Announcement$, Ind[1]);
+
+	Message$ = MID(Announcement$, Ind[1], Ind[2] - Ind[1]);
+
+	PRINT("Message: %s\n", Message$);
+
+	If(Find("Action", Message$) || Find("PlayBackSeek",Message$) 
+						|| Find("MediaChanged",Message$)
+						|| Find("QueueNextItem", Message$) )
+	{
+		// Do Nothing
+	}
+	Else If(Find("SpeedChanged", Message$))
+	{                
+		TempSpeed$ 		= mid(Message$,     find("PlayBackSpeedChanged",Message$)+23    ,  find(";",Message$)-(find("OnPlayBackSpeedChanged",Message$)+23) );
+
+		if (Find("-",TempSpeed$)) 
+			PlaySpeed 	= -(atoi(TempSpeed$));
+		else
+			PlaySpeed 	= atoi(TempSpeed$);
+		
+		MakeString(PlayingSpeed$,"%dx",PlaySpeed);
+
+		//PULSE(10, CheckMetadata); 
+	}	
+	Else If(Find("PlayBackStarted", Message$))
+	{
+		PauseFb		= 0; 
+		StopFb		= 0; 
+		PlayFb		= 1; 
+		PlaySpeed	= 1; 
+		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
+		PlayStatus$ = "Playing";
+		//PULSE(10, CheckMetadata);
+	}
+	Else If(Find("PlayBackPaused", Message$)) 
+	{
+		StopFb			= 0; 
+		PlayFb			= 0; 
+		PauseFb			= 1; 
+		PlayingSpeed$ 	= ""; 
+		PlayStatus$ = "Paused";
+		//PULSE(10, CheckMetadata);
+	}
+	Else If(Find("PlayBackEnded", Message$))
+	{
+		PlayFb					= 0; 
+		PauseFb					= 0;
+		StopFb					= 1; 
+		PlayingSpeed$ 			= ""; 
+		PlayStatus$ = "Stopped";
+		//PULSE(10, CheckMetadata);
+		//Pulse(10, ClearCurrentlyPlaying);
+	}
+	Else If(Find("PlayBackResumed", Message$))
+	{
+		PauseFb					= 0; 
+		StopFb					= 0; 
+		PlayFb					= 1; 
+		PlaySpeed				= 1; 
+		PlayStatus$ = "Playing";
+		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
+		Wait(100) 
+		{ 
+			//PULSE(10, CheckMetadata);
+			//Pulse(10, ClearCurrentlyPlaying); 
+		}
+	}
+	Else If(Find("PlayBackStopped", Message$))
+	{   
+		PauseFb					= 0; 
+		PlayFb					= 0; 
+		StopFb					= 1; 
+		PlaySpeed				= 0;                        
+		PlayStatus$ = "Stopped";
+		PlayingSpeed$ = ""; 
+		
+		//PULSE(10, CheckMetadata);
+		//Pulse(10, ClearCurrentlyPlaying);
+
+	}
+	Else If(Find("StartUp", Message$) > 0)
+	{
+		//Pulse(10, ClearCurrentlyPlaying);
+	}
+	Else
+		PRINT("XBMC.usp: Unknown announcement: %s\n", LEFT(Message$,200));
+}
+
+/*
   	Take the raw JSON result string and send it to the correct parsing function
 */
 FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
@@ -1079,9 +1117,9 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 	ELSE IF (id = REQUESTID_VIDEOPLAYLIST_GETITEMS)
 	{
 		IF ( FIND("showtitle",Result$) )
-			IsTVShow = ON; 
+			IsTVShow = 1; 
 		ELSE 
-			IsTVShow = OFF;
+			IsTVShow = 0;
 		CALL GetMetadataFromResponse(Result$);
 	}
 	ELSE IF (id = REQUESTID_GETTIME_SECONDS)
@@ -1184,179 +1222,101 @@ INTEGER_FUNCTION GetRequestID(STRING IN$)
 }
 /*******************************************************************************************
   TCPIP Connection
-*******************************************************************************************/
-SOCKETCONNECT XBMC
+*******************************************************************************************/ 
+
+CHANGE Rx$
 {
-    SIGNED_LONG_INTEGER PortNumber;
-    SIGNED_INTEGER LocalStatus;
-    STRING RemoteIPAddress[20];
-    STRING RequestedAddress[256];
-
-    LocalStatus = SocketGetAddressAsRequested(XBMC, RequestedAddress);
-    if (LocalStatus < 0)
-        Print("Error getting remote ip address. %d\n", LocalStatus);
-
-    #IF_DEFINED DEBUG
-	    Print("OnConnect: Connect call to %s successful\n", RequestedAddress);
-	    PortNumber = SocketGetPortNumber(XBMC);
-	    if (PortNumber < 0)
-	        Print("Error getting client port number. %ld\n", PortNumber);
-	    LocalStatus = SocketGetRemoteIPAddress(XBMC, RemoteIPAddress);
-	    if (LocalStatus < 0)
-	        Print("Error getting remote ip address. %d\n", LocalStatus);
-	    Print("OnConnect: Connected to port %ld on address %s\n", 
-	                PortNumber, RemoteIPAddress);
-	#ENDIF
-}
- 
-SOCKETDISCONNECT XBMC
-{
-	#IF_DEFINED DEBUG PRINT("Socket disconnected."); #ENDIF
-}
- 
-
-SOCKETSTATUS XBMC
-{
-	// global variable
-    ConnectionStatus = SocketGetStatus();
-
-	#IF_DEFINED DEBUG
-	    Print("The SocketGetStatus returns:       %d\n", ConnectionStatus);
-	#ENDIF
-
-	IF (ConnectionStatus = 0)
-	{
-        Connecting = OFF;
-		Connected = OFF;
-	}
-	ELSE IF (ConnectionStatus = 2)
-    {
-        Connecting = OFF;
-		Connected = ON;
-	}
-}
-
-SOCKETRECEIVE XBMC
-{
-	STRING Response$[65534];	//Response from XBMC
-
 	INTEGER ID;  				// The request id. It is used to match the response
 								// with the request that it is replying to.
-
-	INTEGER ContentLength;
-	INTEGER Ind[2];			//Index variables used to parse the HTTP response
-	INTEGER HeaderLength;
-	STRING Header$[512];
 	    
+	STRING Response$[65534]; 	// The response from XBMC
+	INTEGER Ind[2];				//Index variables used to parse the response  
+                     
 	//Semaphore
-	WHILE (HttpBlock) 
+	WHILE (TCPBlocker) 
 	{	
 		Delay(10);
 	}	
-	HttpBlock = 1;
+	TCPBlocker = 1;
     
 	// Test for empty buffer (Can happen if buffer emptied by earlier event)
-	IF (LEN(XBMC.SocketRxBuf) = 0) 
+	IF (LEN(Rx$) = 0) 
 	{
-		HttpBlock = 0;
+		TCPBlocker = 0;
 		TERMINATEEVENT;
 	}
-    
-	ContentLength = 0;
-	Ind[0] = Find("Content-Length", XBMC.SocketRxBuf);
-    IF (Ind[0] > 0)
-	{
-		Ind[1] = Find("\n", XBMC.SocketRxBuf, Ind[0]);
-     	ContentLength = AtoI(Mid(XBMC.SocketRxBuf, Ind[0] + 16, Ind[1] - Ind[0] - 16));
-	}
 
-	// Determine if it's a complete packet by looking at the length of the packet
-	// versus the Content length and the header length
-	HeaderLength = FIND("\n\n", XBMC.SocketRxBuf) + 1; // this will mark the end of the header
-	
-	IF (HeaderLength && (LEN(XBMC.SocketRxBuf) >= HeaderLength + ContentLength) )
+	DO
 	{
-		// The buffer content is at least one complete packet...
-		// ... so get rid of the HTTP header
-		Header$ = Remove("\n\n", XBMC.SocketRxBuf);
-        
-		// Process Data
-		IF (ContentLength > 0)
+		Response$ = GATHER("<EOF>", Rx$, GATHER_TIMEOUT);		
+	} 
+	UNTIL (LEN(Response$));
+    
+	Response$ = LEFT(Response$, LEN(Response$) - 5); // remove <EOF> delimiter
+
+	// Process the JSON payload, which is now in the Response$ variable
+	IF (FIND ("result", Response$))
+	{
+
+		// Determine request id
+        ID = GetRequestID(Response$);
+              
+		// 'result' string within XBMC Response
+		Ind[0] = FIND ("{", Response$, Ind[0]);
+		IF (Ind[0])
+			Ind[1] = REVERSEFIND ("}\x0A", Response$);
+		ELSE
 		{
-			// remove only the HTTP payload, leaving any fragments of the next packet
-			Response$ = GatherByLength(ContentLength, XBMC.SocketRxBuf, GATHER_TIMEOUT);  
-            
-			// Process the HTTP payload, which is now in the Response$ variable
-			Ind[0] = FIND ("result", Response$);
-			IF (Ind[0])
-			{
-
-				// Determine request id
-                ID = GetRequestID(Response$);
-                
-				// 'result' string within XBMC Response
-				Ind[0] = FIND ("{", Response$, Ind[0]);
-				IF (Ind[0])
-					Ind[1] = REVERSEFIND ("}\x0A", Response$);
-				ELSE
-				{
-                    Ind[0] = FIND (":", Response$, FIND ("result", Response$)) + 1;
-					Ind[1] = REVERSEFIND ("\x0A}", Response$);
-				}
-
-				Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
-
-				IF (ID)
-				{
-					CALL ParseJSONResult(ID, Response$);  	
-					
-					// Release block on sending new requests with this id
-                 	Block = 0;
-					#IF_DEFINED DEBUG Print("Release block %d", ID); #ENDIF
-				}
-			}
-			ELSE 
-			{
-
-				// JSON error?
-				Ind[0] = FIND ("error", Response$);
-				IF (Ind[0])
-				{
-					// Determine request id
-                	ID = GetRequestID(Response$);
-	                
-					// 'error' string within XBMC Response
-                    Ind[0] = FIND (":", Response$, FIND ("error", Response$)) + 1;
-					Ind[1] = REVERSEFIND ("\x0A}", Response$);
-
-					Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
-                    
-					IF (ID)
-						CALL ParseJSONError(ID, Response$);
-					ELSE 
-						Print("XBMC.usp: id:%d error:'%s'", ID, LEFT(Response$,100));
-
-					// Release block on sending new requests
-					Block = 0;
-				}
-				ELSE
-				{
-					Print("Unrecognised Payload: %s", LEFT(Response$,100));
-				}	
-			}
+            Ind[0] = FIND (":", Response$, FIND ("result", Response$)) + 1;
+			Ind[1] = REVERSEFIND ("\x0A}", Response$);
 		}
-    }
-    
-	// Reset the flag to zero
-	HttpBlock = 0;
 
-	#IF_DEFINED DEBUG Print("Remaining in buffer: %d", LEN(XBMC.SocketRxBuf)); #ENDIF
+		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
+
+		IF (ID)
+			CALL ParseJSONResult(ID, Response$);  	
+	}
+	// Announcement?
+	ELSE IF (FIND ("Announcement", Response$))
+	{
+       	Ind[0] = FIND (":", Response$, FIND ("params", Response$)) + 1;
+		Ind[1] = REVERSEFIND ("\x0A}", Response$);
+		
+		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
+
+        CALL ParseAnnouncementMessage(Response$);
+	}
+	// JSON error?
+	ELSE IF (FIND ("error", Response$))
+	{
+		// Determine request id
+           ID = GetRequestID(Response$);
+              
+		// 'error' string within XBMC Response
+           Ind[0] = FIND (":", Response$, FIND ("error", Response$)) + 1;
+		Ind[1] = REVERSEFIND ("\x0A}", Response$);
+
+		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
+                 
+		IF (ID)
+			CALL ParseJSONError(ID, Response$);
+		ELSE 
+			Print("XBMC.usp: id:%d error:%s", ID, LEFT(Response$,200));
+	}
+	ELSE
+	{
+		Print("Unrecognised Payload: %s", LEFT(Response$,200));
+	}	
+
+                
+	// Reset the flag to zero
+	TCPBlocker = 0;
+
 
 }
 
 /*******************************************************************************************
   Functions
-  (Add any additional functions here)
   Note:  Functions must be physically placed before the location in
          the code that calls them.
 *******************************************************************************************/
@@ -1366,84 +1326,38 @@ SOCKETRECEIVE XBMC
 */
 Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 {
-	STRING Data$[16384];
-	STRING OUT$[16384];
-	STRING TEMP$[255];
-	STRING BASE64$[255];		// Base64 encoding of username and password
-	INTEGER Count;				// When reaches 30 then time-out
-    
-	// If the tcp socket is not connected then exit
-	IF (ConnectionStatus != 2)
-		RETURN;
+	STRING Command$[16384];
 
     IF (LEN(Arguments) = 0)
 	{
 		// \x22 is a double quote (")
-		MAKESTRING (Data$, "{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
-						,id ,Command);
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
+			,id ,Command);
 	}
 	ELSE
 	{
-		//#IF_DEFINED DEBUG Print("Arguments: %s", LEFT(Arguments,255)); #ENDIF
-		MAKESTRING (Data$, "{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
-						,id ,Command, Arguments);
-	}
-
-	//Semaphore: blocks any other thread from sending requests
-	// Only unset in SOCKETRECEIVE XBMC event upon receipt of a response
-	WHILE (Block) 
-	{	
-    	// If request is for time update then drop the request.
-		// these requests happen every 2-3 seconds so ok to discard.
-		IF (id = REQUESTID_GETTIME_SECONDS || id = REQUESTID_GETTIME_PERCENTAGE)
-		{
-			RETURN;
-		}
-	
-		DELAY(10);
-
-		// Simple timeout check.
-		Count = Count+1;
-		IF (Count = 30)
-		{
-			//Count of 30 is about equal to 3 seconds
-              
-			// lift the block
-            Block = 0;
-
-			DisconnectFromXbmc();
-			
-			ConnectToXbmc();
-	
-			RETURN;
-		}
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
+			,id ,Command, Arguments);
 	}	
-	Block = 1;
-		
-	SOCKETSEND(XBMC, "POST /jsonrpc HTTP/1.1\n");
-	
-	MAKESTRING(OUT$, "HOST: %s:%s\n", XBMC_IPAddr$, XBMC_Port$); 
-	SOCKETSEND(XBMC, OUT$);
-	
-	IF(LOGIN <> "0d" && PASSWORD <> "0d")
+
+	// Send out the command in chunks
+	WHILE (LEN(Command$))
 	{
-		MAKESTRING(TEMP$,"%s:%s", LOGIN, PASSWORD); 
-		BASE64$ = GetBase64(TEMP$);
-	
-		MAKESTRING(OUT$, "Authorization: Basic %s\n", BASE64$); 
-		#IF_DEFINED DEBUG Print("tx: %s", OUT$); #ENDIF
-		SOCKETSEND(XBMC, OUT$);
+		IF (LEN(Command$)>200)
+		{
+			// Send to serial out
+			Tx$ = REMOVEBYLENGTH(200, Command$);
+		}
+		ELSE
+		{
+			// Append a delimiter ('\n') and send to serial out
+			MAKESTRING(Tx$, "%s\n", Command$);
+			Command$ = "";
+		}
 	}
-
-	MAKESTRING(OUT$, "Content-Length: %s\n", ItoA(LEN(Data$))); 
-	SOCKETSEND(XBMC, OUT$);
-
-	SOCKETSEND(XBMC, "Connection: Keep-Alive\n");
-	SOCKETSEND(XBMC, "\n");
-	
-	MAKESTRING(OUT$, "%s", Data$); 
-	SOCKETSEND(XBMC, OUT$);
-                        
+	                        
 }
 
 
@@ -1886,18 +1800,12 @@ CHANGE Seek_Time
 }
 
 PUSH Connect
-{
-	// connect to XBMC
-	ConnectToXbmc();
-  
-	CALL UpdateMetadata();
+{ 
+	//CALL UpdateMetadata();
 
 }
 RELEASE Connect
 {
- 	// disconnect from XBMC
-	DisconnectFromXbmc();
-
 	CALL Initialize_Outputs();
 }
 
