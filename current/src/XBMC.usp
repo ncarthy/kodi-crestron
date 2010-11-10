@@ -758,7 +758,6 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		PlaySpeed	= 1; 
 		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
 		PlayStatus$ = "Playing";
-		//CALL UpdateMetadata();
 	}
 	Else If(Find("PlaybackPaused", Message$)) 
 	{
@@ -785,11 +784,6 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		PlaySpeed				= 1; 
 		PlayStatus$ = "Playing";
 		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
-		Wait(100) 
-		{ 
-			//CALL UpdateMetadata();
-			//CALL Initialize_Outputs(); 
-		}
 	}
 	Else If(Find("StartUp", Message$) > 0)
 	{
