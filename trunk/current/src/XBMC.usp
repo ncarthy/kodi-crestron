@@ -731,7 +731,8 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 
 	If(Find("Action", Message$) || Find("PlayBackSeek",Message$) 
 						|| Find("MediaChanged",Message$)
-						|| Find("QueueNextItem", Message$) )
+						|| Find("QueueNextItem", Message$) 
+						|| Find("NewSong", Message$))
 	{
 		// Do Nothing
 	}
@@ -795,7 +796,7 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		CALL Initialize_Outputs();
 	}
 	Else
-		PRINT("XBMC.usp: Unknown announcement: %s\n", LEFT(Message$,200));
+		PRINT("XBMC.usp: Unknown announcement: %s\n", LEFT(Announcement$,200));
 }
 
 /*

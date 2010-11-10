@@ -126,7 +126,7 @@ APg=1
 StdCmd=0
 FltTmp=1
 FpCS=0
-NumFixedInputs=206
+NumFixedInputs=208
 NumFixedOutputs=321
 NumFixedParams=9
 MinVariableInputs=0
@@ -344,6 +344,7 @@ InputSigType203=Analog
 InputSigType204=Analog
 InputSigType205=Digital
 InputSigType206=Serial
+InputSigType207=Digital
 OutputSigType1=Digital
 OutputSigType2=Digital
 OutputSigType3=Digital
@@ -880,6 +881,8 @@ InputCue203=[Seek_Time_Percentage/#]
 InputCue204=[Seek_Time_Seconds/#]
 InputCue205=[~UNUSED~]
 InputCue206=[SendNotification$]
+InputCue207=[~UNUSED~]
+InputCue208=[IsPlayingOnExternalPlayer]
 OutputCue1=[~UNUSED~]
 OutputCue2=[~UNUSED~]
 OutputCue3=STOP_FB
@@ -1303,9 +1306,9 @@ SmC=55
 ObjVer=1
 PrH=5
 CF=2
-n1I=206
+n1I=208
 n1O=321
-mI=206
+mI=208
 I1=9
 I2=133
 I3=135
@@ -1512,6 +1515,8 @@ I203=94
 I204=93
 I205=133
 I206=25
+I207=133
+I208=65
 mO=321
 tO=321
 O1=133
@@ -2110,7 +2115,7 @@ I10=46
 I11=47
 I13=448
 I14=20
-I15=26
+I15=18
 I16=25
 mO=2
 tO=2
@@ -2140,7 +2145,7 @@ I12=84
 I13=85
 I14=86
 I15=87
-I16=253
+I16=65
 I18=96
 I19=457
 I20=64
@@ -3299,6 +3304,12 @@ SgTp=4
 ]
 [
 ObjTp=Sg
+H=18
+Nm=//__serial_reserved__
+SgTp=4
+]
+[
+ObjTp=Sg
 H=19
 Nm=[Current_Series_Title$]
 SgTp=4
@@ -3336,12 +3347,6 @@ SgTp=4
 ObjTp=Sg
 H=25
 Nm=[SendNotification$]
-SgTp=4
-]
-[
-ObjTp=Sg
-H=26
-Nm=//LogMessage$
 SgTp=4
 ]
 [
@@ -3561,6 +3566,11 @@ SgTp=4
 ObjTp=Sg
 H=64
 Nm=//Clear_Currently_Playing
+]
+[
+ObjTp=Sg
+H=65
+Nm=[IsPlayingOnExternalPlayer]
 ]
 [
 ObjTp=Sg
