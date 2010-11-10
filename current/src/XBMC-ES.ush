@@ -71,7 +71,7 @@
   Expand2=expand_separately
   OffsetOutputs=2
   ProgramTree=Logic
-  SymbolTree=4
+  SymbolTree=41
   Hint=Control XBMC using EventServer API
   PdfHelp=
   HelpID= 

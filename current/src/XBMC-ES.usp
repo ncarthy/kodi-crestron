@@ -35,7 +35,7 @@ Comments:
 
 /////////////////////Compiler Directives
 #SYMBOL_NAME "XBMC-ES"
-#CATEGORY "4" //"Device Interface" 
+#CATEGORY "41" // Remote System Interface
 #HINT "Control XBMC using EventServer API" 
 #PRINT_TO_TRACE
 #ENABLE_DYNAMIC
