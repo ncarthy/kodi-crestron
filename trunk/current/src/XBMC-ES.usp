@@ -219,10 +219,6 @@ Comments:
 
 #DEFINE_CONSTANT ACTION_SHOW_OSD					161
 #DEFINE_CONSTANT ACTION_SHOW_ASPECT_RATIO			162
-#DEFINE_CONSTANT ACTION_SHOW_MOVIE_TITLES			163
-#DEFINE_CONSTANT ACTION_SHOW_MUSIC_LIBRARY			164
-#DEFINE_CONSTANT ACTION_SHOW_TVSHOW_TITLES			165
-
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -234,8 +230,11 @@ DIGITAL_INPUT Up, Down, Lt, Rt, _SKIP_;
 DIGITAL_INPUT Repeat, Shuffle, _SKIP_;
 
 ANALOG_INPUT Command;
+ANALOG_INPUT WindowName#; // Activate this window (Delta Window ID) See http://wiki.xbmc.org/index.php?title=Window_IDs                            
+STRING_INPUT WindowName$[100];
 
-STRING_INPUT XBMC_IPAddr$[16]; //the ip of the XBMC server.
+STRING_INPUT _SKIP_, XBMC_IPAddr$[16], //the ip of the XBMC server.
+			 _SKIP_;
 
 BUFFER_INPUT LogMessage$[500];
 BUFFER_INPUT Notification$[500];
@@ -727,11 +726,7 @@ CHANGE Command
 		Case (ACTION_CONTEXT_MENU)			: { SendAction(ACTION_BUTTON, "contextmenu"); }
 		Case (ACTION_SHOW_OSD)				: { SendAction(ACTION_BUTTON, "osd"); }
 		Case (ACTION_SHOW_ASPECT_RATIO)		: { SendAction(ACTION_BUTTON, "aspectratio"); }
-		
-		// ActivateWindow parameters: http://wiki.xbmc.org/index.php?title=Opening_Windows_and_Dialogs
-		Case (ACTION_SHOW_MOVIE_TITLES)			: { SendAction(ACTION_EXECBUILTIN, "ActivateWindow(videolibrary,movietitles)"); }
-		Case (ACTION_SHOW_MUSIC_LIBRARY)			: { SendAction(ACTION_EXECBUILTIN, "ActivateWindow(musiclibrary)"); }
-		Case (ACTION_SHOW_TVSHOW_TITLES)			: { SendAction(ACTION_EXECBUILTIN, "ActivateWindow(videolibrary,tvshowtitles)"); }
+
 	}       
 }
 
@@ -809,6 +804,27 @@ CHANGE Notification$
 	CLEARBUFFER(Notification$);
 	
 	CALL SendNotification("Crestron System says:", responseLine$);
+}
+
+CHANGE WindowName#
+{
+	// ActivateWindow parameters: http://wiki.xbmc.org/index.php?title=Opening_Windows_and_Dialogs
+    // and http://wiki.xbmc.org/index.php?title=Window_IDs
+	String Command$[ 100 ];
+	
+	MAKESTRING(Command$, "ActivateWindow(%d)", WindowName#);
+    
+	SendAction(ACTION_EXECBUILTIN, Command$);
+}
+CHANGE WindowName$
+{
+	// ActivateWindow parameters: http://wiki.xbmc.org/index.php?title=Opening_Windows_and_Dialogs
+    // and http://wiki.xbmc.org/index.php?title=Window_IDs
+	String Command$[ 100 ];
+	
+	MAKESTRING(Command$, "ActivateWindow(%s)", WindowName$);
+
+	SendAction(ACTION_EXECBUILTIN, Command$);
 }
 
 
