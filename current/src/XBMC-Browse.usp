@@ -481,15 +481,27 @@ FUNCTION UpdateOutputsFromBrowseList(STRING Array$)
 	     	IF (Category[i] = "file") List_Filename$[ItemNumber] = Info[i];
 			ELSE IF(Category[i] = "title") Name$[ItemNumber] = Info[i];
 			ELSE IF(Category[i] = "label") Name$[ItemNumber] = Info[i];
-			ELSE IF(Category[i] = "movieid") List_IDs[ItemNumber] = AtoI(Info[i]);
-			ELSE IF(Category[i] = "tvshowid") List_IDs[ItemNumber] = AtoI(Info[i]);
-            ELSE IF(Category[i] = "episodeid") List_IDs[ItemNumber] = AtoI(Info[i]);
+			ELSE IF(Category[i] = "movieid") 
+			{
+				IF (List_CurrentScreen = MOVIE_TITLE_LIST)
+					List_IDs[ItemNumber] = AtoI(Info[i]);
+			}
+			ELSE IF(Category[i] = "tvshowid") 
+			{
+				IF (List_CurrentScreen = TV_SHOW_LIST)
+					List_IDs[ItemNumber] = AtoI(Info[i]);
+			}
+            ELSE IF(Category[i] = "episodeid")
+			{
+				IF (List_CurrentScreen = TV_EPISODE_LIST)
+			 		List_IDs[ItemNumber] = AtoI(Info[i]);
+			}
 			ELSE IF(Category[i] = "albumid") List_IDs[ItemNumber] = AtoI(Info[i]);
 			ELSE IF(Category[i] = "artistid") List_IDs[ItemNumber] = AtoI(Info[i]);
 			ELSE IF(Category[i] = "songid") List_IDs[ItemNumber] = AtoI(Info[i]);
 			ELSE IF(Category[i] = "season") 
 			{
-				IF (List_CurrentScreen != TV_EPISODE_LIST) List_IDs[ItemNumber] = AtoI(Info[i]);
+				IF (List_CurrentScreen = TV_SEASON_LIST) List_IDs[ItemNumber] = AtoI(Info[i]);
 				SeasonOrAlbumName$[ItemNumber] = "Season " + Info[i];
 			}
 			ELSE IF(Category[i] = "artist") SeriesOrArtistName$[ItemNumber] = Info[i];
@@ -962,18 +974,15 @@ FUNCTION Play()
             IF (AlbumID)
             {
 				MAKESTRING(Command$,"%s.Add",PlaylistType$);
-                FOR (I=0 TO 100)
+                WHILE (PlaylistIDs[I])	
 				{
-					IF (PlaylistIDs[I])
-					{
-                        MAKESTRING(Parameter$, "{\x22songid\x22:%d}", 
+                	MAKESTRING(Parameter$, "{\x22songid\x22:%d}", 
 										PlaylistIDs[I]);
 
                         
-						SendJsonCommand(REQUESTID_PLAYLIST_ADD, "AudioPlaylist.Add", Parameter$);
-					}
-					ELSE
-						BREAK;
+					SendJsonCommand(REQUESTID_PLAYLIST_ADD, "AudioPlaylist.Add", Parameter$);
+
+					I = I + 1;
 				}
 
 			    Delay(JSON_DELAY);
