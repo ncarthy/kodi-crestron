@@ -60,8 +60,10 @@
   InputSigType20=Digital
   InputCue21=[~UNUSED~]
   InputSigType21=Digital
-  InputCue22=[~UNUSED~]
+  InputCue22=SocketIsBusy
   InputSigType22=Digital
+  InputCue23=[~UNUSED~]
+  InputSigType23=Digital
   OutputCue1=PlayFb
   OutputSigType1=Digital
   OutputCue2=StopFb
@@ -185,8 +187,8 @@
   ParamSigType5=String
   ParamCue6=PASSWORD
   ParamSigType6=String
-  MinVariableInputs=22
-  MaxVariableInputs=22
+  MinVariableInputs=23
+  MaxVariableInputs=23
   MinVariableInputsList2=4
   MaxVariableInputsList2=4
   MinVariableOutputs=3

@@ -138,6 +138,8 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
 				List_Exit_Details_Page,
 				_SKIP_;
 
+DIGITAL_INPUT SocketIsBusy, _SKIP_; // HIGH when a JSON command is being transmitted;
+
 ANALOG_INPUT PlayItem, SelectedItem;
 ANALOG_INPUT PlotItem;						// The index of the plot array
 
@@ -736,6 +738,11 @@ CHANGE Rx$
 Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 {
 	STRING Command$[16384];
+
+	IF (SocketIsBusy)
+	{
+     	Delay(2);
+	}
 
     IF (LEN(Arguments) = 0)
 	{

@@ -58,6 +58,10 @@
   InputSigType19=Digital
   InputCue20=[~UNUSED~]
   InputSigType20=Digital
+  InputCue21=SocketIsBusy
+  InputSigType21=Digital
+  InputCue22=[~UNUSED~]
+  InputSigType22=Digital
   OutputCue1=MovieDetails
   OutputSigType1=Digital
   OutputCue2=TvShowDetails
@@ -417,8 +421,8 @@
   ParamSigType6=String
   ParamCue7=PASSWORD
   ParamSigType7=String
-  MinVariableInputs=20
-  MaxVariableInputs=20
+  MinVariableInputs=22
+  MaxVariableInputs=22
   MinVariableInputsList2=7
   MaxVariableInputsList2=7
   MinVariableOutputs=16
