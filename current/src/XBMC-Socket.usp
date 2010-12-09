@@ -69,7 +69,8 @@ Comments:
 DIGITAL_INPUT _SKIP_,_SKIP_, _SKIP_;
 DIGITAL_INPUT Connect;					//  When HIGH connect to the XBMC tcp socket.
 BUFFER_INPUT IN$[16384];				// JSON command IN
-DIGITAL_OUTPUT Connected;				// HIGH when connected.
+DIGITAL_OUTPUT Connected, _SKIP_;		// HIGH when connected.
+DIGITAL_OUTPUT Busy, _SKIP_;			// HIGH when transmitting JSON command to server
 STRING_OUTPUT OUT$;						// JSON reply OUT
 
 ///////////////////////////// Parameters
@@ -226,6 +227,7 @@ CHANGE IN$
 		Delay(10);
 	}	
 	TxBlocker = 1;
+	Busy = ON;
     
 	// Test for empty buffer (Can happen if buffer emptied by earlier event)
 	IF (LEN(IN$) = 0) 
@@ -236,9 +238,10 @@ CHANGE IN$
 
 	Command$ = GATHER("\n", IN$, GATHER_TIMEOUT);
     SocketSend(XBMC, Command$);
-    
-	// Release block
+
+	// Reset the flags to zero
 	TxBlocker = 0;
+	Busy = OFF;
 }
    
 /*******************************************************************************************
@@ -319,5 +322,6 @@ SOCKETRECEIVE XBMC
                 
 	// Reset the flag to zero
 	RxBlocker = 0;
+	TxBlocker = 0;
 
 }

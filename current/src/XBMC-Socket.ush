@@ -28,6 +28,12 @@
   InputSigType4=Digital
   OutputCue1=Connected
   OutputSigType1=Digital
+  OutputCue2=[~UNUSED~]
+  OutputSigType2=Digital
+  OutputCue3=Busy
+  OutputSigType3=Digital
+  OutputCue4=[~UNUSED~]
+  OutputSigType4=Digital
   InputList2Cue1=IN$
   InputList2SigType1=Serial
   OutputList2Cue1=OUT$
@@ -41,8 +47,8 @@
   MaxVariableInputs=4
   MinVariableInputsList2=1
   MaxVariableInputsList2=1
-  MinVariableOutputs=1
-  MaxVariableOutputs=1
+  MinVariableOutputs=4
+  MaxVariableOutputs=4
   MinVariableOutputsList2=1
   MaxVariableOutputsList2=1
   MinVariableParams=2
