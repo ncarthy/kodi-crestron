@@ -98,7 +98,7 @@
   InputList2SigType1=Analog
   InputList2Cue2=SelectedItem
   InputList2SigType2=Analog
-  InputList2Cue3=PlotItem
+  InputList2Cue3=[~UNUSED~]
   InputList2SigType3=Analog
   InputList2Cue4=[~UNUSED~]
   InputList2SigType4=Serial

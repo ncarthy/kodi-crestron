@@ -36,7 +36,7 @@ Comments:
 #DEFAULT_VOLATILE
 #ENABLE_STACK_CHECKING
 #ENABLE_TRACE
-#OUTPUT_SHIFT 8			// Shift the outputs down 6 lines on the SIMPL window
+#OUTPUT_SHIFT 8			// Shift the outputs down 8 lines on the SIMPL window
 
 #USER_LIBRARY "Common_Functions"
 
@@ -989,7 +989,7 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 	STRING Command$[16384];
 	
 	IF (SocketIsBusy)
-	{
+	{		
 		IF (id = REQUESTID_GETTIME_SECONDS ||
 				id = REQUESTID_GETTIME_PERCENTAGE)
 			RETURN;
