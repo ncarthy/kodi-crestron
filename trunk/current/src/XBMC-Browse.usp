@@ -62,16 +62,18 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_GETTIME_SECONDS				5
 #DEFINE_CONSTANT REQUESTID_GETTIME_PERCENTAGE			6
 #DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIES		7
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSHOWS		8
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSEASONS	9
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVEPISODES	10
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTS		11
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		12
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		13
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				14
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					15
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				16
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			17
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIEDETAILS	8
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSHOWS		9
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSEASONS	10
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVEPISODES	11
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETEPISODEDETS	12
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTS		13
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		14
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		15
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				16
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					17
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				18
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			19
                                                           
 
 /*******************************************************************************************
@@ -124,7 +126,7 @@ STRING_OUTPUT _SKIP_,Name$[10],
 
 /* Browse functionality */
 DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,				
-				List_UnWatchedOnly,
+				List_UnWatchedOnly,	// Not implemented yet!
 				List_TopPage,
 				List_BottomPage,
 				List_PageMinus,
@@ -140,8 +142,7 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
 
 DIGITAL_INPUT SocketIsBusy, _SKIP_; // HIGH when a JSON command is being transmitted;
 
-ANALOG_INPUT PlayItem, SelectedItem;
-ANALOG_INPUT PlotItem;						// The index of the plot array
+ANALOG_INPUT PlayItem, SelectedItem,_SKIP_;
 
 STRING_INPUT _SKIP_, SearchCriteria$[256], _SKIP_;	
 BUFFER_INPUT Rx$[65534];					// The reply from XBMC
@@ -215,17 +216,108 @@ INTEGER IsPlaying;
   XBMC Response logic
 *******************************************************************************************/
 /*
-  	Return a string containing the xbmc parameter list for Video Playlists
+  	Return a string containing the xbmc parameter list for browse queries
 */
-STRING_FUNCTION VideoPlaylistParameters(STRING AdditionalParameters, INTEGER start, INTEGER end
+STRING_FUNCTION VideoBrowseParameters(STRING AdditionalParameters, INTEGER start, INTEGER end
+											,STRING SortMethod) 
+{
+	STRING Params$[1024];
+
+	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
+	// \x22 is a double-quote (")
+	MAKESTRING (Params$, 
+	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22start\x22:%d,\x22end\x22:%d}"
+								, AdditionalParameters
+								,"\x22title\x22"
+								,"\x22tagline\x22"
+								,"\x22genre\x22"
+								,"\x22showtitle\x22"
+								,"\x22year\x22"
+								,"\x22playcount\x22"
+								,SortMethod
+								,start
+								,end 
+					);
+ 
+	#IF_DEFINED DEBUG PRINT( "VideoBrowseParameters:%s", LEFT(Params$,200)  ); #ENDIF
+
+	RETURN (Params$);
+}
+
+/*
+  	Return a string containing the xbmc parameter list for showing details of a movie
+*/
+STRING_FUNCTION MovieDetailsParameters(INTEGER movieid) 
+{
+	STRING Params$[1024];
+
+	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
+	MAKESTRING (Params$, 
+	"{\x22movieid\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
+								,movieid
+								,"\x22title\x22"
+								,"\x22director\x22"
+								,"\x22tagline\x22"
+								,"\x22genre\x22"
+								,"\x22runtime\x22"
+								,"\x22year\x22"
+								,"\x22rating\x22"
+								,"\x22writer\x22"
+								,"\x22studio\x22"
+								,"\x22plot\x22"
+								,"\x22studio\x22"
+								,"\x22mpaa\x22"
+					);
+ 
+	#IF_DEFINED DEBUG PRINT( "MovieDetailsParameters:%s", LEFT(Params$,200)  ); #ENDIF
+
+	RETURN (Params$);
+}
+
+
+/*
+  	Return a string containing the xbmc parameter list for showing details of a TV Show
+*/
+STRING_FUNCTION TvShowDetailsParameters(INTEGER tvshowid, INTEGER seasonid, INTEGER start, INTEGER end
 											,STRING SortMethod) 
 {
 	STRING Params$[1024];
 
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22start\x22:%d,\x22end\x22:%d}"
-								, AdditionalParameters
+	"{\x22tvshowid\x22:%d,\x22season\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22start\x22:%d,\x22end\x22:%d}"
+								, tvshowid, seasonid
+								,"\x22title\x22"
+								,"\x22genre\x22"
+								,"\x22showtitle\x22"
+								,"\x22runtime\x22"
+								,"\x22season\x22"
+								,"\x22episode\x22"
+								,"\x22firstaired\x22"
+								,"\x22studio\x22"
+								,"\x22playcount\x22"
+								,SortMethod
+								,start
+								,end 
+					);
+ 
+	#IF_DEFINED DEBUG PRINT( "VideoDetailsParameters:%s", LEFT(Params$,200)  ); #ENDIF
+
+	RETURN (Params$);
+}
+
+
+/*
+  	Return a string containing the xbmc parameter list for showing details of a single episode of a TV Show
+*/
+STRING_FUNCTION EpisodeDetailsParameters(INTEGER episodeid) 
+{
+	STRING Params$[1024];
+
+	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
+	MAKESTRING (Params$, 
+	"{\x22episodeid\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
+								, episodeid
 								,"\x22title\x22"
 								,"\x22originaltitle\x22"
 								,"\x22director\x22"
@@ -233,11 +325,9 @@ STRING_FUNCTION VideoPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 								,"\x22genre\x22"
 								,"\x22showtitle\x22"
 								,"\x22runtime\x22"
-								,"\x22year\x22"
 								,"\x22rating\x22"
 								,"\x22writer\x22"
 								,"\x22studio\x22"
-								//,"\x22plotoutline\x22"
 								,"\x22plot\x22"
 								,"\x22season\x22"
 								,"\x22episode\x22"
@@ -245,15 +335,13 @@ STRING_FUNCTION VideoPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 								,"\x22studio\x22"
 								,"\x22mpaa\x22"
 								,"\x22playcount\x22"
-								,SortMethod
-								,start
-								,end 
 					);
  
-	#IF_DEFINED DEBUG PRINT( "VideoPlaylistParameters:%s", LEFT(Params$,200)  ); #ENDIF
+	#IF_DEFINED DEBUG PRINT( "VideoDetailsParameters:%s", LEFT(Params$,200)  ); #ENDIF
 
 	RETURN (Params$);
 }
+
 /*
   	Return a string containing the xbmc parameter list for Audio Playlists
 */
@@ -362,6 +450,7 @@ FUNCTION Initialize_OutputArrays()
 		Fanart$[i] = "";
 		List_Plot$[i] = "";
 		Watched[i] = OFF;
+		List_IDs[i] = 0;
 	}
 
 	PlotSelected$ = "";
@@ -410,6 +499,90 @@ FUNCTION GetPlayAllPlaylistFromResponse(STRING Array$, STRING ID_Identifier)
 	}
 }
 
+/*
+    Update outputs using response from a JSON call that returned an array
+
+	Item$:			The JSON description of the Item		
+*/
+FUNCTION UpdateOutputsFromDetails(STRING Array$)
+{
+	INTEGER Ind[2];					//Index variables used to parse the reponse
+	STRING Info[40][400];			//An array of currently playing information
+	STRING Category[40][40];		//An array of the type of Info e.g. Genre, Artist etc.	  
+	INTEGER i,j;					//Loop vars
+	INTEGER ItemStart;				// The first character of the current array member.
+	INTEGER ItemEnd;				// The last character of the current array member.
+
+	Ind[0] = 1; 
+	ItemStart = 0; ItemEnd = 0;
+	i=0;j=0;
+
+	ItemStart = Find("{", Array$, ItemEnd)+1;
+	Ind[0] = Find("\x22", Array$, ItemStart);
+	i=0; j=0;
+
+	ItemEnd = Find("},\x0A", Array$, ItemStart);
+	IF (ItemEnd=0) ItemEnd = LEN(Array$);
+
+	// Parse the JSON items list into an array of Info & Categories
+	While(Ind[0])
+	{
+		Ind[1] = Find(": ", Array$, Ind[0]);
+		If(Ind[1] && Ind[1]<ItemEnd)
+		{
+
+			Ind[2] = Find(",\x0A", Array$, Ind[1]); // Each list item is separated by a comma, followed by a line-feed
+			IF ( Ind[2] > ItemEnd || Ind[2] = 0) 
+				Ind[2] = Find("}", Array$, Ind[1])-1; // must be the end of the list
+			
+			Category[j] = RemoveDoubleQuotesAndWhitespace( Mid(Array$, Ind[0]+1, Ind[1]-Ind[0]-1) );
+			
+			IF (Category[j] = "plot")
+			{
+                List_Plot$[SelectedItem] = LEFT(RemoveDoubleQuotesAndWhitespace( Mid(Array$, Ind[1]+1, Ind[2]-Ind[1]-1) ), 1024); 
+				SendPlotAsIndirectText(List_Plot$[SelectedItem]);
+			}
+			ELSE
+				Info[j] = LEFT(RemoveDoubleQuotesAndWhitespace( Mid(Array$, Ind[1]+1, Ind[2]-Ind[1]-1) ), 400); 
+
+			#IF_DEFINED DEBUG 
+				PRINT( "%s: %s\n", Category[j], LEFT(Info[j],220)  ); 
+			#ENDIF
+
+			j=j+1;
+			
+			Ind[0] = Ind[2];
+
+			// Emergency bailout
+			IF (j > 38) Ind[0] = 0;
+
+		}
+		Else Ind[0] = 0;
+	} 
+
+	// Assign to OUTPUTs
+	FOR (i = 0 to j-1)
+	{
+     	IF (Category[i] = "file") List_Filename$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "title") Name$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "artist") SeriesOrArtistName$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "genre") Genre$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "director") Director$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "year") Year$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "runtime") Runtime$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "duration") Runtime$[SelectedItem] = ConvertToTime(AtoI(Info[i]));
+		ELSE IF(Category[i] = "rating") Rating$[SelectedItem] = Round(Info[i],2);		
+        ELSE IF(Category[i] = "studio") Studio$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "writer") Writer$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "plot") ; // Do Nothing, handled in section above as special case.
+		ELSE IF(Category[i] = "tagline") TagLine$[SelectedItem] = Info[i];
+		ELSE IF(Category[i] = "mpaa") MPAA$[SelectedItem] = Info[i];
+        ELSE IF(Category[i] = "episode") EpisodeOrTrackNum$[SelectedItem] = "Episode "+Info[i];
+		ELSE IF(Category[i] = "firstaired") Year$[SelectedItem] = "First aired on: "+Info[i];
+		ELSE IF(Category[i] = "season") SeasonOrAlbumName$[SelectedItem] = "Season " + Info[i];
+	}
+
+}
 
 /*
     Update outputs using response from a JSON call that returned an array
@@ -452,13 +625,7 @@ FUNCTION UpdateOutputsFromBrowseList(STRING Array$)
 				
 				Category[j] = RemoveDoubleQuotesAndWhitespace( Mid(Array$, Ind[0]+1, Ind[1]-Ind[0]-1) );
 				
-				IF (Category[j] = "plot")
-				{
-                    List_Plot$[ItemNumber] = LEFT(RemoveDoubleQuotesAndWhitespace( Mid(Array$, Ind[1]+1, Ind[2]-Ind[1]-1) ), 1024); 
-					Info[j] = "";
-				}
-				ELSE
-					Info[j] = LEFT(RemoveDoubleQuotesAndWhitespace( Mid(Array$, Ind[1]+1, Ind[2]-Ind[1]-1) ), 400); 
+				Info[j] = LEFT(RemoveDoubleQuotesAndWhitespace( Mid(Array$, Ind[1]+1, Ind[2]-Ind[1]-1) ), 400); 
 	
 				#IF_DEFINED DEBUG 
 					PRINT( "%s: %s\n", Category[j], LEFT(Info[j],220)  ); 
@@ -501,8 +668,11 @@ FUNCTION UpdateOutputsFromBrowseList(STRING Array$)
 			ELSE IF(Category[i] = "songid") List_IDs[ItemNumber] = AtoI(Info[i]);
 			ELSE IF(Category[i] = "season") 
 			{
-				IF (List_CurrentScreen = TV_SEASON_LIST) List_IDs[ItemNumber] = AtoI(Info[i]);
-				SeasonOrAlbumName$[ItemNumber] = "Season " + Info[i];
+				IF (List_CurrentScreen = TV_SEASON_LIST) 
+				{
+					List_IDs[ItemNumber] = AtoI(Info[i]);
+					SeasonOrAlbumName$[ItemNumber] = "Season " + Info[i];
+				}
 			}
 			ELSE IF(Category[i] = "artist") SeriesOrArtistName$[ItemNumber] = Info[i];
 	 		ELSE IF(Category[i] = "album") SeasonOrAlbumName$[ItemNumber] = Info[i];
@@ -518,9 +688,8 @@ FUNCTION UpdateOutputsFromBrowseList(STRING Array$)
 			ELSE IF(Category[i] = "showtitle") SeriesOrArtistName$[ItemNumber] = Info[i];
 			ELSE IF(Category[i] = "episode") EpisodeOrTrackNum$[ItemNumber] = "Episode "+Info[i];
 			ELSE IF(Category[i] = "tracknumber") EpisodeOrTrackNum$[ItemNumber] = Info[i];
-			ELSE IF(Category[i] = "firstaired") TagLine$[ItemNumber] = "First aired on: "+Info[i];
+			ELSE IF(Category[i] = "firstaired") Year$[ItemNumber] = "First aired on: "+Info[i];
 			ELSE IF(Category[i] = "tagline") TagLine$[ItemNumber] = Info[i];
-			ELSE IF(Category[i] = "mpaa") MPAA$[ItemNumber] = Info[i];
 			ELSE IF(Category[i] = "mpaa") MPAA$[ItemNumber] = Info[i];
 			ELSE IF(Category[i] = "playcount")
 			{
@@ -598,6 +767,11 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
         CALL UpdateOutputsFromBrowseList(
 						GetArrayFromResponse("\x22movies\x22", Result$));
 	}
+	ELSE IF (id = REQUESTID_MOVIELIBRARY_GETMOVIEDETAILS)
+	{
+        CALL UpdateOutputsFromDetails(
+						GetArrayFromResponse("\x22moviedetails\x22", Result$));
+	}
 	ELSE IF (id = REQUESTID_MOVIELIBRARY_GETTVSHOWS)
 	{
 		List_Total = GetListTotalFromResponse(Result$);
@@ -618,6 +792,11 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
         CALL UpdateOutputsFromBrowseList(
 						GetArrayFromResponse("\x22episodes\x22", Result$));		
 	}	
+	else if (REQUESTID_MOVIELIBRARY_GETEPISODEDETS)
+    {
+        CALL UpdateOutputsFromDetails(
+						GetArrayFromResponse("\x22episodedetails\x22", Result$));		
+	}
 	else if (ID = REQUESTID_AUDIOLIBRARY_GETARTISTS)
     {
         List_Total = GetListTotalFromResponse(Result$);
@@ -788,6 +967,27 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 	                        
 }
 
+/*
+	Make the JSON command call that retrieves the details of a movie, in
+	particular the plot (which is usually a long string)	
+*/
+FUNCTION GetMovieDetails(INTEGER movieid)
+{
+	CALL SendJsonCommand (REQUESTID_MOVIELIBRARY_GETMOVIEDETAILS, 
+				"VideoLibrary.GetMovieDetails", MovieDetailsParameters(movieid));
+
+}
+
+/*
+	Make the JSON command call that retrieves the details of a tv episode, in
+	particular the plot g)	
+*/
+FUNCTION GetEpisodeDetails(INTEGER episodeid)
+{
+	CALL SendJsonCommand (REQUESTID_MOVIELIBRARY_GETEPISODEDETS, 
+				"VideoLibrary.GetEpisodeDetails", EpisodeDetailsParameters(episodeid));
+
+}
 
 
 /*
@@ -800,7 +1000,8 @@ FUNCTION RepopulateCurrentList()
 	INTEGER end;
 	STRING method[25];
 	STRING Params$[512];
-
+       
+	// Paginate the list by StepAmount
 	start = List_PageNumber*StepAmount;
 	end = (List_PageNumber+1)*(StepAmount);
 	IF (List_Total > 0)
@@ -823,13 +1024,13 @@ FUNCTION RepopulateCurrentList()
 		CASE (MOVIE_TITLE_LIST) :
 		{
 			CALL SendJsonCommand (REQUESTID_MOVIELIBRARY_GETMOVIES, 
-				"VideoLibrary.GetMovies", VideoPlaylistParameters("",start,end,"sorttitle"));
+				"VideoLibrary.GetMovies", VideoBrowseParameters("",start,end,"sorttitle"));
 
 		}
 		CASE (TV_SHOW_LIST)		: 
 		{ 
 			method = "VideoLibrary.GetTvShows"; 
-			Params$ = VideoPlaylistParameters("", start, end,"sorttitle");
+			Params$ = VideoBrowseParameters("", start, end,"sorttitle");
 
 			CALL SendJsonCommand (REQUESTID_MOVIELIBRARY_GETTVSHOWS, method, Params$);
 		}
@@ -849,10 +1050,7 @@ FUNCTION RepopulateCurrentList()
 		CASE (TV_EPISODE_LIST)  : 
 		{ 
 			method = "VideoLibrary.GetEpisodes"; 
-			MAKESTRING (Params$, "\x22tvshowid\x22:%d,\x22season\x22:%d,"
-							, TvShowID
-							, TvShowSeasonID);
- 			Params$ = VideoPlaylistParameters(Params$, start, end,"episode");
+ 			Params$ = TvShowDetailsParameters(TvShowID, TvShowSeasonID, start, end, "episode");
 
 			CALL SendJsonCommand (REQUESTID_MOVIELIBRARY_GETTVEPISODES, method, Params$);
 		}
@@ -1047,8 +1245,9 @@ CHANGE SelectedItem
 
 	SWITCH (List_CurrentScreen)
 	{
-		CASE (MOVIE_TITLE_LIST) 	: 
+		CASE (MOVIE_TITLE_LIST) : 
 		{
+			GetMovieDetails(List_IDs[SelectedItem]);
 			MovieDetails = ON;
 		}
 		CASE (TV_SHOW_LIST) 	: 
@@ -1063,19 +1262,26 @@ CHANGE SelectedItem
 		}
 		CASE (TV_SEASON_LIST) 	: 
 		{
-	        List_CurrentScreen = TV_EPISODE_LIST;
-			OldSeasonListPage = List_PageNumber;
-			TvShowSeasonID = List_IDs[SelectedItem];
-			List_PageNumber = 0;
-			List_Total = 0;
-			RepopulateCurrentList();		
+			IF (List_IDs[SelectedItem])
+			{
+		        List_CurrentScreen = TV_EPISODE_LIST;
+				OldSeasonListPage = List_PageNumber;
+				TvShowSeasonID = List_IDs[SelectedItem];
+				List_PageNumber = 0;
+				List_Total = 0;
+				RepopulateCurrentList();		
+			}
 		}
 		CASE (TV_EPISODE_LIST)  : 
 		{ 
-    	    TvShowDetails = ON;	
-	    	MovieDetails = OFF;
+			IF (List_IDs[SelectedItem])
+			{
+				GetEpisodeDetails(List_IDs[SelectedItem]);
+    	    	TvShowDetails = ON;	
+	    		MovieDetails = OFF;
+			}
 		}
-		CASE (MUSIC_ALBUM_LIST)  : 
+		CASE (MUSIC_ALBUM_LIST) : 
 		{ 
 	        List_CurrentScreen = MUSIC_SONG_LIST;
 			OldAlbumListPage = List_PageNumber;
@@ -1090,7 +1296,7 @@ CHANGE SelectedItem
 			RepopulateCurrentList();
 
 		}
-		CASE (MUSIC_ARTIST_LIST)  : 
+		CASE (MUSIC_ARTIST_LIST) : 
 		{ 
 	        List_CurrentScreen = MUSIC_ALBUM_LIST;
 			OldArtistListPage = List_PageNumber;
@@ -1115,12 +1321,6 @@ CHANGE SelectedItem
 	}
 }
 
-CHANGE PlotItem
-{
-	//#IF_DEFINED DEBUG Print("PlotItem changed. Now value = %d", PlotItem); #ENDIF
-	SendPlotAsIndirectText(List_Plot$[PlotItem]);
-}
-
 PUSH List_Back
 {
 	#IF_DEFINED DEBUG Print("List_CurrentScreen = %d", List_CurrentScreen); #ENDIF
@@ -1140,6 +1340,7 @@ PUSH List_Back
 		{ 
 			List_PageNumber = OldSeasonListPage;
 			List_CurrentScreen = TV_SEASON_LIST;
+			TvShowDetails = OFF; // Just in case
 		}
         DEFAULT: 
 		{
