@@ -792,7 +792,7 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
         CALL UpdateOutputsFromBrowseList(
 						GetArrayFromResponse("\x22episodes\x22", Result$));		
 	}	
-	else if (REQUESTID_MOVIELIBRARY_GETEPISODEDETS)
+	else if (ID = REQUESTID_MOVIELIBRARY_GETEPISODEDETS)
     {
         CALL UpdateOutputsFromDetails(
 						GetArrayFromResponse("\x22episodedetails\x22", Result$));		
