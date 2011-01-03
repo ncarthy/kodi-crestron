@@ -304,10 +304,14 @@ FUNCTION Send(INTEGER PacketType)
 	ELSE
 		MAKESTRING(Packet$, "%s%s", Header$, LEFT(Payload$, PayloadLength));
 
-	SOCKETSEND(EventServerUdp, Packet$); 
+	IF (SOCKETSEND(EventServerUdp, Packet$) < 0)
+	{
+		PRINT ("Connect: %d", Connect);
+        PRINT ("IP address: %s", XBMC_IPAddr$);
+	}
 
 }
-
+ 
 /************************************************************************/
 /* SendHelo - 															*/
 /* Payload format:			                                            */
