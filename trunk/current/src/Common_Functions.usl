@@ -28,10 +28,11 @@ Comments:
   Compiler Directives
   (Uncomment and declare compiler directives as needed)
 *******************************************************************************************/
-#DEFAULT_NONVOLATILE
+#PRINT_TO_TRACE
+#ENABLE_DYNAMIC
+#DEFAULT_VOLATILE
 #ENABLE_STACK_CHECKING
 #ENABLE_TRACE
-
 
 /*
     Remove leading and trailing whitespace and non-printable characters
@@ -233,4 +234,65 @@ STRING_FUNCTION Round(STRING Number, INTEGER N)
 	}
 	ELSE
 		RETURN (Number);
+}
+  
+
+/*
+	Return 1 if the number is even, 0 otherwise
+*/
+INTEGER_FUNCTION IsEven(INTEGER I)
+{
+	RETURN (I MOD 2 = 0);
+}
+                            
+/*
+	A simplistic lookup function that trys to convert Utf8 to extended ascii
+	or nearest ascii equivalent.
+
+	Only works for ascii and 2-byte Unicode
+*/
+INTEGER_FUNCTION ConvertUtf8ToAscii(INTEGER highByte, INTEGER lowByte)
+{
+	STRING S[20];
+	INTEGER Dec;
+	INTEGER I;
+	INTEGER Bits[7];
+	INTEGER PowerOfTwo;
+
+	IF (highByte>224) // 3- or 4-Byte Unicode
+	{
+		// We can only handle 2-byte unicode at present
+		RETURN (95); // underscore '_'			
+	}
+	ELSE IF (highByte=0)
+		RETURN (lowByte);	// ascii (1-Byte unicode)
+    
+	// Initialize
+	SetArray(Bits,0);
+         
+	// Create binary array
+	MAKESTRING(S, "%c%c", highByte, lowByte);
+    Bits[0] = BIT(S, 1, 7);
+    Bits[1] = BIT(S, 1, 6);
+    Bits[2] = BIT(S, 2, 5);
+    Bits[3] = BIT(S, 2, 4);
+    Bits[4] = BIT(S, 2, 3);
+    Bits[5] = BIT(S, 2, 2);
+    Bits[6] = BIT(S, 2, 1);
+    Bits[7] = BIT(S, 2, 0);
+     
+	// Convert to decimal      
+	PowerOfTwo = 128;
+	Dec = 0;
+	FOR (I = 0 TO 7)
+	{
+    	IF (Bits[I])
+			Dec = Dec + PowerOfTwo;
+
+		PowerOfTwo = PowerOfTwo / 2; 			
+	}
+
+	//PRINT ("Hex: \\x%s, Dec: %d, chr:%s", ItoHex(Dec), Dec, chr(Dec));
+
+	RETURN (Dec);
 }
