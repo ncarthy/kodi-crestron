@@ -60,10 +60,12 @@
   InputSigType20=Digital
   InputCue21=[~UNUSED~]
   InputSigType21=Digital
-  InputCue22=SocketIsBusy
+  InputCue22=IsConnected
   InputSigType22=Digital
-  InputCue23=[~UNUSED~]
+  InputCue23=SocketIsBusy
   InputSigType23=Digital
+  InputCue24=[~UNUSED~]
+  InputSigType24=Digital
   OutputCue1=PlayFb
   OutputSigType1=Digital
   OutputCue2=StopFb
@@ -187,8 +189,8 @@
   ParamSigType5=String
   ParamCue6=PASSWORD
   ParamSigType6=String
-  MinVariableInputs=23
-  MaxVariableInputs=23
+  MinVariableInputs=24
+  MaxVariableInputs=24
   MinVariableInputsList2=4
   MaxVariableInputsList2=4
   MinVariableOutputs=3
@@ -201,9 +203,8 @@
   Expand2=expand_separately
   OffsetOutputs=8
   ProgramTree=Logic
-  SymbolTree=46
-  UserSymTreeName=HTTP Operations
-  Hint=Control XBMC over HTTP
+  SymbolTree=41
+  Hint=Control XBMC using JSON api. Communicate metadata of currently playing media.
   PdfHelp=
   HelpID= 
   Render=4
@@ -228,7 +229,6 @@
   SPlus2CompiledName=S2_XBMC
   SymJam=NonExclusive
   Usl1=Common_Functions.usl
-  Usl2=base64.usl
 [END]
 [BEGIN]
   ObjTp=Dp
@@ -242,7 +242,7 @@
   Tp=1
   SD=The IP Address of the XBMC HTTP server.
   HD=True
-  DV=
+  DV=5C
   NoS=False
   VVS=0
 [END]

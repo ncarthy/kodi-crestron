@@ -26,8 +26,8 @@ Comments:
 */
 
 #SYMBOL_NAME "XBMC"
-#CATEGORY "46" "HTTP Operations" // Custom Category
-#HINT "Control XBMC over HTTP"  
+#CATEGORY "41" // Remote System Interface
+#HINT "Control XBMC using JSON api. Communicate metadata of currently playing media."  
 
 
 /////////////////////Compiler Directives
@@ -44,7 +44,16 @@ Comments:
 //#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
 #DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds 
-                   
+#DEFINE_CONSTANT BUFFER_SIZE 40000      // large!
+
+//Useful characters that we'll need in parsing metadata
+#DEFINE_CONSTANT CR 0x0D		 	// Carriage return
+#DEFINE_CONSTANT LF 0x0A		 	// Linefeed
+#DEFINE_CONSTANT TAB 0x09		 	// Tab
+#DEFINE_CONSTANT SPACE 0x20	   		// Space
+#DEFINE_CONSTANT DBLQUOTE 0x22	   	// "
+#DEFINE_CONSTANT BACKSLASH 0x5C	   	// \
+                  
 /* Types of playing media, output via Currently_Playing_Type*/
 #DEFINE_CONSTANT TYPE_NONE							 0
 #DEFINE_CONSTANT TYPE_MOVIE							 1
@@ -60,17 +69,19 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_VIDEOPLAYLIST_GETITEMS		4
 #DEFINE_CONSTANT REQUESTID_GETTIME_SECONDS				5
 #DEFINE_CONSTANT REQUESTID_GETTIME_PERCENTAGE			6
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIES		7
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSHOWS		8
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSEASONS	9
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVEPISODES	10
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTS		11
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		12
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		13
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				14
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					15
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				16
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			17
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIES		7 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIEDETAILS	8 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSHOWS		9 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSEASONS	10 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVEPISODES	11 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETEPISODEDETS	12 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTS		13 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		14 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		15 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				16 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					17 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				18 // Request Ids 7-20 are handled by XBMC-Browse
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			19 // Request Ids 7-20 are handled by XBMC-Browse
                                                           
 #DEFINE_CONSTANT REQUESTID_SKIPNEXT						22
 #DEFINE_CONSTANT REQUESTID_SKIPPREV						23
@@ -87,6 +98,7 @@ Comments:
 #DEFINE_CONSTANT ACTIVEPLAYER_AUDIO						1
 #DEFINE_CONSTANT ACTIVEPLAYER_SLIDESHOW					2
 #DEFINE_CONSTANT ACTIVEPLAYER_VIDEO						4
+
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -153,17 +165,17 @@ DIGITAL_INPUT IsPlayingOnExternalPlayer, _SKIP_; // HIGH if movie is playing on 
 /* INPUTs to trigger 'Currently Playing' and 'Time' metadata Update */
 DIGITAL_INPUT CheckCurrentlyPlaying, Get_Time, ClearCurrentlyPlaying, _SKIP_;
 
+DIGITAL_INPUT IsConnected; // HIGH when a xbmc socket is connected;
 DIGITAL_INPUT SocketIsBusy, _SKIP_; // HIGH when a JSON command is being transmitted;
 
 ANALOG_INPUT Seek_Percentage, Seek_Time; 	// Seek to this %age, time.
 
 STRING_INPUT  _SKIP_;	
-BUFFER_INPUT Rx$[65534];					// The reply from XBMC
+BUFFER_INPUT Rx$[BUFFER_SIZE];				// The reply from XBMC
 
 ///////////////////////////// Parameters
 STRING_PARAMETER XBMC_IPAddr$[16];   //the ip of the XBMC server.
 STRING_PARAMETER XBMC_Port$[5];		 //the port that the XBMC server lives on
-//INTEGER_PARAMETER StepAmount;		 // Only return this many results from database at a time
 INTEGER_PARAMETER UseJpgExtension;	 // Use '.jpg' as thumbnail extension instead of '.tbn'
 STRING_PARAMETER LOGIN[30];			 // Username for http server (used to download thumbnails) 
 STRING_PARAMETER PASSWORD[30];		 // Password for http server (used to download thumbnails)
@@ -213,10 +225,14 @@ STRING List_Plot$[10][1024];						   // An internal store of the Plot (which is 
 												   // done this way to circumvent limitation on length of
 												   // indirect text to VT-Pro-e programs
 INTEGER TCPBlocker;					// Semaphore for incomplete JSON packets. A packet is not complete
-									// until we receive the '<EOF>' tag.
+									// until we receive the '\n' delimiter.
 SIGNED_INTEGER PlaySpeed;			// Speed of current audio/video playback (1x, 2x, 4x etc.)
-INTEGER IsTvShow;
-INTEGER IsPlaying;
+INTEGER IsTvShow;					// =1 when a Tv Show is playing on the xbmc, 0 otherwise
+INTEGER IsPlaying;					// =1 when media is playing on the xbmc, 0 otherwise
+
+STRING ResultName$[20][40];
+STRING ResultValue$[20][2000];
+INTEGER NameValueCount;
 
 /*
   	Set the video outputs to appropiate state depending on current status
@@ -276,6 +292,17 @@ Function SetSlideShowStatus(INTEGER Status)
 	else
 	{
 		ActivePlayer = ActivePlayer & 253; // switch off the 2nd bit
+	}
+}
+ 
+/*
+	DELAY until socket is clear
+*/
+Function WaitforSocketToClear()
+{
+	WHILE (TCPBlocker)
+	{
+     	delay(1);
 	}
 }
 
@@ -371,6 +398,36 @@ STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
     RETURN (tmpCoverPath);
 }
 
+/*
+    Send the plot string (usu very long) to a STRING_OUTPUT
+	Done this way to overcome length restriction on Indirect Text joins
+*/
+FUNCTION SendPlotAsIndirectText(STRING longstring$)
+{
+	STRING chunk[100];	
+	STRING Original$[1024];
+
+	Original$ = longstring$;
+
+	// Must reset the output string.
+    CurrentPlot$ = "";
+
+	while (len(longstring$))
+	{
+		if (len(longstring$)>100)
+		{
+			chunk = removebylength(100, longstring$);
+		}
+		else
+		{
+			chunk = longstring$;
+			longstring$ = "";
+		}
+		CurrentPlot$ = "\xFE\x02" + chunk;
+	}	
+
+	longstring$ = Original$;
+}
 
 /*
 	Set the outputs to a default empty state
@@ -425,58 +482,40 @@ FUNCTION Initialize_Outputs()
 }
 
 /*
-	Update IsVideo, IsAudio and IsSlideshow from GetActivePlayers response
+	Update IsVideo, IsAudio and IsSlideshow digital outputs from the GetActivePlayers response
 
-	Expecting a response string of the form (ignoring whitespace): 
-	 				{"audio":false,"picture":false,"video":false}
+	The original JSON would have been of the form (ignoring whitespace):
+	 				{"audio":false,"picture":false,"video":true}
+	
+	The ParseObject method has transferred the names and values to 
+	the ResultName$ and ResultValue$ arrays.
 
 */
-FUNCTION GetActivePlayersFromResponse(STRING Response$)
+FUNCTION GetActivePlayersFromResponse()
 {
-	INTEGER Ind[1];			//Index variables used to parse the JSON response
-    STRING  Value[5];		// temp variable to hold true/false value
+	INTEGER i;
 
-    Ind[0] = FIND(":", Response$, FIND("audio", Response$)) + 1; 
-	Ind[1] = FIND(",", Response$, Ind[0]) - 1;
-	Value = MID(Response$, Ind[0], Ind[1]-Ind[0]+1);
-	Value = TRIM(Value);
+	FOR (i = 1 TO 3)
+	{
+		IF (ResultName$[i] = "audio")
+			IF (ResultValue$[i] = "true")
+				SetAudioStatus(ON);
+			ELSE
+				SetAudioStatus(OFF);
 
-	IF (Value = "true")
-	{
-		SetAudioStatus(ON);
-	}
-	ELSE
-	{
-		SetAudioStatus(OFF);
-    }                
-    
-	Ind[0] = 0; Ind[1] = 0;
-	Ind[0] = FIND(":", Response$, FIND("picture", Response$)) + 1;
-	Ind[1] = FIND(",", Response$, Ind[0]) - 1;
-	IF (Ind[0] > 0 && Ind[1] > 0)
-	{
-		Value = MID(Response$, Ind[0], Ind[1]-Ind[0]+1);
-		Value = TRIM(Value);
-
-		IF (Value = "true")
-			SetSlideShowStatus(ON);
+		ELSE IF (ResultName$[i] = "video")	
+			IF (ResultValue$[i] = "true")
+				SetVideoStatus(ON);
+			ELSE
+				SetVideoStatus(OFF);
+		ELSE IF (ResultName$[i] = "picture")	
+			IF (ResultValue$[i] = "true")
+				SetSlideShowStatus(ON);
+			ELSE
+				SetSlideShowStatus(OFF);
 		ELSE
-			SetSlideShowStatus(OFF);
-       }
-
-	Ind[0] = 0; Ind[1] = 0;
-	Ind[0] = FIND("video", Response$);
-	Ind[0] = FIND(":", Response$, Ind[0]) + 1;
-	Ind[1] = FIND("}", Response$, Ind[0]) - 1; // assumes video always comes last
-	IF (Ind[0] > 0 && Ind[1] > 0)
-	{
-		Value = MID(Response$, Ind[0], Ind[1]-Ind[0]+1);
-		Value = TRIM(Value);
-
-		IF (Value = "true") 
-			SetVideoStatus(ON);
-		ELSE
-			SetVideoStatus(OFF);
+			PRINT ("XBMC.usp (GetActivePlayersFromResponse): Unknown ResultName (%s)", LEFT(ResultName$[i], 20));
+				    	
 	}
 	
 	IF (!ActivePlayer) 
@@ -497,90 +536,56 @@ FUNCTION GetActivePlayersFromResponse(STRING Response$)
 	NextInPlaylist:	When =1 then Item$ contains details of the next track in the playlist
 					When =0 then Item$ contains details of the current track in the playlist		
 */
-FUNCTION GetMetadataFromList(STRING Item$, INTEGER NextInPlaylist)
+FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 {
-	INTEGER Ind[2];					//Index variables used to parse the reponse
-	STRING Info[40][255];			//An array of currently playing information
-	STRING Category[40][40];		//An array of the type of Info e.g. Genre, Artist etc.	  
-	INTEGER i,j;					//Loop vars
+    INTEGER i;
 	STRING CoverartTmp[512];//The coverart uri. Must be treated as a special case due to TPS-6X limitations
-
-	i=0; j=0; Ind[0] = Find("{", Item$)+1;
-
-	#IF_DEFINED DEBUG PRINT("Item$: %s", LEFT(Item$, 245)); #ENDIF
-
-	// Parse the JSON items list into an array of Info & Categories
-	While(Ind[0])
-	{
-		Ind[1] = Find(":", Item$, Ind[0]);
-		If(Ind[1] )
-		{
-
-			Ind[2] = Find(",\x0A", Item$, Ind[1]); // Each list item is separated by a comma, followed by a line-feed
-			IF ( Ind[2] = 0) Ind[2] = ReverseFind("}", Item$)-1; // must be the end of the list
-
-			Category[j] = RemoveDoubleQuotesAndWhitespace( Mid(Item$, Ind[0]+1, Ind[1]-Ind[0]-1) );
-			
-            Info[j] = LEFT(RemoveDoubleQuotesAndWhitespace( Mid(Item$, Ind[1]+1, Ind[2]-Ind[1]-1) ),255);
-
-			#IF_DEFINED DEBUG 
-				PRINT( "%s: %s\n", Category[j], LEFT(Info[j],220)  ); 
-			#ENDIF
-
-			j=j+1;
-			
-			Ind[0] = Ind[2];
-
-			// Emergency bailout
-			IF (J > 39) Ind[0] = 0;
-
-		}
-		Else Ind[0] = 0;
-	} 
     
+	#IF_DEFINED DEBUG PRINT ("NextInPlaylist %d, NameValueCount %d ", NextInPlaylist, NameValueCount); #ENDIF
+
 	// Assign to OUTPUTs
 	IF(!NextInPlaylist)
 	{
-		FOR (i = 0 to j-1)
+		FOR (i = 1 to NameValueCount)
 		{
-	     	IF (Category[i] = "file") CurrentFilename$ = RIGHT(Info[i],255); //SIMPL strings can only be 255 chars long
-			ELSE IF(Category[i] = "title") CurrentTitle$ = Info[i];
-			ELSE IF(Category[i] = "tracknumber") CurrentTrackNumber$ = Info[i];
-			ELSE IF(Category[i] = "artist") CurrentArtist$ = Info[i];
-	 		ELSE IF(Category[i] = "album") CurrentAlbum$ = Info[i];
-			ELSE IF(Category[i] = "genre") CurrentGenre$ = Info[i];
-			ELSE IF(Category[i] = "director") CurrentDirector$ = Info[i];
-			ELSE IF(Category[i] = "year") CurrentYear$ = Info[i];
-			ELSE IF(Category[i] = "musicplayer.bitrate") CurrentAudioBitRate$ = Info[i];
-			ELSE IF(Category[i] = "musicplayer.codec") AudioCodec$ = Info[i];
-			ELSE IF(Category[i] = "videoplayer.videocodec") VideoCodec$ = Info[i];
-			ELSE IF(Category[i] = "rating") CurrentRating$ = Round(Info[i],2);		
-	        ELSE IF(Category[i] = "studio") CurrentStudio$ = Info[i];
-			ELSE IF(Category[i] = "writer") CurrentWriter$ = Info[i];
-			ELSE IF(Category[i] = "showtitle") CurrentShowTitle$ = Info[i];
-			ELSE IF(Category[i] = "season") CurrentSeason$ = Info[i];
-			ELSE IF(Category[i] = "episode") CurrentEpisode$ = Info[i];
-			ELSE IF(Category[i] = "firstaired") CurrentFirstAired$ = Info[i];
-			ELSE IF(Category[i] = "tagline") CurrentTagLine$ = Info[i];
-			ELSE IF(Category[i] = "plot") CurrentPlot$ = LEFT(Info[i],200); //width restriction imposed			ELSE IF(Category[i] = "plotoutline") CurrentPlotOutline$ = Info[i];
-			ELSE IF(Category[i] = "thumbnail") 
+	     	IF (ResultName$[i] = "file") CurrentFilename$ = RIGHT(ResultValue$[i],255); //SIMPL strings can only be 255 chars long
+			ELSE IF(ResultName$[i] = "title") CurrentTitle$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "tracknumber") CurrentTrackNumber$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "artist") CurrentArtist$ = ResultValue$[i];
+	 		ELSE IF(ResultName$[i] = "album") CurrentAlbum$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "genre") CurrentGenre$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "director") CurrentDirector$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "year") CurrentYear$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "musicplayer.bitrate") CurrentAudioBitRate$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "musicplayer.codec") AudioCodec$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "videoplayer.videocodec") VideoCodec$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "rating") CurrentRating$ = Round(ResultValue$[i],2);		
+	        ELSE IF(ResultName$[i] = "studio") CurrentStudio$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "writer") CurrentWriter$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "showtitle") CurrentShowTitle$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "season") CurrentSeason$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "episode") CurrentEpisode$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "firstaired") CurrentFirstAired$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "tagline") CurrentTagLine$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "plot") SendPlotAsIndirectText(ResultValue$[i]);
+			ELSE IF(ResultName$[i] = "thumbnail") 
 			{
-				CurrentCoverArt$ = ThumbnailUri(Info[i],UseJpgExtension);
-				CoverartTmp = ThumbnailUri(Info[i],UseJpgExtension);
+				CurrentCoverArt$ = ThumbnailUri(ResultValue$[i],UseJpgExtension);
+				CoverartTmp = ThumbnailUri(ResultValue$[i],UseJpgExtension);
 			}
-			ELSE IF(Category[i] = "time") 
+			ELSE IF(ResultName$[i] = "time") 
 			{
-				Position_Seconds = AtoI(Info[i]);
+				Position_Seconds = AtoI(ResultValue$[i]);
 				CurrentTime$ = ConvertToTime(Position_Seconds);
 			}
-			ELSE IF(Category[i] = "total") 
+			ELSE IF(ResultName$[i] = "total") 
 			{
-				Duration_Seconds = AtoI(Info[i]);
+				Duration_Seconds = AtoI(ResultValue$[i]);
 				CurrentDuration$ = ConvertToTime(Duration_Seconds);					
 			}
-			ELSE IF(Category[i] = "Playlist.position")
+			ELSE IF(ResultName$[i] = "Playlist.position")
 			{
-				PlaylistPosition = AtoI(Info[i]);
+				PlaylistPosition = AtoI(ResultValue$[i]);
 	            IF (PlaylistPosition)
 					PlaylistPosition = PlaylistPosition -1; // make it zero-based    	
 				ELSE
@@ -600,19 +605,136 @@ FUNCTION GetMetadataFromList(STRING Item$, INTEGER NextInPlaylist)
 	}
 	ELSE
 	{
-		FOR (i = 0 to j-1)
+		FOR (i = 1 to NameValueCount)
 		{
-	     	IF(Category[i] = "title") NextTitle$ = Info[i];
-			ELSE IF(Category[i] = "tracknumber") NextTrackNumber$ = Info[i];
-			ELSE IF(Category[i] = "artist") NextArtist$ = Info[i];
-	 		ELSE IF(Category[i] = "album") NextAlbum$ = Info[i];
-			ELSE IF(Category[i] = "genre") NextGenre$ = Info[i];
+	     	IF(ResultName$[i] = "title") NextTitle$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "tracknumber") NextTrackNumber$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "artist") NextArtist$ = ResultValue$[i];
+	 		ELSE IF(ResultName$[i] = "album") NextAlbum$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "genre") NextGenre$ = ResultValue$[i];
 		}
 	}
 }
 
 /*
-    Update metadata using response from a JSON call that returned a list
+    Parse a JSON result object that does not contain an array.
+
+	The JSON result object is required to be of the form (ignoring whitespace):
+	 				{"name1":"value1","name2":"value2","name3":.. etc.   ..}
+	
+	This method will then transfer the names and values to the ResultName$ 
+	and ResultValue$ arrays.
+
+*/
+
+FUNCTION ParseObject(STRING Result$)
+{
+	INTEGER loop;
+	INTEGER character;				// current character from the buffer
+	INTEGER prevCharacter;			// previous character from the buffer
+	INTEGER inputLength;			// length of Result$
+	INTEGER SkipCharacter;			// when =1 drop character, otherwise process it
+	INTEGER DoubleQuotesCount;		// number of quotes ("). Used to determine if inside a string
+	INTEGER InItemName;				// when =1 we are currently parsing the name of a name/value pair
+	INTEGER outputPosition;			// position in output string
+
+	// initialize
+	InItemName = 1;
+	NameValueCount = 1;
+	outputPosition = 1;
+	SetArray(ResultName$,"");		// These are module-level arrays
+	SetArray(ResultValue$,"");		//
+
+	inputLength = len(Result$);
+	
+	for(loop = 1 to inputLength) //step through every character of Buffer input
+	{
+		SkipCharacter = 0;
+		character = byte(Result$, loop); //extract it
+		switch(character) //examine it
+		{
+			case ('{'):
+			{
+				IF (IsEven(DoubleQuotesCount))
+					SkipCharacter = 1;
+			}
+			case ('}'):
+			{
+				IF (IsEven(DoubleQuotesCount))
+					SkipCharacter = 1;						
+			}
+
+            case (DBLQUOTE): // " (double quotes)
+			{
+				IF (prevCharacter != BACKSLASH) // Avoid case where double quote is escaped (\")
+				{
+            		DoubleQuotesCount = DoubleQuotesCount + 1;
+					SkipCharacter = 1;
+				}
+			}
+			case (','):
+			{
+				// Ignore the comma that seperates individual array items
+				IF (IsEven(DoubleQuotesCount))
+				{
+					InItemName = 1;
+					SkipCharacter = 1;
+					outputPosition = 1;
+					NameValueCount = NameValueCount+1;
+				}
+					
+			}
+            case (':'):
+			{
+				IF (IsEven(DoubleQuotesCount))
+				{
+					InItemName = 0;
+					SkipCharacter = 1;
+					outputPosition = 1;			
+				}
+			}
+			case (BACKSLASH):
+			{
+            	IF (IsEven(DoubleQuotesCount))
+				{
+					IF (prevCharacter != BACKSLASH)	// Avoid case where backslash is escaped (\\)		
+						SkipCharacter = 1;
+				}
+
+			}
+		}
+
+		IF (!SkipCharacter)
+		{
+			//append the character
+			IF (InItemName)
+				setString(chr(character), outputPosition, ResultName$[NameValueCount]);				
+			ELSE
+				setString(chr(character), outputPosition, ResultValue$[NameValueCount]);								
+
+			// increment counter
+            outputPosition = outputPosition + 1;
+		}         
+        
+		// store previous character
+		prevCharacter = character;   
+		 
+	}
+    
+	#IF_DEFINED DEBUG 
+		FOR (loop = 1 to NameValueCount)
+		{
+	    	IF (LEN(ResultName$[loop]))
+				PRINT ("XBMC.usp:ParseObject() %s: %s", ResultName$[loop], LEFT(ResultValue$[loop], 100));
+			ELSE
+				Break;
+		}
+	#ENDIF
+}
+
+/*
+    Update metadata using JSON result object that contains an array of
+	one or at most 2 items: "[{...}]" or "[{...},{...}]"
 */
 FUNCTION GetMetadataFromResponse(STRING Response$)
 {
@@ -626,96 +748,34 @@ FUNCTION GetMetadataFromResponse(STRING Response$)
 
 	// Mark out the start and end of (i) the "items" array and (ii) the first item in the array
 	ItemsArrayBookends[0] = Find("[", Response$);    
-	ItemsArrayBookends[1] = Find("]", Response$, ItemsArrayBookends[0]);
+	//ItemsArrayBookends[1] = Find("]", Response$, ItemsArrayBookends[0]);
 	ListItemBookends[0] = Find("{", Response$, ItemsArrayBookends[0]);    
-	ListItemBookends[1] = Find("}", Response$, ListItemBookends[0]); 
+	ListItemBookends[1] = Find("}", Response$, ListItemBookends[0]);    
 
 	Item$ = MID(Response$, ListItemBookends[0], ListItemBookends[1] - ListItemBookends[0]);  
- 
-	CALL GetMetadataFromList(Item$, 0);
+	ParseObject(Item$);
+	CALL GetMetadataFromList(0);
+                
 
 	// Mark out the start and end of the second item in the array
-	ListItemBookends[0] = Find("{", Response$, ListItemBookends[1]);    
+	ListItemBookends[0] = Find("{", Response$, ListItemBookends[1]); 
+	IF ( ListItemBookends[0] = 0) 
+		RETURN;
+   
 	ListItemBookends[1] = Find("}", Response$, ListItemBookends[0]);
 	IF ( ListItemBookends[1] = 0) ListItemBookends[1] = LEN(Response$);
-    #IF_DEFINED DEBUG PRINT("ListItemBookends[0]: %d, ListItemBookends[1]: %d", 
-					ListItemBookends[0],ListItemBookends[1]); #ENDIF
-	Item$ = MID(Response$, ListItemBookends[0], ListItemBookends[1] - ListItemBookends[0]); 
-
-	CALL GetMetadataFromList(Item$, 1);
+	Item$ = MID(Response$, ListItemBookends[0], ListItemBookends[1] - ListItemBookends[0]);
+    ParseObject(Item$);
+	CALL GetMetadataFromList(1);
 
 }
 
-/*
-    Update the duration and time of the current track
-*/
-FUNCTION GetTimeFromResponse(STRING Response$)
-{
-	INTEGER ListItemBookends[2];	//Start and end of an item in the items list
-	STRING Item$[1000];				//A single item
-
-	// Mark out the start and end of (i) the "items" array and (ii) the first item in the array
-	// The first item in the array contains details of the track that's currently playing
-	ListItemBookends[0] = Find("{", Response$);    
-	ListItemBookends[1] = Find("}", Response$, ListItemBookends[0]); 
-
-	Item$ = MID(Response$, ListItemBookends[0], ListItemBookends[1] - ListItemBookends[0]);  
- 
-	CALL GetMetadataFromList(Item$, 0);
-}
 
 /*
-    Return a JSON array with the given name.
+	Analyse and respond to the content of an Announcement message
 
-	ArrayName: e.g. "\x22movies\x22", "\x22episodes\x22" etc.
-*/
-STRING_FUNCTION GetArrayFromResponse(STRING ArrayName, STRING Response$)
-{
-    STRING Array$[16384];
-
-	INTEGER FirstSquareBracket; 
-	INTEGER LastSquareBracket; 
-    
-    #IF_DEFINED DEBUG PRINT("Response$: %s", LEFT(Response$, 200)); #ENDIF
-
-	FirstSquareBracket = FIND("[\x0A", Response$, Find(ArrayName, Response$)) + 3;
-	LastSquareBracket = ReverseFind("],\x0A", Response$); 
-	IF (LastSquareBracket = 0)
-		LastSquareBracket = ReverseFind("]", Response$); 
-	//#IF_DEFINED DEBUG PRINT("FirstSquareBracket: %d, LastSquareBracket: %d", FirstSquareBracket, LastSquareBracket); #ENDIF
-	Array$ = MID(Response$, FirstSquareBracket, LastSquareBracket - FirstSquareBracket);
-    //#IF_DEFINED DEBUG PRINT("MovieList$: %s", LEFT(MovieList$, 200)); #ENDIF
-
-	RETURN (Array$);
-}
-   
-/*
-    Get the value of the "total" field in a List Response
-*/
-INTEGER_FUNCTION GetListTotalFromResponse(STRING Result$)
-{
-    STRING Total$[10];
-    
-	INTEGER IndexOfTotal;
-	INTEGER IndexOfColon; 
-	INTEGER IndexOfNextComma;
-	INTEGER IndexOfOpeningArrayBracket;
-
-	IndexOfTotal = Find("\x22total\x22", Result$); 
-    
-	IndexOfColon = FIND(":", Result$, IndexOfTotal);
-	IndexOfNextComma = Find(",", Result$, IndexOfColon);
-	IF (IndexOfNextComma=0)
-		IndexOfNextComma = Find("}", Result$, IndexOfColon);
-
-	Total$ = MID(Result$, IndexOfColon+1, IndexOfNextComma - IndexOfColon-1);
-    #IF_DEFINED DEBUG PRINT("Total$: %s", Total$); #ENDIF
-
-	RETURN (AtoI(Total$));
-}
-
-/*
-
+	Typical form of announcement message:
+	{}
 */
 FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 {
@@ -729,12 +789,18 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 
 	Message$ = MID(Announcement$, Ind[1], Ind[2] - Ind[1]);
 
-	PRINT("Message: %s\n", Message$);
+	#IF_DEFINED DEBUG 	
+		PRINT("Message: %s\n", Message$);
+    #ENDIF
 
 	If(Find("Action", Message$) || Find("PlayBackSeek",Message$) 
 						|| Find("MediaChanged",Message$)
 						|| Find("QueueNextItem", Message$) 
-						|| Find("NewSong", Message$))
+						|| Find("NewSong", Message$)
+						|| Find("NewPlayCount", Message$)
+						|| Find("ApplicationStop", Message$)
+						|| Find("ApplicationStart", Message$)
+						|| Find("Sleep", Message$))
 	{
 		// Do Nothing
 	}
@@ -802,11 +868,13 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 {
 	IF (id = REQUESTID_GETACTIVEPLAYERS)
 	{
-		CALL GetActivePlayersFromResponse(Result$);
+		CALL ParseObject(Result$);
+		CALL GetActivePlayersFromResponse();
 	}
 	ELSE IF (id = REQUESTID_GETINFOLABELS)
 	{
-		CALL GetMetadataFromList(Result$, 0);
+		CALL ParseObject(Result$);
+		CALL GetMetadataFromList(0);
 	}
 	ELSE IF (id = REQUESTID_AUDIOPLAYLIST_GETITEMS)
 	{
@@ -822,7 +890,10 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 	}
 	ELSE IF (id = REQUESTID_GETTIME_SECONDS)
 	{
-		CALL GetTimeFromResponse(Result$);
+		CALL ParseObject(Result$);
+
+		//Update the duration and time of the current track
+		CALL GetMetadataFromList(0);
 	}
 	ELSE IF (id = REQUESTID_GETTIME_PERCENTAGE)
 	{
@@ -830,14 +901,8 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 		CurrentPercentage$ = Round(Result$,0)+"%";
 		Progress_Percentage = AtoI(Round(Result$,0));
 	}
-	ELSE IF (ID = REQUESTID_MOVIELIBRARY_GETMOVIES
-				|| ID = REQUESTID_MOVIELIBRARY_GETTVSHOWS
-				|| ID = REQUESTID_MOVIELIBRARY_GETTVSEASONS
-				|| ID = REQUESTID_MOVIELIBRARY_GETTVEPISODES
-				|| ID = REQUESTID_AUDIOLIBRARY_GETARTISTS
-				|| ID = REQUESTID_AUDIOLIBRARY_GETALBUMS
-				|| ID = REQUESTID_AUDIOLIBRARY_GETSONGS
-				|| ID = REQUESTID_PLAYLIST_PLAYALLLIST)
+	ELSE IF (ID >= REQUESTID_MOVIELIBRARY_GETMOVIES
+				&& ID <= REQUESTID_PLAYLIST_PLAYALLLIST)
     {
         // Do Nothing.
 		// Handled by XBMC-Browse		
@@ -872,50 +937,30 @@ INTEGER_FUNCTION GetRequestID(STRING IN$)
     INTEGER Ind[1];		// Indices used in parsing input string
 	STRING ID$[10];
 	
-	Ind[0] = FIND("id", IN$);
-	Ind[0] = FIND(":", IN$, Ind[0]) + 1;
-	Ind[1] = FIND(",\x0A", IN$, Ind[0]) - 1; 
+	Ind[0] = FIND("id\x22:", IN$)+ 4;
+	Ind[1] = FIND(",", IN$, Ind[0]) - 1; 
 	ID$ = MID(IN$, Ind[0], Ind[1] - Ind[0] + 1);
-    ID$ = TRIM(ID$);
 
 	RETURN (AtoI(ID$));
 }
-/*******************************************************************************************
-  TCPIP Connection
-*******************************************************************************************/ 
 
-CHANGE Rx$
+/*
+	Parse the JSON reply from Xbmc to either:
+		i) select the 'result' object from the XbmcResponse
+		ii) select the 'error' object from the XbmcResponse
+		iii) select the 'params' object from the XbmcResponse, if the message is an Announcement
+*/
+FUNCTION ProcessResponse(STRING Response$)
 {
 	INTEGER ID;  				// The request id. It is used to match the response
 								// with the request that it is replying to.
-	    
-	STRING Response$[65534]; 	// The response from XBMC
 	INTEGER Ind[2];				//Index variables used to parse the response  
-                     
-	//Semaphore
-	WHILE (TCPBlocker) 
-	{	
-		Delay(10);
-	}	
-	TCPBlocker = 1;
-    
-	// Test for empty buffer (Can happen if buffer emptied by earlier event)
-	IF (LEN(Rx$) = 0) 
-	{
-		TCPBlocker = 0;
-		TERMINATEEVENT;
-	}
 
-	DO
-	{
-		Response$ = GATHER("<EOF>", Rx$, GATHER_TIMEOUT);		
-	} 
-	UNTIL (LEN(Response$));
-    
-	Response$ = LEFT(Response$, LEN(Response$) - 5); // remove <EOF> delimiter
+	#IF_DEFINED DEBUG  Print("Payload Received (%d bytes): %s", LEN(Response$), LEFT(Response$,200)); #ENDIF
 
 	// Process the JSON payload, which is now in the Response$ variable
-	IF (FIND ("result", Response$))
+	Ind[0] = FIND ("result", Response$);
+	IF (Ind[0])
 	{
 
 		// Determine request id
@@ -924,14 +969,18 @@ CHANGE Rx$
 		// 'result' string within XBMC Response
 		Ind[0] = FIND ("{", Response$, Ind[0]);
 		IF (Ind[0])
-			Ind[1] = REVERSEFIND ("}\x0A", Response$);
+			Ind[1] = REVERSEFIND ("}}", Response$);
 		ELSE
 		{
+			// To capture the case of GetPercentage() which doesn't return a result object...
+			// instead it returns a number as the result e.g. "{id:7,jsonrpc:2.0,result:5.6578436456}"
             Ind[0] = FIND (":", Response$, FIND ("result", Response$)) + 1;
-			Ind[1] = REVERSEFIND ("\x0A}", Response$);
+			Ind[1] = REVERSEFIND ("}", Response$);
 		}
+		IF (Ind[1]=0)
+			Ind[1] = LEN(Response$);
 
-		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
+		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
 
 		IF (ID)
 			CALL ParseJSONResult(ID, Response$);  	
@@ -940,9 +989,11 @@ CHANGE Rx$
 	ELSE IF (FIND ("Announcement", Response$))
 	{
        	Ind[0] = FIND (":", Response$, FIND ("params", Response$)) + 1;
-		Ind[1] = REVERSEFIND ("\x0A}", Response$);
+		Ind[1] = REVERSEFIND ("}", Response$);
+		IF (Ind[1]=0)
+			Ind[1] = LEN(Response$);
 		
-		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
+		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
 
         CALL ParseAnnouncementMessage(Response$);
 	}
@@ -950,13 +1001,15 @@ CHANGE Rx$
 	ELSE IF (FIND ("error", Response$))
 	{
 		// Determine request id
-           ID = GetRequestID(Response$);
+        ID = GetRequestID(Response$);
               
 		// 'error' string within XBMC Response
-           Ind[0] = FIND (":", Response$, FIND ("error", Response$)) + 1;
-		Ind[1] = REVERSEFIND ("\x0A}", Response$);
+        Ind[0] = FIND (":", Response$, FIND ("error", Response$)) + 1;
+		Ind[1] = REVERSEFIND ("}}", Response$);
+		IF (Ind[1]=0)
+			Ind[1] = LEN(Response$);
 
-		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0]);
+		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
                  
 		IF (ID)
 			CALL ParseJSONError(ID, Response$);
@@ -965,30 +1018,23 @@ CHANGE Rx$
 	}
 	ELSE
 	{
-		Print("Unrecognised Payload: %s", LEFT(Response$,200));
+		Print("XBMC.usp (ProcessResponse): Unrecognised Payload: %s", LEFT(Response$,190));
 	}	
-
-                
-	// Reset the flag to zero
+    
 	TCPBlocker = 0;
-
-
 }
 
-/*******************************************************************************************
-  Functions
-  Note:  Functions must be physically placed before the location in
-         the code that calls them.
-*******************************************************************************************/
-
 /*
-	Send the JSON-RPC Post command
+	Send the JSON-RPC command
 */
 Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 {
 	STRING Command$[16384];
+
+	IF (IsConnected = OFF)
+		RETURN;
 	
-	IF (SocketIsBusy)
+	WHILE (SocketIsBusy || TCPBlocker)
 	{		
 		IF (id = REQUESTID_GETTIME_SECONDS ||
 				id = REQUESTID_GETTIME_PERCENTAGE)
@@ -996,6 +1042,11 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 
      	Delay(2);
 	}
+	TCPBlocker = 1;
+	Wait(200) // 2-second timeout
+	{
+    	TCPBlocker = 0; 	
+	}                      
 
     IF (LEN(Arguments) = 0)
 	{
@@ -1026,7 +1077,7 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 			Command$ = "";
 		}
 	}
-	                        
+ 
 }
 
 
@@ -1070,7 +1121,7 @@ FUNCTION GetCurrentTime()
 	{
 		CALL SendJsonCommand (REQUESTID_GETTIME_SECONDS, 
 										"AudioPlayer.GetTime", "");
-		DELAY(JSON_DELAY);
+		WaitforSocketToClear();
 		CALL SendJsonCommand (REQUESTID_GETTIME_PERCENTAGE, 
 									"AudioPlayer.GetPercentage","");
 	}
@@ -1078,7 +1129,7 @@ FUNCTION GetCurrentTime()
 	{
 		CALL SendJsonCommand (REQUESTID_GETTIME_SECONDS, 
 											"VideoPlayer.GetTime", "");
-		DELAY(JSON_DELAY);
+		WaitforSocketToClear();		
 		CALL SendJsonCommand (REQUESTID_GETTIME_PERCENTAGE, 
 									"VideoPlayer.GetPercentage", "");
 	}
@@ -1098,13 +1149,12 @@ FUNCTION GetCurrentTime()
 */
 FUNCTION UpdateMetadata()
 {
-	CALL GetActivePlayers();	
+	CALL GetActivePlayers();	   
+	WaitforSocketToClear();
     
-	DELAY(JSON_DELAY);
-	CALL GetCurrentPlaylistPositionAndInfoLabels();
-
-	DELAY(JSON_DELAY);
-	//ProcessLogic();
+	IF (IsPlaying)
+		CALL GetCurrentPlaylistPositionAndInfoLabels();
+	WaitforSocketToClear();
   	
 	// only return the current item and one more
 	IF (ActivePlayer = ACTIVEPLAYER_AUDIO)
@@ -1112,7 +1162,7 @@ FUNCTION UpdateMetadata()
     	CALL SendJsonCommand (REQUESTID_AUDIOPLAYLIST_GETITEMS, 
 									"AudioPlaylist.GetItems", 
 									AudioPlaylistParameters("", 
-								PlaylistPosition, PlaylistPosition+1, "track"));
+								PlaylistPosition, PlaylistPosition+2, "track"));
 	}
 	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO)
 	{
@@ -1238,7 +1288,11 @@ CHANGE Seek_Time
   
 ///////////// Initialization script
 Function Main()
-{                            
+{     
+	    
+	STRING Xbmc$[BUFFER_SIZE]; 	// The response from XBMC
+
+                       
 	// This line must be before WaitForInitializationComplete()
 	// This IP address is passed to XBMC-ES via this output
 	IPAddress$ = XBMC_IPAddr$;
@@ -1247,6 +1301,12 @@ Function Main()
 
 	WaitForInitializationComplete();
      
+    // Eternal loop, waiting for Data from Xbmc 
+	WHILE(1)
+	{
+  		Xbmc$ = Gather("\n", RX$);
+		CALL ProcessResponse(Xbmc$);		
+	} 
 
 }
        
