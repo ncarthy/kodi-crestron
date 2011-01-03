@@ -4,7 +4,6 @@
   * Download and install a recent version of Xbmc. I suggest using the latest nightly version from http://sshcs.com/xbmc/
   * The VT Pro-e project requires at least version 4.2 of [http://www.crestron.com VisionTools]
 
-.
 
 = Compiling =
 What follows are instructions for getting the demo XPanel project working. 
