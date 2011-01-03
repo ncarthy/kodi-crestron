@@ -15,10 +15,10 @@ namespace CopyThumbnails
         {
             // Arg 1 is the directory to do, recursively
             // Arg 2 is new width, use '0' if not resizing
-            // Arg 3 is a list of exclude masks. A good list is "generated,Profiles,Pictures,Programs,Artists,Fanart,LastFM,Bookmarks".
+            // Arg 3 is a list of exclude masks. A good list is "generated,Profiles,Pictures,Programs,LastFM,Bookmarks".
             //
             // Usage:    CopyThumbnails.exe "C:\Users\Admin\AppData\Roaming\XBMC\userdata\Thumbnails",
-            //                    120,"generated,Profiles,Pictures,Programs,Artists,Fanart,LastFM,Bookmarks"
+            //                    120,"generated,Profiles,Pictures,Programs,Fanart,LastFM,Bookmarks"
             if (args.Length <2)
 	        {
                 if (args.Length >= 1)
@@ -69,7 +69,7 @@ namespace CopyThumbnails
 
                     // Only do directories whose name is one character long
                     DirectoryInfo di = new DirectoryInfo(directory);
-                    if (di.Name.Length == 1)
+                    if (di.Name.Length == 1 || di.Name == "Artists" || di.Name == "Fanart")
                     {
                         DoDir(directory);
                     } 
@@ -118,7 +118,19 @@ namespace CopyThumbnails
 
 
                 Image i = ResizeImage(fileName, newFileName, width, 9999, false);
-                i.Save(newFileName, format);
+                try
+                {
+                    i.Save(newFileName, format);
+                }
+                catch (System.Runtime.InteropServices.ExternalException ex)
+                {
+                    // DO NOTHING
+                    Console.WriteLine(ex.Message);
+                }
+                catch (Exception e)
+                {
+                    throw new ApplicationException("Error resizing file", e);
+                }
             }
         }
 
