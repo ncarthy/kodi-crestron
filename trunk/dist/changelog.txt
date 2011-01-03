@@ -1,0 +1,16 @@
+xbmc-crestron history
+
+0.3 03-Jan-2010
+SMS search enabled
+* Can browse for albums now supported
+* When browsing by artist can select an album or all songs
+* Convert 2-byte UTF8 characters to extended ASCII
+* Supply feedback when loading large list
+* Added socket to XBMC-Browse module instead of using XBMC-Socket module. The separate module was too slow.
+* Moved socket gather command to Main() function instead of Change event to reduce number of threads started.
+* JSON code received from Xbmc is now parsed character-by-character
+
+Bug Fixes
+* Plot of currently playing movie or TV episode is no longer truncated.
+
+
