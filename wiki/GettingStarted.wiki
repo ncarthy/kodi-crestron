@@ -1,0 +1,15 @@
+#summary Full instructions to get this project working on your system.
+
+= Preliminaries =
+  * Download and install a recent version of Xbmc. I suggest using the latest nightly version from http://sshcs.com/xbmc/
+  * The VT Pro-e project requires at least version 4.2 of [http://www.crestron.com VisionTools]
+
+.
+
+= Compiling =
+What follows are instructions for getting an XPanel project working 
+  * Download and extract the source code zip file from the Downloads tab
+  * Open the xbmc-test.smw project file in SIMPL windows
+    *  This project is set up for an AV2 processor. Change if required.
+  * Located the XBMC V2 module in the project. In the detail view, at the bottom of this module you will see 9 parameters:
+    * Item_Count: 
