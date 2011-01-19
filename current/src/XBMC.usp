@@ -405,7 +405,7 @@ STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
 FUNCTION SendPlotAsIndirectText(STRING longstring$)
 {
 	STRING chunk[100];	
-	STRING Original$[1024];
+	STRING Original$[5000];
 
 	Original$ = longstring$;
 
@@ -1154,6 +1154,9 @@ FUNCTION UpdateMetadata()
     
 	IF (IsPlaying)
 		CALL GetCurrentPlaylistPositionAndInfoLabels();
+	ELSE
+		CALL Initialize_Outputs();
+
 	WaitforSocketToClear();
   	
 	// only return the current item and one more
