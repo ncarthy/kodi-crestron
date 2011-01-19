@@ -1,0 +1,6 @@
+#summary quick tips if it isn't working for you
+
+=== Details of Movies / TV Episodes ===
+
+In order to view details of movies and TV show episodes I make use of 2 JSON methods (GetMovieDetails and GetEpisodeDetails) that were not part of the Dharma release of xbmc. They are in the latest xbmc source code which is now hosted at https://github.com/xbmc/xbmc.
+
