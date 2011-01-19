@@ -2138,7 +2138,7 @@ CHANGE SearchCriteria$
 					FOR (i = 1 TO NumberOfAlbums)
 					{						
 						// Exclude case where name begins with an Extended ASCII character
-						FirstCharacter = BYTE(Artists[i].label,1);
+						FirstCharacter = BYTE(Albums[i].label,1);
 						IF (FirstCharacter < 127)
 		                   	IF (CompareStringsNoCase(Albums[i].label, Search$) >= 0)
 							{
