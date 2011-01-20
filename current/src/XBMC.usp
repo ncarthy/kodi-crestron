@@ -695,7 +695,7 @@ FUNCTION ParseObject(STRING Result$)
 			}
 			case (BACKSLASH):
 			{
-            	IF (IsEven(DoubleQuotesCount))
+            	IF (IsOdd(DoubleQuotesCount)) // Inside a string
 				{
 					IF (prevCharacter != BACKSLASH)	// Avoid case where backslash is escaped (\\)		
 						SkipCharacter = 1;

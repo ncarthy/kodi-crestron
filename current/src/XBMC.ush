@@ -203,7 +203,7 @@
   Expand2=expand_separately
   OffsetOutputs=8
   ProgramTree=Logic
-  SymbolTree=41
+  SymbolTree=32
   Hint=Control XBMC using JSON api. Communicate metadata of currently playing media.
   PdfHelp=
   HelpID= 

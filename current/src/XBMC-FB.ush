@@ -89,7 +89,6 @@
   SPlus2CompiledName=S2_XBMC_FB
   SymJam=NonExclusive
   Usl1=Common_Functions.usl
-  Usl2=base64.usl
 [END]
 [BEGIN]
   ObjTp=Dp
