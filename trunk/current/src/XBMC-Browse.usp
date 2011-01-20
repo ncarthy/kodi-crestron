@@ -1106,6 +1106,15 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 					outputArrayItemPosition = 1;			
 				}
 			}
+			case (BACKSLASH):
+			{
+            	IF (IsOdd(DoubleQuotesCount)) // Inside a string
+				{
+					IF (prevCharacter != BACKSLASH)	// Avoid case where backslash is escaped (\\)		
+						SkipCharacter = 1;
+				}
+
+			}
 		}
 
         // Handle 2-byte UTF-8 characters
