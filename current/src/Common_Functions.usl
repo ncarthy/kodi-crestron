@@ -244,6 +244,15 @@ INTEGER_FUNCTION IsEven(INTEGER I)
 {
 	RETURN (I MOD 2 = 0);
 }
+
+/*
+	Return 1 if the number is odd, 0 otherwise
+*/
+INTEGER_FUNCTION IsOdd(INTEGER I)
+{
+	RETURN (I MOD 2);
+}
+
                             
 /*
 	A simplistic lookup function that trys to convert Utf8 to extended ascii
@@ -271,6 +280,7 @@ INTEGER_FUNCTION ConvertUtf8ToAscii(INTEGER highByte, INTEGER lowByte)
 	SetArray(Bits,0);
          
 	// Create binary array
+	// See http://en.wikipedia.org/wiki/UTF-8 for details
 	MAKESTRING(S, "%c%c", highByte, lowByte);
     Bits[0] = BIT(S, 1, 7);
     Bits[1] = BIT(S, 1, 6);
