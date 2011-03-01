@@ -10,7 +10,7 @@
 #	1. Put script in decent place. (for example: /home/xbmc/conv.sh)
 #	2. Optiona: Adjust convert argument for best results. ($ man convert)
 #	2. Make it executable. ($ chmod +x /home/xbmc/conv.sh)					
-#	3. Add crontab job ($ crontab -e  (for example: */2 * * * * /home/xbmc/conv.sh ))	
+#	3. Add crontab job ($ crontab -e  (for example: */10 * * * * /home/xbmc/conv.sh ))	
 #################################################################################################
 
 THUMBNAILS_DIR='/home/xbmc/.xbmc/userdata/Thumbnails'
