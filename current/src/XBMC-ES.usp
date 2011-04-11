@@ -614,7 +614,7 @@ CHANGE Command
 
 		Case (BTN_TITLE)					: { ProcessButton("title"); }
 		Case (BTN_MENU)						: { ProcessButton("menu"); }
-		Case (BTN_INFO)						: { SendAction(ACTION_BUTTON, "info"); }
+		Case (BTN_INFO)						: { ProcessButton("info"); }
 		Case (BTN_BACK)						: { ProcessButton("back"); }
 		Case (BTN_DISPLAY)					: { ProcessButton("display");}
                                     	
