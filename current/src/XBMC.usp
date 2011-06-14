@@ -5,7 +5,7 @@
 /*
 Dealer Name:
 System Name: XBMC
-System Number: 1.0
+System Number: 1.1
 Programmer: Neil Carthy (arduino@scpgwiki.com)
 Comments:                                             
     
@@ -107,6 +107,8 @@ Comments:
 DIGITAL_OUTPUT PlayFb,					// HIGH when something is playing
 			   StopFb,					// HIGH when playback is stopped
 		       PauseFb;					// HIGH when playback is paused
+
+DIGITAL_OUTPUT IsPlayingOnExternalPlayer_fb;// HIGH when video is playing on an external player (e.g. mpc-hc)
                  	
 STRING_OUTPUT 	_SKIP_,
 				CurrentFilename$,				// The file name of the currently playing track
@@ -230,9 +232,11 @@ SIGNED_INTEGER PlaySpeed;			// Speed of current audio/video playback (1x, 2x, 4x
 INTEGER IsTvShow;					// =1 when a Tv Show is playing on the xbmc, 0 otherwise
 INTEGER IsPlaying;					// =1 when media is playing on the xbmc, 0 otherwise
 
-STRING ResultName$[20][40];
-STRING ResultValue$[20][2000];
+STRING ResultName$[21][40];
+STRING ResultValue$[21][2000];
 INTEGER NameValueCount;
+
+INTEGER PlayingOnExternalPlayer;	// =1 when video is playing on an external player (e.g. mpc-hc), 0 otherwise
 
 /*
   	Set the video outputs to appropiate state depending on current status
@@ -319,7 +323,7 @@ STRING_FUNCTION VideoPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22start\x22:%d,\x22end\x22:%d}"
+	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
 								, AdditionalParameters
 								,"\x22title\x22"
 								,"\x22originaltitle\x22"
@@ -332,12 +336,11 @@ STRING_FUNCTION VideoPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 								,"\x22rating\x22"
 								,"\x22writer\x22"
 								,"\x22studio\x22"
-								//,"\x22plotoutline\x22"
+								,"\x22thumbnail\x22"
 								,"\x22plot\x22"
 								,"\x22season\x22"
 								,"\x22episode\x22"
 								,"\x22firstaired\x22"
-								,"\x22studio\x22"
 								,"\x22mpaa\x22"
 								,"\x22playcount\x22"
 								,SortMethod
@@ -359,7 +362,7 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22start\x22:%d,\x22end\x22:%d}"
+	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
 								, AdditionalParameters
 								,"\x22title\x22"
 								,"\x22artist\x22"
@@ -369,6 +372,7 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 								,"\x22rating\x22"
 								,"\x22duration\x22"
 								,"\x22tracknumber\x22"
+								,"\x22thumbnail\x22"
 								,SortMethod
 								,start
 								,end 
@@ -479,6 +483,8 @@ FUNCTION Initialize_Outputs()
 	PlayFb = OFF;
 
 	CoverArtInternal$ = "";
+
+	PlayingOnExternalPlayer = 0;
 }
 
 /*
@@ -487,7 +493,7 @@ FUNCTION Initialize_Outputs()
 	The original JSON would have been of the form (ignoring whitespace):
 	 				{"audio":false,"picture":false,"video":true}
 	
-	The ParseObject method has transferred the names and values to 
+	The ParseObject method has already transferred the names and values to 
 	the ResultName$ and ResultValue$ arrays.
 
 */
@@ -527,6 +533,113 @@ FUNCTION GetActivePlayersFromResponse()
 		Currently_Playing_Type 	= TYPE_NONE;
 	}
 }
+
+      
+/*
+
+*/
+INTEGER_FUNCTION ConvertTimeObjectToSeconds(STRING TimeObject$)
+{
+	INTEGER loop;
+	STRING TimeValueName$[10][20];	// The name of the time value e.g. "hours" or "seconds"
+	STRING TimeValue$[10][20];		// The value corresponding to the TimeValueName
+	INTEGER character;				// current character from the buffer
+	INTEGER inputLength;			// length of Result$
+	INTEGER SkipCharacter;			// when =1 drop character, otherwise process it
+	INTEGER DoubleQuotesCount;		// number of quotes ("). Used to determine if inside a string.
+	INTEGER InItemName;				// when =1 we are currently parsing the name of a name/value pair
+	INTEGER outputPosition;			// position in output string
+	INTEGER resultSeconds;			// The time in seconds
+
+	// initialize
+	InItemName = 1;
+	NameValueCount = 1;
+	outputPosition = 1;
+    DoubleQuotesCount = 0;
+	resultSeconds = 0;
+	SetArray(TimeValueName$,"");	
+	SetArray(TimeValue$,"");		
+
+	inputLength = len(TimeObject$);
+	
+	for(loop = 1 to inputLength) //step through every character of Buffer input
+	{
+		SkipCharacter = 0;
+		character = byte(TimeObject$, loop); //extract it
+
+		switch(character) //examine it
+		{
+			case ('{'):
+			{
+				IF (IsEven(DoubleQuotesCount))
+						SkipCharacter = 1;
+			}
+			case ('}'):
+			{
+				IF (IsEven(DoubleQuotesCount))
+					SkipCharacter = 1;	
+              					
+			}
+
+            case (DBLQUOTE): // " (double quotes)
+			{
+				DoubleQuotesCount = DoubleQuotesCount + 1;
+				SkipCharacter = 1;
+			}
+			case (','):
+			{
+				// Ignore the comma that seperates individual array items
+				IF (IsEven(DoubleQuotesCount))
+				{
+					InItemName = 1;
+					SkipCharacter = 1;
+					outputPosition = 1;
+					NameValueCount = NameValueCount+1;
+				}
+					
+			}
+            case (':'):
+			{
+				IF (IsEven(DoubleQuotesCount))
+				{
+					InItemName = 0;
+					SkipCharacter = 1;
+					outputPosition = 1;			
+				}
+			}
+
+		}
+
+		IF (!SkipCharacter)
+		{
+			//append the character
+			IF (InItemName)
+				setString(chr(character), outputPosition, TimeValueName$[NameValueCount]);				
+			ELSE
+				setString(chr(character), outputPosition, TimeValue$[NameValueCount]);								
+
+			// increment counter
+            outputPosition = outputPosition + 1;
+		}         
+  
+		 
+	}
+    
+    // Convert the time values to seconds. Ignore milliseconds.
+	FOR (loop = 1 to NameValueCount)
+	{
+    	IF (TimeValueName$[loop] = "hours")
+			resultSeconds = resultSeconds + 3600 * AtoI(TimeValue$[loop]);
+    	ELSE IF (TimeValueName$[loop] = "minutes")
+			resultSeconds = resultSeconds + 60 * AtoI(TimeValue$[loop]);
+    	ELSE IF (TimeValueName$[loop] = "seconds")
+			resultSeconds = resultSeconds + AtoI(TimeValue$[loop]);
+	}
+
+
+	RETURN (resultSeconds);
+}
+
 
 
 /*
@@ -575,13 +688,20 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 			}
 			ELSE IF(ResultName$[i] = "time") 
 			{
-				Position_Seconds = AtoI(ResultValue$[i]);
+				Position_Seconds = ConvertTimeObjectToSeconds(ResultValue$[i]);
 				CurrentTime$ = ConvertToTime(Position_Seconds);
 			}
 			ELSE IF(ResultName$[i] = "total") 
 			{
-				Duration_Seconds = AtoI(ResultValue$[i]);
-				CurrentDuration$ = ConvertToTime(Duration_Seconds);					
+				Duration_Seconds = ConvertTimeObjectToSeconds(ResultValue$[i]);
+				CurrentDuration$ = ConvertToTime(Duration_Seconds);	
+                                        
+				// Check for mpc-hc running in the background
+				IF (Duration_Seconds = 1)				
+				{
+                 	#IF_DEFINED DEBUG PRINT ("%s", "Video is playing on external player."); #ENDIF
+					PlayingOnExternalPlayer = 1;
+				}
 			}
 			ELSE IF(ResultName$[i] = "Playlist.position")
 			{
@@ -634,14 +754,19 @@ FUNCTION ParseObject(STRING Result$)
 	INTEGER prevCharacter;			// previous character from the buffer
 	INTEGER inputLength;			// length of Result$
 	INTEGER SkipCharacter;			// when =1 drop character, otherwise process it
-	INTEGER DoubleQuotesCount;		// number of quotes ("). Used to determine if inside a string
+	INTEGER DoubleQuotesCount;		// number of quotes ("). Used to determine if inside a string.
+	INTEGER CurlyBracketCount;		// number of brackets ({}). Used to determine if inside a nested object.
 	INTEGER InItemName;				// when =1 we are currently parsing the name of a name/value pair
 	INTEGER outputPosition;			// position in output string
+
+	//This routine can handle a single level of nested objects only
 
 	// initialize
 	InItemName = 1;
 	NameValueCount = 1;
 	outputPosition = 1;
+	CurlyBracketCount = 0;
+    DoubleQuotesCount = 0;
 	SetArray(ResultName$,"");		// These are module-level arrays
 	SetArray(ResultValue$,"");		//
 
@@ -651,55 +776,66 @@ FUNCTION ParseObject(STRING Result$)
 	{
 		SkipCharacter = 0;
 		character = byte(Result$, loop); //extract it
+
 		switch(character) //examine it
 		{
 			case ('{'):
 			{
-				IF (IsEven(DoubleQuotesCount))
-					SkipCharacter = 1;
+				CurlyBracketCount = CurlyBracketCount + 1;
+
+				IF (CurlyBracketCount <= 1)
+					IF (IsEven(DoubleQuotesCount))
+						SkipCharacter = 1;
 			}
 			case ('}'):
 			{
-				IF (IsEven(DoubleQuotesCount))
-					SkipCharacter = 1;						
+				IF (CurlyBracketCount <= 1)
+					IF (IsEven(DoubleQuotesCount))
+						SkipCharacter = 1;	
+
+				CurlyBracketCount = CurlyBracketCount - 1;               					
 			}
 
             case (DBLQUOTE): // " (double quotes)
 			{
-				IF (prevCharacter != BACKSLASH) // Avoid case where double quote is escaped (\")
-				{
-            		DoubleQuotesCount = DoubleQuotesCount + 1;
-					SkipCharacter = 1;
-				}
+				IF (CurlyBracketCount <= 1)
+					IF (prevCharacter != BACKSLASH) // Avoid case where double quote is escaped (\")
+					{
+        	    		DoubleQuotesCount = DoubleQuotesCount + 1;
+						SkipCharacter = 1;
+					}
 			}
 			case (','):
 			{
-				// Ignore the comma that seperates individual array items
-				IF (IsEven(DoubleQuotesCount))
-				{
-					InItemName = 1;
-					SkipCharacter = 1;
-					outputPosition = 1;
-					NameValueCount = NameValueCount+1;
-				}
+				IF (CurlyBracketCount <= 1)
+					// Ignore the comma that seperates individual array items
+					IF (IsEven(DoubleQuotesCount))
+					{
+						InItemName = 1;
+						SkipCharacter = 1;
+						outputPosition = 1;
+						NameValueCount = NameValueCount+1;
+					}
 					
 			}
             case (':'):
 			{
-				IF (IsEven(DoubleQuotesCount))
-				{
-					InItemName = 0;
-					SkipCharacter = 1;
-					outputPosition = 1;			
-				}
+				IF (CurlyBracketCount <= 1)
+					IF (IsEven(DoubleQuotesCount))
+					{
+						InItemName = 0;
+						SkipCharacter = 1;
+						outputPosition = 1;			
+					}
 			}
 			case (BACKSLASH):
 			{
-            	IF (IsOdd(DoubleQuotesCount)) // Inside a string
-				{
-					IF (prevCharacter != BACKSLASH)	// Avoid case where backslash is escaped (\\)		
-						SkipCharacter = 1;
-				}
+				IF (CurlyBracketCount <= 1)
+	            	IF (IsOdd(DoubleQuotesCount)) // Inside a string
+					{
+						IF (prevCharacter != BACKSLASH)	// Avoid case where backslash is escaped (\\)		
+							SkipCharacter = 1;
+					}
 
 			}
 		}
@@ -890,6 +1026,10 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 	}
 	ELSE IF (id = REQUESTID_GETTIME_SECONDS)
 	{
+		#IF_DEFINED DEBUG 	
+			PRINT ("Result(REQUESTID_GETTIME_SECONDS): %s", Result$);
+	    #ENDIF
+		
 		CALL ParseObject(Result$);
 
 		//Update the duration and time of the current track
@@ -1061,6 +1201,10 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
 			,id ,Command, Arguments);
 	}	
+                     
+	#IF_DEFINED DEBUG  
+		Print("SendJsonCommand (%d bytes): %s", LEN(Command$), LEFT(Command$,200)); 
+	#ENDIF
 
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
@@ -1095,7 +1239,7 @@ FUNCTION GetCurrentPlaylistPositionAndInfoLabels()
 {
 	STRING Params$[1024];
 
-	MAKESTRING(Params$, "[%s,%s,%s,%s]"
+	MAKESTRING(Params$, "{\x22labels\x22:[%s,%s,%s,%s]}"
 								,"\x22Playlist.position\x22" // \x22 is a double quote (")
 								,"\x22musicplayer.bitrate\x22"
 								,"\x22musicplayer.codec\x22"
@@ -1257,6 +1401,10 @@ push UpdateMusic
 								"AudioLibrary.ScanForContent", "");
 
 } 
+push IsPlayingOnExternalPlayer
+{
+	PlayingOnExternalPlayer = 1;
+}
 
 
 CHANGE Seek_Percentage
