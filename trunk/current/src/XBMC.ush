@@ -72,6 +72,8 @@
   OutputSigType2=Digital
   OutputCue3=PauseFb
   OutputSigType3=Digital
+  OutputCue4=IsPlayingOnExternalPlayer_fb
+  OutputSigType4=Digital
   InputList2Cue1=Seek_Percentage
   InputList2SigType1=Analog
   InputList2Cue2=Seek_Time
@@ -193,8 +195,8 @@
   MaxVariableInputs=24
   MinVariableInputsList2=4
   MaxVariableInputsList2=4
-  MinVariableOutputs=3
-  MaxVariableOutputs=3
+  MinVariableOutputs=4
+  MaxVariableOutputs=4
   MinVariableOutputsList2=49
   MaxVariableOutputsList2=49
   MinVariableParams=5
@@ -203,7 +205,7 @@
   Expand2=expand_separately
   OffsetOutputs=8
   ProgramTree=Logic
-  SymbolTree=32
+  SymbolTree=41
   Hint=Control XBMC using JSON api. Communicate metadata of currently playing media.
   PdfHelp=
   HelpID= 

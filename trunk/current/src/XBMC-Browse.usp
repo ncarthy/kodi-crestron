@@ -5,7 +5,7 @@
 /*
 Dealer Name:
 System Name: XBMC
-System Number: 1.0
+System Number: 1.1
 Programmer: Neil Carthy (arduino@scpgwiki.com)
 Comments:                                             
     
@@ -41,6 +41,7 @@ Comments:
 #USER_LIBRARY "Common_Functions"
 
 /*****    DEFINE NEW CONSTANTS    *******/
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
 #DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 200 
@@ -416,9 +417,9 @@ STRING_FUNCTION VideoBrowseParameters(STRING SortMethod)
 
 	// These labels from examining CFileItemHandler::FillDetails in FileItemHandler.cpp (xbmc src code)	
 	// \x22 is a double-quote (")
-	// Must use 'ignorethe'=false otherwise SearchCriteria won't work
+	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
 	MAKESTRING (Params$, 
-		"{\x22fields\x22:[%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorethe\x22:false}}"
+		"{\x22fields\x22:[%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
 								,"\x22title\x22"
 								,"\x22genre\x22"
 								,"\x22showtitle\x22"
@@ -523,9 +524,9 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, STRING Sort
 	STRING Params$[1024];
 
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
-	// Must use 'ignorethe'=false otherwise SearchCriteria won't work
+	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorethe\x22:false}}"
+	"{%s\x22fields\x22:[%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
 				,AdditionalParameters,"\x22artist\x22","\x22genre\x22","\x22year\x22",SortMethod);
 
 /*
@@ -1243,6 +1244,9 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 			,id ,Command, Arguments);
 	}
 	
+	#IF_DEFINED DEBUG
+		PRINT("SendJsonCommand: %s" ,Command$);
+	#ENDIF
 
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
