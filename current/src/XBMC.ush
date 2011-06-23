@@ -244,7 +244,7 @@
   Tp=1
   SD=The IP Address of the XBMC HTTP server.
   HD=True
-  DV=5C
+  DV=
   NoS=False
   VVS=0
 [END]

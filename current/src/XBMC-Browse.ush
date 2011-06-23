@@ -471,7 +471,7 @@
   Expand2=expand_separately
   OffsetOutputs=7
   ProgramTree=Logic
-  SymbolTree=41
+  SymbolTree=32
   Hint=Browse/search the XBMC catalogs for video and music.
   PdfHelp=
   HelpID= 
@@ -512,7 +512,7 @@
   Tp=1
   SD=The IP Address of the XBMC HTTP server.
   HD=True
-  DV=5C
+  DV=
   NoS=False
   VVS=0
 [END]
