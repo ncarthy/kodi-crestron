@@ -23,6 +23,15 @@ Comments:
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+	***** ******* *****
+
+	A note on the Rx/Tx Outputs
+	This module is connected to XBMC.usp by outputs Rx & Tx. This module is
+	responsible for all communication with the XBMC.exe via port 9090. It was
+	designed this way so that one module could control the flow of requests
+	and replies to prevent messages getting jammed.
+
 */
 
 #SYMBOL_NAME "XBMC-Browse"
@@ -39,6 +48,8 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 #USER_LIBRARY "Common_Functions"
+/* Request IDs for different JSON-RPC commands are defined in Common_Functions.usl*/
+/* Response Types for different JSON-RPC commands are defined in Common_Functions.usl*/  
 
 /*****    DEFINE NEW CONSTANTS    *******/
 //#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
@@ -47,14 +58,6 @@ Comments:
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 200 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 40000		// Socket buffer size
-
-//Useful characters that we'll need in parsing metadata
-#DEFINE_CONSTANT CR 0x0D		 	// Carriage return
-#DEFINE_CONSTANT LF 0x0A		 	// Linefeed
-#DEFINE_CONSTANT TAB 0x09		 	// Tab
-#DEFINE_CONSTANT SPACE 0x20	   		// Space
-#DEFINE_CONSTANT DBLQUOTE 0x22	   	// "
-#DEFINE_CONSTANT BACKSLASH 0x5C	   	// \
                                                       
 /* Types of List */ 
 #DEFINE_CONSTANT MOVIE_TITLE_LIST					 1
@@ -64,30 +67,8 @@ Comments:
 #DEFINE_CONSTANT MUSIC_ARTIST_LIST                   5
 #DEFINE_CONSTANT MUSIC_ALBUM_LIST                    6
 #DEFINE_CONSTANT MUSIC_SONG_LIST                     7  
-#DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums
-                   
-/* REequest IDs for different JSON-RPC commands */
-#DEFINE_CONSTANT REQUESTID_GETACTIVEPLAYERS				1
-#DEFINE_CONSTANT REQUESTID_GETINFOLABELS				2
-#DEFINE_CONSTANT REQUESTID_AUDIOPLAYLIST_GETITEMS		3
-#DEFINE_CONSTANT REQUESTID_VIDEOPLAYLIST_GETITEMS		4
-#DEFINE_CONSTANT REQUESTID_GETTIME_SECONDS				5
-#DEFINE_CONSTANT REQUESTID_GETTIME_PERCENTAGE			6
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIES		7
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIEDETAILS	8
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSHOWS		9
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSEASONS	10
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVEPISODES	11
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETEPISODEDETS	12
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTS		13
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		14
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		15
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS 16
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				17
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					18
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				19
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			20
-                                                          
+#DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums                                                        
+
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -222,7 +203,7 @@ TCP_CLIENT XBMC[BUFFER_SIZE];			// Socket for connecting to XBMC on TCP port 909
 /*******************************************************************************************
   STRUCTURES
 *******************************************************************************************/
-STRUCTURE 	ListItem
+STRUCTURE 	ListItem //Generic list item
 {
 	INTEGER id;
 	STRING  label[MAX_SERIAL_STRING_LENGTH];
@@ -251,7 +232,12 @@ STRUCTURE 	SongListItem
 	STRING  duration[10];
 	STRING  trackno[3];
 };
-
+STRUCTURE 	Limits
+{
+	INTEGER start;
+	INTEGER end;
+	INTEGER total;
+};
 
    
 /*******************************************************************************************
@@ -288,21 +274,33 @@ INTEGER NumberOfTvShowEpisodes;
 INTEGER NumberOfArtistAlbums;
 
 // Variables used in parsing response from XBMC
-INTEGER NumStartBrackets;			// Number of opening curly brackets '{'	
-INTEGER NumEndBrackets;				// Number of closing curly brackets '}'
-INTEGER DoubleQuotesCount;			// Number of quotes (") in the response.
-INTEGER InArray;					// When ON then we are parsing an Array of JSON objects
-INTEGER InArrayObject;				// When ON we are parsing a member of an array of JSON objects
-INTEGER InArrayItemName;
-INTEGER InArrayNameValueNumber; 
-INTEGER outputPosition;
-INTEGER outputArrayItemPosition;
-STRING 	outputString[MAX_SERIAL_STRING_LENGTH];
-STRING 	outputStringName[20][MAX_SERIAL_STRING_LENGTH];
-STRING 	outputStringValue[20][2000];
-INTEGER prevCharacter;
+// They are module-level because the response might come in several parts
 INTEGER ExternalRequest;			// When HIGH any data received from XBMC is to be
 									// sent to Rx$ rather than processed internally.
+
+INTEGER ResponseId;					// The value of the "id" in the response. If =0 then its an announcement.
+INTEGER ResponseType;				// An error, result or notification (constants defined in Common_Functions.usl)
+INTEGER InResponsePropertyName;		// When =1 the loop is currently inside a property name
+INTEGER ResponsePropertyNumber;		// The index of the current property
+STRING  ResponsePropertyName[10][20];// An array of property names e.g. "id" or "result"
+STRING  ResponsePropertyValue[10][50];// The value of the property, represented as a string.
+INTEGER ResponsePropertyPosition;	// The index of the current position within the ResponseProperty string (either the name or the value)
+INTEGER NumStartBrackets;			// Number of opening curly brackets '{' in JSON response
+INTEGER NumEndBrackets;				// Number of closing curly brackets '}' in JSON response
+INTEGER DoubleQuotesCount;			// Number of quotes (") in the response.
+INTEGER prevCharacter;				// This is used to test for escaped or Unicode characters
+STRING 	outputString[MAX_SERIAL_STRING_LENGTH]; // Message to be sent to Xbmc
+INTEGER outputPosition;				// Current position inside outputstring$
+INTEGER SendToOutput;				// When =1 send all future response characters to Tx$ OUTPUT, for XBMC.usp to process.
+INTEGER InNestedObject;				// When =1 the position of the loop is inside a nested object {...{.X.}} 
+INTEGER InLimitsObject;				// When =1 the position of the loop is inside a nested limits object {..."limits":{.X.}} 
+INTEGER InArrayObject;				// When =1 the position of the loop is inside a nested array {...[.X.].} (square brackets)
+Limits	ListLimits;
+INTEGER InArrayItemName;
+INTEGER InArrayNameValueNumber;
+INTEGER outputArrayItemPosition;
+STRING 	outputStringName[20][MAX_SERIAL_STRING_LENGTH];
+STRING 	outputStringValue[20][2000];
 
 
 
@@ -357,12 +355,19 @@ FUNCTION ConnectToXbmc()
 
 	// Initialize module variables
 	// Do this to reset module during disconnect/reconnect.
-	// TODO TxBlocker = 0;
 	NumStartBrackets = 0;
 	NumEndBrackets = 0;
 	DoubleQuotesCount = 0;
-	InArray = 0;
-	InArrayNameValueNumber = 1;
+	ResponseId = 0;
+	ResponseType = 0;
+	InResponsePropertyName = 1;
+	ResponsePropertyPosition = 1;
+	SendToOutput = 0;
+	InNestedObject = 0;
+	ListLimits.start = 0;
+	ListLimits.end = 0;
+	ListLimits.total = 0;
+	InArrayObject = 0;
 	InArrayItemName = 1;
 
 	NumberOfMovies = 0;
@@ -409,9 +414,9 @@ SOCKETSTATUS XBMC
   XBMC Response logic
 *******************************************************************************************/
 /*
-  	Return a string containing the xbmc parameter list for browse queries
+  	Return a string containing the xbmc parameter list for the GetMovies browse query
 */
-STRING_FUNCTION VideoBrowseParameters(STRING SortMethod) 
+STRING_FUNCTION MovieBrowseParameters() 
 {
 	STRING Params$[1024];
 
@@ -419,10 +424,28 @@ STRING_FUNCTION VideoBrowseParameters(STRING SortMethod)
 	// \x22 is a double-quote (")
 	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
 	MAKESTRING (Params$, 
+		"{\x22fields\x22:[%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22title\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
+								,"\x22title\x22"
+								,"\x22thumbnail\x22"
+								,"\x22genre\x22"
+								,"\x22year\x22"
+								,"\x22playcount\x22"
+					);
+
+	RETURN (Params$);
+}
+
+/*
+  	Return a string containing the xbmc parameter list for the GetTvShow browse query
+*/
+STRING_FUNCTION TvShowBrowseParameters(STRING SortMethod) 
+{
+	STRING Params$[1024];
+	MAKESTRING (Params$, 
 		"{\x22fields\x22:[%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
 								,"\x22title\x22"
+								,"\x22thumbnail\x22"
 								,"\x22genre\x22"
-								,"\x22showtitle\x22"
 								,"\x22year\x22"
 								,"\x22playcount\x22"
 								,SortMethod
@@ -440,19 +463,20 @@ STRING_FUNCTION MovieDetailsParameters(INTEGER movieid)
      
 	// These labels from examining CFileItemHandler::FillDetails in FileItemHandler.cpp (xbmc src code)
 	MAKESTRING (Params$, 
-	"{\x22movieid\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
+	"{\x22movieid\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
 								,movieid
 								,"\x22title\x22"
+								,"\x22thumbnail\x22"
 								,"\x22director\x22"
 								,"\x22tagline\x22"
 								,"\x22genre\x22"
 								,"\x22runtime\x22"
 								,"\x22year\x22"
 								,"\x22rating\x22"
-								,"\x22writingcredits\x22"
+								,"\x22playcount\x22"
 								,"\x22studio\x22"
 								,"\x22plot\x22"
-								,"\x22studio\x22"
+								,"\x22lastplayed\x22"
 								,"\x22mpaa\x22"
 					);
 	RETURN (Params$);
@@ -467,16 +491,15 @@ STRING_FUNCTION TvShowDetailsParameters(INTEGER tvshowid, INTEGER seasonid, STRI
 	STRING Params$[1024];
 
 	MAKESTRING (Params$, 
-	"{\x22tvshowid\x22:%d,\x22season\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22}}"
+	"{\x22tvshowid\x22:%d,\x22season\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22}}"
 								, tvshowid, seasonid
 								,"\x22title\x22"
-								,"\x22genre\x22"
+								,"\x22thumbnail\x22"
 								,"\x22showtitle\x22"
 								,"\x22runtime\x22"
 								,"\x22season\x22"
 								,"\x22episode\x22"
 								,"\x22firstaired\x22"
-								,"\x22studio\x22"
 								,"\x22playcount\x22"
 								,SortMethod
 					);
@@ -493,26 +516,27 @@ STRING_FUNCTION EpisodeDetailsParameters(INTEGER episodeid)
 
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	MAKESTRING (Params$, 
-	"{\x22episodeid\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
+	"{\x22episodeid\x22:%d,\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
 								, episodeid
 								,"\x22title\x22"
-								,"\x22originaltitle\x22"
+								,"\x22thumbnail\x22"
 								,"\x22director\x22"
-								,"\x22tagline\x22"
-								,"\x22genre\x22"
 								,"\x22showtitle\x22"
 								,"\x22runtime\x22"
 								,"\x22rating\x22"
-								,"\x22writingcredits\x22"
-								,"\x22studio\x22"
+								,"\x22writer\x22"
 								,"\x22plot\x22"
 								,"\x22season\x22"
 								,"\x22episode\x22"
 								,"\x22firstaired\x22"
-								,"\x22studio\x22"
-								,"\x22mpaa\x22"
 								,"\x22playcount\x22"
 					);
+
+	#IF_DEFINED DEBUG
+		PRINT("EpisodeDetailsParameters: %s" ,LEFT(Params$,200));
+	#ENDIF
+
+
 	RETURN (Params$);
 }
 
@@ -526,29 +550,21 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, STRING Sort
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
-				,AdditionalParameters,"\x22artist\x22","\x22genre\x22","\x22year\x22",SortMethod);
+	"{%s\x22fields\x22:[%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
+				,AdditionalParameters
+				,"\x22artist\x22"
+				,"\x22thumbnail\x22"
+				,"\x22genre\x22"
+				,"\x22year\x22"
+				,SortMethod);
 
-/*
-	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22}}"
-								, AdditionalParameters
-								,"\x22title\x22"
-								,"\x22artist\x22"
-								,"\x22album\x22"
-								,"\x22genre\x22"
-								,"\x22year\x22"
-								,"\x22rating\x22"
-								,"\x22duration\x22"
-								,"\x22tracknumber\x22"
-								,SortMethod
-					);
-*/
 	RETURN (Params$);
 }
 
+
 /*
     Take the uri given by XBMC and add http://, ip_address, port etc.
-	When UseJPG = 1, Use the extension '.jpg' instead of '.tbn'.
+	When UseJPG = 1, Use the extension '.jpg' instead of '.tbn'. 
 */
 STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
 {
@@ -983,24 +999,161 @@ FUNCTION AssignDetailsData(INTEGER Count, STRING Names$[], STRING Values$[])
 		}
 	}
 }
+      
+/*
+
+*/
+FUNCTION ProcessLimitsObject()
+{
+	INTEGER i;
+
+	FOR(i = 0 to ResponsePropertyNumber)
+	{
+		#IF_DEFINED 
+			DEBUG PRINT("ProcessLimitsObject(): ResponsePropertyName(%s), ResponsePropertyValue(%s)"
+				,ResponsePropertyName[i], ResponsePropertyValue[i]); 
+		#ENDIF
+
+    	IF(ResponsePropertyName[i] = "start")
+		{
+        	ListLimits.start = AtoI(ResponsePropertyValue[i]);
+		}
+	    ELSE IF(ResponsePropertyName[i] = "end")
+		{
+        	ListLimits.end = AtoI(ResponsePropertyValue[i]);
+		}
+	    ELSE IF(ResponsePropertyName[i] = "total")
+		{
+        	ListLimits.total = AtoI(ResponsePropertyValue[i]);
+		}
+	}
+    
+	/*
+	IF (ListLimits.total)
+	    IF (ListLimits.total > StepAmount)
+			MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, ListLimits.total);
+		ELSE
+			MAKESTRING (List_Summary$, "1 to %d of %d", ListLimits.total, ListLimits.total);
+ 	*/
+}
 
 /*
-	Process a string received from the XBMC socket buffer
-	The string is expected to be in JSON-RPC format. Any other format will cause unhandled errors.
+    This function is called from ProcessResponse when there is enough information
+	in the module-level variables to determine response type and response id.
+                                                                
+	Response id is the id of the original request that was submitted to xbmc
+	Response type is one of 'result', 'error' or 'Notification'.
+	
+*/
+FUNCTION DetermineIdAndResponseType()
+{
+	INTEGER i;
+     
+	//Initialize
+	ResponseId = 0;
+	ResponseType = 0;
+
+	#IF_DEFINED DEBUG PRINT("%s","Entering DetermineIdAndResponseType"); #ENDIF
+
+	// Determine response id
+	FOR(i = 0 to ResponsePropertyNumber)
+	{
+    	IF(ResponsePropertyName[i] = "id")
+		{
+			ResponseId = AtoI(ResponsePropertyValue[i]);
+			#IF_DEFINED DEBUG PRINT("Response id:%d",ResponseId); #ENDIF
+			Break;
+		}
+	}
+
+	// Determine response type
+	FOR(i = 0 to ResponsePropertyNumber)
+	{
+    	IF(ResponsePropertyName[i] = "result")
+		{
+			ResponseType = JSON_RESULT;
+			#IF_DEFINED DEBUG PRINT("Response Type:%s","result"); #ENDIF
+			Break;
+		}
+		ELSE IF (ResponsePropertyName[i] = "error")
+		{
+			ResponseType = JSON_ERROR;
+			#IF_DEFINED DEBUG PRINT("Response Type:%s","error"); #ENDIF
+			Break;
+		}
+	} 	
+	IF (ResponseType = 0)
+	{
+		ResponseType = JSON_NOTIFY;		
+		#IF_DEFINED DEBUG PRINT("Response Type:%s","Notification"); #ENDIF
+	}
+}
+
+/*
+	Prepare the start of the OutputString for sending on Tx$ to XBMC.usp.
+	The pipe character (|) acts as a delimiter.
+*/
+FUNCTION PrepareOutputString()
+{
+	INTEGER i;
+	
+	IF (ResponseType=JSON_NOTIFY)
+	{
+		FOR (i = 0 TO ResponsePropertyNumber)
+		{
+			IF (ResponsePropertyName[i] = "method")
+			{
+				MAKESTRING(outputString, "%d|%s|data:", ResponseType, ResponsePropertyValue[i]);
+				outputPosition = (LEN(outputString)+1) MOD MAX_SERIAL_STRING_LENGTH;
+			    if (outputPosition = 0) outputPosition = 1;
+				Break;
+			}
+		}    
+	}
+	ELSE
+	{
+        MAKESTRING(outputString, "%d|%d|", ResponseType, ResponseId);
+		outputPosition = (LEN(outputString)+1) MOD MAX_SERIAL_STRING_LENGTH;
+	    if (outputPosition = 0) outputPosition = 1;
+	}
+
+}
+
+/*
+
+*/
+FUNCTION ResetNameValueVariables()
+{
+	ResponsePropertyNumber = 0;
+	ResponsePropertyPosition = 1;
+	SetArray(ResponsePropertyName, "");
+	SetArray(ResponsePropertyValue, "");
+	InResponsePropertyName = 1;
+}
+/*
+	Process a string received from the XBMC socket buffer.
+	The string is expected to be in JSON-RPC format.
+
+	If we are handling a response for XBMC.usp (ExternalRequest=ON) then any content received is 
+	forwarded directly to the Tx output, minus some unnecessary whitespace characters.
 
   	When sending content to serial out (RX$) the content is delimited by '\n'. The correct location 
 	for the delimiter is determined by  counting curly brackets ({..}). The counting is only done 
 	if the curly brackets are found outside strings (i.e. When the number of double quotes is even)
+
 */ 
 FUNCTION ProcessResponse(STRING fromBuffer)
 {
+	INTEGER i;
 	INTEGER loop;
 	INTEGER character;
 	INTEGER inputLength;
 	INTEGER SkipCharacter;
 	INTEGER ExtendedAscii;
-
+	
 	//Semaphore to ensure only 1 thread at a time
+	//Using module-level variables so this is required.
+	//I'm aware it could block forever.
 	WHILE (TCPBlocker[0]) 
 	{	
 		Delay(5);
@@ -1008,54 +1161,107 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 	TCPBlocker[0] = ON;
 
 	inputLength = len(fromBuffer);
+
+
+	#IF_DEFINED DEBUG 
+		PRINT("Entering ProcessResponse(), buffer: (%d) %s", inputLength, LEFT(fromBuffer, 100)); 
+	#ENDIF
 	
 	for(loop = 1 to inputLength) //step through every character of Buffer input
 	{
-		SkipCharacter = 0;
+		SkipCharacter = 0; //reset for each character
 		character = byte(fromBuffer, loop); //extract it
 		switch(character) //examine it
 		{
-			case ('{'):
+			case ('{'): // this marks either i) the start of the response or ii) the start of a nested object
 			{
-				IF (IsEven(DoubleQuotesCount))
-					IF(InArray)
-						SkipCharacter = 1;
-					ELSE
-            			NumStartBrackets = NumStartBrackets + 1;
-			}
-			case ('}'):
-			{
-				IF (IsEven(DoubleQuotesCount))
-					IF (InArray)
-                        SkipCharacter = 1;
-					ELSE
-            			NumEndBrackets = NumEndBrackets + 1;
-						
-			}
-
-			case ('['): //JSON symbol for an array start [...
-			{
-				IF (IsEven(DoubleQuotesCount))
-				{
-					IF (!InArray)
+				IF (IsEven(DoubleQuotesCount)) // only valid if outside a string
 					{
-						outputString = outputString+"[";
-						outputPosition = outputPosition+1;
-                        
-						IF (!ExternalRequest)
-	            			InArray = ON;
+            			NumStartBrackets = NumStartBrackets + 1;
 
-						outputArrayItemPosition = 1;
+						IF (NumStartBrackets = 1) //start of a nested object
+						{
+                            SkipCharacter = 1;
+						}
+						ELSE
+						{
+                            
+							IF (ResponseType = 0)
+								DetermineIdAndResponseType();
+                            
+							IF ((ExternalRequest || ResponseType = JSON_NOTIFY) && !InNestedObject)
+							{
+                                PrepareOutputString();
+								SendToOutput = 1;
+								InNestedObject = 1;
+							}
+
+							IF (SendToOutput = 0)	
+							{
+								SkipCharacter = 1;
+
+								IF ((NumStartBrackets - NumEndBrackets) = 2)
+								{
+                                    ResetNameValueVariables();
+								}
+								ELSE IF ((NumStartBrackets - NumEndBrackets) = 3)
+								{	
+									IF (ResponsePropertyName[ResponsePropertyNumber] = "limits")
+									{
+	                                 	InLimitsObject = 1;
+	                                    ResetNameValueVariables();									
+									}
+									ELSE
+									{
+                                    	InNestedObject = 1;
+										outputArrayItemPosition = 1;
+										ResetNameValueVariables();
+									}
+	
+								}
+				
+				/*			#IF_DEFINED 
+								DEBUG PRINT("Limits: %c, SendToOutput(%d), StartBrackets(%d), EndBrackets(%d), InLimitsObject(%d), InNestedObject(%d)"
+									, character, SendToOutput, NumStartBrackets, NumEndBrackets, InLimitsObject, InNestedObject); 
+							#ENDIF
+
+
+							#IF_DEFINED 
+								DEBUG PRINT("Limits: %c, ResponsePropertyNumber(%d), ResponsePropertyName[ResponsePropertyNumber](%s)"
+									, character, ResponsePropertyNumber, ResponsePropertyName[ResponsePropertyNumber]); 
+							#ENDIF*/
+    						}            	
+                             
+						}
+
 					}
-
-					SkipCharacter = 1;
-				}
 			}
-			case (']'): //JSON symbol for an array end ...]
+			case ('}'): // this marks either i) the end of the response or ii) the end of a nested object
 			{
-				IF (IsEven(DoubleQuotesCount) && InArray)
+				IF (IsEven(DoubleQuotesCount))
 				{
-            		InArray = OFF;
+           			NumEndBrackets = NumEndBrackets + 1;
+
+					IF (SendToOutput && InNestedObject && ((NumStartBrackets - NumEndBrackets) = 1))
+						InNestedObject = 0;	
+
+					IF (NumStartBrackets > 0 && NumEndBrackets > 0 
+						&& NumStartBrackets = NumEndBrackets)
+						SkipCharacter = 1;
+
+					IF (InLimitsObject) //now at end of this object... process
+					{
+                        ProcessLimitsObject();
+						
+                        SkipCharacter = 1;
+			            ResetNameValueVariables();
+						InLimitsObject = 0;
+
+					}
+					ELSE IF (!SendToOutput) 
+					{
+                        SkipCharacter = 1;
+					}
 				}
 			}
             case (DBLQUOTE): // " (double quotes)
@@ -1063,8 +1269,8 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 				IF (prevCharacter != BACKSLASH) // Avoid case where double quote is escaped (\")
 				{
             		DoubleQuotesCount = DoubleQuotesCount + 1;
-					IF (!ExternalRequest)
-                 		SkipCharacter = 1;
+					IF (!SendToOutput || !InNestedObject)
+						SkipCharacter = 1;
 				}
 			}
 			case (TAB): SkipCharacter = 1;  //
@@ -1079,34 +1285,58 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 			}
 			case (','):
 			{
-				// Ignore the comma that seperates individual array items
-				IF (IsEven(DoubleQuotesCount))
-					IF(InArray)
-						// end of Array item
-						IF (prevCharacter = '}')
-						{
-	            			SkipCharacter = 1;
-							outputArrayItemPosition = 1;
-							InArrayItemName = 1;
-						}
-						ELSE
-						{
-	            			SkipCharacter = 1;
-							outputArrayItemPosition = 1;
-							InArrayNameValueNumber = InArrayNameValueNumber + 1;
-							InArrayItemName = 1;
-						}
-
+				// Ignore the comma that seperates properties
+				IF (IsEven(DoubleQuotesCount) && SendToOutput = 0)
+				{
+           			SkipCharacter = 1;
+					InResponsePropertyName = 1;
+					ResponsePropertyPosition = 1;
+					ResponsePropertyNumber = ResponsePropertyNumber + 1;
+					IF (InArrayObject || InNestedObject)
+					{
+						InArrayItemName = 1;			
+                     	outputArrayItemPosition = 1;
+						InArrayNameValueNumber = InArrayNameValueNumber + 1;
+					}			
+                }
 			}
             case (':'):
 			{
-				IF (IsEven(DoubleQuotesCount) && InArray)
+				// Ignore the colon that seperates property names from values
+				IF (IsEven(DoubleQuotesCount) && SendToOutput =0)
 				{
-					InArrayItemName = 0;
 					SkipCharacter = 1;
-					outputArrayItemPosition = 1;			
+					InResponsePropertyName = 0;
+					ResponsePropertyPosition = 1;
+					IF (InArrayObject || InNestedObject)
+					{
+						InArrayItemName = 0;			
+                     	outputArrayItemPosition = 1;
+					}
 				}
 			}
+            case ('['):
+			{
+				// Ignore the colon that seperates property names from values
+				IF (IsEven(DoubleQuotesCount) && SendToOutput =0)
+				{
+					SkipCharacter = 1;
+					InArrayObject = 1;
+					outputArrayItemPosition = 1;
+					ResetNameValueVariables();			
+				}
+			}
+            case (']'):
+			{
+				// Ignore the colon that seperates property names from values
+				IF (IsEven(DoubleQuotesCount) && SendToOutput =0)
+				{
+					SkipCharacter = 1;
+					InArrayObject = 0;
+				}
+			}
+
+
 			case (BACKSLASH):
 			{
             	IF (IsOdd(DoubleQuotesCount)) // Inside a string
@@ -1117,7 +1347,7 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 
 			}
 		}
-
+        
         // Handle 2-byte UTF-8 characters
 		if (character > 126) // not ASCII
 		{						
@@ -1129,13 +1359,30 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 				ExtendedAscii = ConvertUtf8ToAscii(prevCharacter, character); // This function is very simplistic
 				character = ExtendedAscii;
 
-				//ConvertUtf8ToAscii() is in CommonFunctiuons.usl
+				//ConvertUtf8ToAscii() is in CommonFunctions.usl
 			}
 		}
+    
+		/*#IF_DEFINED DEBUG
+			IF (InNestedObject)
+			{
+			IF (!InArrayObject && !InNestedObject)
+				PRINT("ProcessResponse: %c, loop(%d), InPropName(%d), SkipC(%d), StartB(%d), EndB(%d), Num(%d), Name(%s), Value(%s)"
+					, character, loop, InResponsePropertyName, SkipCharacter, NumStartBrackets, NumEndBrackets, ResponsePropertyNumber
+					, ResponsePropertyName[ResponsePropertyNumber], ResponsePropertyValue[ResponsePropertyNumber]); 
+			ELSE 
+				PRINT("%c, loop(%d), InArrayObject(%d), InArrayItemName(%d), ItemPosition(%d), Number(%d), name(%s), value(%s)"
+					, character, loop, InArrayObject, InArrayItemName, outputArrayItemPosition
+					, InArrayNameValueNumber, outputStringName[InArrayNameValueNumber], outputStringValue[InArrayNameValueNumber]); 
+			}
+			ELSE
+				PRINT("%c, %d", character, SkipCharacter);
+		#ENDIF*/
 
+		//append the character
 		IF (!SkipCharacter)
 		{
-			IF (!InArray)
+			IF (SendToOutput)
 			{
         		setString(chr(character), outputPosition, outputString);//append the character
 				outputPosition = ((outputPosition + 1) MOD MAX_SERIAL_STRING_LENGTH);
@@ -1143,32 +1390,51 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 			}
 			ELSE
 			{
-				IF (InArrayItemName)
+				IF (InArrayObject || InNestedObject)
 				{
-					//append the character
-					setString(chr(character), outputArrayItemPosition, outputStringName[InArrayNameValueNumber]);
-					outputArrayItemPosition = outputArrayItemPosition + 1;				
+					IF (InArrayItemName = 1)
+					{
+						//append the character
+						setString(chr(character), outputArrayItemPosition, outputStringName[InArrayNameValueNumber]);
+						outputArrayItemPosition = outputArrayItemPosition + 1;					
+					}
+					ELSE
+					{
+						//append the character
+						setString(chr(character), outputArrayItemPosition, outputStringValue[InArrayNameValueNumber]);
+						outputArrayItemPosition = outputArrayItemPosition + 1;
+					}
 				}
 				ELSE
 				{
-					setString(chr(character), outputArrayItemPosition, outputStringValue[InArrayNameValueNumber]);
-					outputArrayItemPosition = outputArrayItemPosition + 1;				
-				}
-			}
-
-		}
+					IF (InResponsePropertyName)
+						setString(chr(character), ResponsePropertyPosition, ResponsePropertyName[ResponsePropertyNumber]);
+					ELSE
+						setString(chr(character), ResponsePropertyPosition, ResponsePropertyValue[ResponsePropertyNumber]);
+	
+					#IF_DEFINED 
+						IF (NumStartBrackets >= 3)
+							DEBUG PRINT("%c, PropertyNumber(%d), InName(%d), PropertyName(%s), PropertyValue(%s)"
+							, character, ResponsePropertyNumber, InResponsePropertyName
+							, ResponsePropertyName[ResponsePropertyNumber]
+							, ResponsePropertyValue[ResponsePropertyNumber]); 
+					#ENDIF
 		
+					ResponsePropertyPosition = ResponsePropertyPosition + 1;
+				}
+            }
+        }
+
 		// Send the temp string to the Rx Output if the counter has looped, or hit end of input data
-        IF (!InArray && LEN(outputString) && (outputPosition = 1 || loop = inputLength))
+        IF (SendToOutput && LEN(outputString) && (outputPosition = 1 || loop = inputLength))
 		{
-			IF (ExternalRequest)
-				Rx$ = outputString;
+			Rx$ = outputString; //Send to XBMC.usp
 
             outputPosition = 1;
 			outputString = "";
 		}
-					
-		IF (InArray)
+
+		IF (!SendToOutput && (InArrayObject || InNestedObject))
 		{
 			// Test for end of Array item
 			IF (IsEven(DoubleQuotesCount) && character = '}')
@@ -1183,35 +1449,62 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 				InArrayNameValueNumber = 1;
 				outputArrayItemPosition = 1;
 				InArrayItemName = 1;
+				InNestedObject = 0;
 			}
 		}	
 		ELSE
 		{
+
 			// Test for the end of the entire message (using count of curly brackets)
 			IF (NumStartBrackets > 0 && NumEndBrackets > 0 
 				&& NumStartBrackets = NumEndBrackets)
 			{
-				IF (ExternalRequest)
+           
+				IF (ResponseType = 0)
+	                DetermineIdAndResponseType();
+				
+	        	IF (ExternalRequest && !SendToOutput)
+				{
+	                PrepareOutputString();
+					SendToOutput = 1;
+					MakeString(outputString,"%sresult:%s", outputString, ResponsePropertyValue[ResponsePropertyNumber]);            	
+					Rx$ = outputString;
+				}
+			
+				IF (SendToOutput)
 		            IF (outputPosition != 1 && loop != inputLength)
-    	    	    	Rx$ = outputString + "\n";
+	   	    	    	Rx$ = outputString + "\n";
 					ELSE
 						Rx$ = "\n";
-
+	
 			    NumStartBrackets = 0;
 				NumEndBrackets = 0;
-				DoubleQuotesCount = 0;
-				
+				DoubleQuotesCount = 0;			
 				outputPosition = 1;
 				outputString = "";
+				SendToOutput = 0;
+				InNestedObject = 0;
+                InArrayItemName = 1;
+				InArrayObject = 0;
+				InArrayNameValueNumber = 1;
+				InLimitsObject = 0;
+	
+				ResponsePropertyNumber = 0;
+				ResponsePropertyPosition = 1;
+				SetArray(ResponsePropertyName, "");
+				SetArray(ResponsePropertyValue, "");
+				InResponsePropertyName = 1;
+	
+				ResponseId = 0;
+				ResponseType = 0;
 		
 				SocketBusy = OFF;
 				Loading = OFF;
 				ExternalRequest = OFF;
 			}
-   		}           
-        
-		prevCharacter = character;   
-		 
+        }
+		
+		prevCharacter = character;
 	}
 
 	TCPBlocker[0] = OFF;
@@ -1222,7 +1515,7 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 /*
 	Send the JSON-RPC command via the TCP socket
 */
-Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
+Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 {
 	STRING Command$[16384];
     
@@ -1235,19 +1528,15 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 		// \x22 is a double quote (")
 		MAKESTRING (Command$, 
 			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
-			,id ,Command);
+			,id ,Method);
 	}
 	ELSE
 	{
 		MAKESTRING (Command$, 
 			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
-			,id ,Command, Arguments);
+			,id ,Method, Arguments);
 	}
-	
-	#IF_DEFINED DEBUG
-		PRINT("SendJsonCommand: %s" ,Command$);
-	#ENDIF
-
+    Print("SendJsonCommand (%s)", Command$);
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
 	{
@@ -1256,12 +1545,12 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 
 		IF (LEN(Command$)>250)
 		{
-			// Send to serial out
+			// Send to soucket in chunks
 			SocketSend(XBMC, REMOVEBYLENGTH(250, Command$));
 		}
 		ELSE
 		{
-			// Append a delimiter ('\n') and send to socket
+			// send last chunk
 			SocketSend(XBMC, Command$);
 			Command$ = "";
 		}
@@ -1271,7 +1560,9 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 
 /*
 	Make the JSON command call that retrieves the details of a movie, in
-	particular the plot (which is usually a long string)	
+	particular the plot (which is usually a long string)
+
+	This method is called from 'SelectedItem'.	
 */
 FUNCTION GetMovieDetails(INTEGER movieid)
 {
@@ -1281,8 +1572,10 @@ FUNCTION GetMovieDetails(INTEGER movieid)
 }
 
 /*
-	Make the JSON command call that retrieves the details of a tv episode, in
-	particular the plot g)	
+	Make the JSON command call that retrieves the details of a tv episode (in
+	particular the plot).
+
+	This method is called from 'SelectedItem'.		
 */
 FUNCTION GetEpisodeDetails(INTEGER episodeid)
 {
@@ -1479,6 +1772,8 @@ FUNCTION RepopulateOutputList(INTEGER start)
 	Make the JSON command call that retrieves a browse list e.g. of Movies or Albums
 
 	The reply from xbmc will be handled first by ProcessResponse and then AssignListData 
+
+	The constants (e.g. REQUESTID_MOVIELIBRARY_GETMOVIES) are defined in Common_Functions.usl
 */
 FUNCTION RepopulateMediaList()
 {
@@ -1493,13 +1788,13 @@ FUNCTION RepopulateMediaList()
 		CASE (MOVIE_TITLE_LIST) :
 		{
 			CALL SendJsonCommand (REQUESTID_MOVIELIBRARY_GETMOVIES, 
-				"VideoLibrary.GetMovies", VideoBrowseParameters("sorttitle"));
+				"VideoLibrary.GetMovies", MovieBrowseParameters());
             BREAK;
 		}
 		CASE (TV_SHOW_LIST)		: 
 		{ 
 			method = "VideoLibrary.GetTvShows"; 
-			Params$ = VideoBrowseParameters("sorttitle");
+			Params$ = TvShowBrowseParameters("sorttitle");
 
 			CALL SendJsonCommand (REQUESTID_MOVIELIBRARY_GETTVSHOWS, method, Params$);
 			BREAK;
@@ -1536,9 +1831,10 @@ FUNCTION RepopulateMediaList()
 		CASE (MUSIC_ARTIST_LIST)  : 
 		{ 
 			method = "AudioLibrary.GetArtists"; 
- 			Params$ = AudioPlaylistParameters("", "artist");
+ 			//Params$ = AudioPlaylistParameters("", "artist");
 
-			CALL SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETARTISTS, method, Params$);
+			CALL SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETARTISTS, method, 
+				"{\x22sort\x22:{\x22method\x22:\x22label\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:true}}");
 			BREAK;
 		}
 		CASE (MUSIC_ARTIST_CHOOSE_LIST)  : 
@@ -1625,19 +1921,19 @@ FUNCTION Play()
 		{
 			MovieDetails = OFF;
 			PlaylistType$ = "VideoPlaylist";
-        	MAKESTRING(Parameter$, "{\x22movieid\x22:%d}", List_IDs[SelectedItem]);
+        	MAKESTRING(Parameter$, "{\x22item\x22:{\x22movieid\x22:%d}}", List_IDs[SelectedItem]);
 		}
 		CASE (TV_SHOW_LIST)		: {}
 		CASE (TV_SEASON_LIST) 	: 
 		{
 			PlaylistType$ = "VideoPlaylist";
-        	MAKESTRING(Parameter$, "{\x22seriesid\x22:%d,\x22seasonid\x22:%d}", 
+        	MAKESTRING(Parameter$, "{\x22item\x22:{\x22seriesid\x22:%d,\x22seasonid\x22:%d}}", 
 										TvShowID, List_IDs[SelectedItem]);
 		}
 		CASE (TV_EPISODE_LIST)  : 
 		{
 			PlaylistType$ = "VideoPlaylist";
-        	MAKESTRING(Parameter$, "{\x22episodeid\x22:%d}", 
+        	MAKESTRING(Parameter$, "{\x22item\x22:{\x22episodeid\x22:%d}}", 
 										List_IDs[SelectedItem]);
 		}
 		CASE (MUSIC_ALBUM_LIST)  : {}
@@ -1656,7 +1952,7 @@ FUNCTION Play()
 				MAKESTRING(Command$,"%s.Add",PlaylistType$);
                 WHILE (PlaylistIDs[loop])	
 				{
-                	MAKESTRING(Parameter$, "{\x22songid\x22:%d}", 
+                	MAKESTRING(Parameter$, "{\x22item\x22:{\x22songid\x22:%d}}", 
 										PlaylistIDs[loop]);
 
                         
@@ -1668,20 +1964,22 @@ FUNCTION Play()
     			ItemNumberZeroBased = SelectedItem-1+StepAmount*List_PageNumber;
 				IF (ItemNumberZeroBased<0) ItemNumberZeroBased=0; 
 				IF (ItemNumberZeroBased>(NumberOfSongs-1)) ItemNumberZeroBased=(NumberOfSongs-1); 
-			    SendJsonCommand(REQUESTID_PLAYLIST_PLAY, "AudioPlaylist.Play", ItoA(ItemNumberZeroBased));
+                MAKESTRING(Parameter$, "{\x22item\x22:%d}", ItemNumberZeroBased);
+
+			    SendJsonCommand(REQUESTID_PLAYLIST_PLAY, "AudioPlaylist.Play", Parameter$);
 
 			    // Wait 3 seconds before requesting metadata
 				WAIT(300)
 				{
 					PULSE(10, CheckCurrentlyPlaying);
 				}
-				RETURN;
+				RETURN; // Exit function
 			}
 			ELSE
 			{
 				// Play One Song
 				PlaylistType$ = "AudioPlaylist";
-        		MAKESTRING(Parameter$, "{\x22songid\x22:%d}", 
+        		MAKESTRING(Parameter$, "{\x22item\x22:{\x22songid\x22:%d}}", 
 										List_IDs[SelectedItem]);
 			}
 			
@@ -2194,7 +2492,7 @@ CHANGE Tx$
 	}
 
 	Command$ = GATHER("\n", Tx$, GATHER_TIMEOUT);
-
+    
 	SocketBusy = ON;
 	ExternalRequest = ON;
 	
@@ -2208,6 +2506,7 @@ CHANGE Tx$
 }
 
 
+
 ///////////// Initialization script
 Function Main()
 {              
@@ -2219,6 +2518,7 @@ Function Main()
 	WHILE(1)
 	{
 		// Wait for a minimum of 10 bytes
+		// Can't use a delimiter because with JSON there isn't one.
   		Xbmc$ = GatherByLength(MAX(10,LEN(XBMC.SocketRxBuf)), XBMC.SocketRxBuf);
 		CALL ProcessResponse(Xbmc$);		
 	} 

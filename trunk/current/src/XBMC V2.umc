@@ -2270,7 +2270,7 @@ I18=96
 I19=457
 I20=64
 I22=114
-I23=108
+I23=15
 I25=94
 I26=93
 I28=144
@@ -2501,7 +2501,7 @@ O12=152
 O13=153
 O15=11
 O16=64
-O18=108
+O18=15
 O19=98
 O22=476
 O23=477
@@ -3642,6 +3642,11 @@ Nm=XBMC_Poll
 ]
 [
 ObjTp=Sg
+H=15
+Nm=[SocketIsBusy]
+]
+[
+ObjTp=Sg
 H=16
 Nm=//ACTION_REBOOT
 ]
@@ -4166,11 +4171,6 @@ ObjTp=Sg
 H=107
 Nm=[Current_Video_Codec$]
 SgTp=4
-]
-[
-ObjTp=Sg
-H=108
-Nm=SocketIsBusy
 ]
 [
 ObjTp=Sg

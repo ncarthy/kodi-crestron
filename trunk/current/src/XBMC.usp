@@ -23,6 +23,14 @@ Comments:
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+	***** ******* *****
+
+	A note on the Rx/Tx Outputs
+	This module is connected to XBMC-Browse.usp by outputs Rx & Tx.  
+	XBMC-Browse.usp is responsible for all communication with the XBMC.exe.
+	It was designed this way so that one module could control the flow of
+	requests and replies to prevent messages getting jammed.
 */
 
 #SYMBOL_NAME "XBMC"
@@ -45,53 +53,8 @@ Comments:
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
 #DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds 
 #DEFINE_CONSTANT BUFFER_SIZE 40000      // large!
-
-//Useful characters that we'll need in parsing metadata
-#DEFINE_CONSTANT CR 0x0D		 	// Carriage return
-#DEFINE_CONSTANT LF 0x0A		 	// Linefeed
-#DEFINE_CONSTANT TAB 0x09		 	// Tab
-#DEFINE_CONSTANT SPACE 0x20	   		// Space
-#DEFINE_CONSTANT DBLQUOTE 0x22	   	// "
-#DEFINE_CONSTANT BACKSLASH 0x5C	   	// \
-                  
-/* Types of playing media, output via Currently_Playing_Type*/
-#DEFINE_CONSTANT TYPE_NONE							 0
-#DEFINE_CONSTANT TYPE_MOVIE							 1
-#DEFINE_CONSTANT TYPE_AUDIO							 2
-#DEFINE_CONSTANT TYPE_SERIES					     3
-#DEFINE_CONSTANT TYPE_PICTURES						 4
-#DEFINE_CONSTANT TYPE_OTHERVIDEO					 5
-
-/* REequest IDs for different JSON-RPC commands */
-#DEFINE_CONSTANT REQUESTID_GETACTIVEPLAYERS				1
-#DEFINE_CONSTANT REQUESTID_GETINFOLABELS				2
-#DEFINE_CONSTANT REQUESTID_AUDIOPLAYLIST_GETITEMS		3
-#DEFINE_CONSTANT REQUESTID_VIDEOPLAYLIST_GETITEMS		4
-#DEFINE_CONSTANT REQUESTID_GETTIME_SECONDS				5
-#DEFINE_CONSTANT REQUESTID_GETTIME_PERCENTAGE			6
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIES		7 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETMOVIEDETAILS	8 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSHOWS		9 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVSEASONS	10 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETTVEPISODES	11 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_MOVIELIBRARY_GETEPISODEDETS	12 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTS		13 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		14 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		15 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				16 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					17 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				18 // Request Ids 7-20 are handled by XBMC-Browse
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			19 // Request Ids 7-20 are handled by XBMC-Browse
                                                           
-#DEFINE_CONSTANT REQUESTID_SKIPNEXT						22
-#DEFINE_CONSTANT REQUESTID_SKIPPREV						23
-#DEFINE_CONSTANT REQUESTID_SMALLSKIPFORWARD				24
-#DEFINE_CONSTANT REQUESTID_SMALLSKIPBACKWARD			25
-#DEFINE_CONSTANT REQUESTID_LARGESKIPFORWARD				26
-#DEFINE_CONSTANT REQUESTID_LARGESKIPBACKWARD			27
-#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_SCAN			28
-#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_SCAN			29
-
+/* NB: REQUESTIDs defined in Common_Functions.usl */
 
 /* ActivePlayer IDs */
 #DEFINE_CONSTANT ACTIVEPLAYER_NONE						0
@@ -371,7 +334,7 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 								,"\x22year\x22"
 								,"\x22rating\x22"
 								,"\x22duration\x22"
-								,"\x22tracknumber\x22"
+								,"\x22track\x22"
 								,"\x22thumbnail\x22"
 								,SortMethod
 								,start
@@ -663,7 +626,7 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 		{
 	     	IF (ResultName$[i] = "file") CurrentFilename$ = RIGHT(ResultValue$[i],255); //SIMPL strings can only be 255 chars long
 			ELSE IF(ResultName$[i] = "title") CurrentTitle$ = ResultValue$[i];
-			ELSE IF(ResultName$[i] = "tracknumber") CurrentTrackNumber$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "track") CurrentTrackNumber$ = ResultValue$[i];
 			ELSE IF(ResultName$[i] = "artist") CurrentArtist$ = ResultValue$[i];
 	 		ELSE IF(ResultName$[i] = "album") CurrentAlbum$ = ResultValue$[i];
 			ELSE IF(ResultName$[i] = "genre") CurrentGenre$ = ResultValue$[i];
@@ -741,6 +704,10 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 
 	The JSON result object is required to be of the form (ignoring whitespace):
 	 				{"name1":"value1","name2":"value2","name3":.. etc.   ..}
+	OR				{"name1":"value1","name2":{"name3":"value3, "name4":.. etc.} etc.   ..}
+					(2-level object)
+
+	This routine can handle a single level of nested objects only
 	
 	This method will then transfer the names and values to the ResultName$ 
 	and ResultValue$ arrays.
@@ -755,18 +722,21 @@ FUNCTION ParseObject(STRING Result$)
 	INTEGER inputLength;			// length of Result$
 	INTEGER SkipCharacter;			// when =1 drop character, otherwise process it
 	INTEGER DoubleQuotesCount;		// number of quotes ("). Used to determine if inside a string.
-	INTEGER CurlyBracketCount;		// number of brackets ({}). Used to determine if inside a nested object.
+	INTEGER NumStartBrackets;		// number of brackets ({). Used to determine if inside a nested object.
+   	INTEGER NumEndBrackets;		    // number of brackets (}). Used to determine if inside a nested object.
 	INTEGER InItemName;				// when =1 we are currently parsing the name of a name/value pair
 	INTEGER outputPosition;			// position in output string
+   	INTEGER InsideNestedObject;		// Loop is currently inside a nested object {....{...X...}...}
 
-	//This routine can handle a single level of nested objects only
 
 	// initialize
 	InItemName = 1;
 	NameValueCount = 1;
 	outputPosition = 1;
-	CurlyBracketCount = 0;
-    DoubleQuotesCount = 0;
+	NumStartBrackets = 0;
+	NumEndBrackets = 0;
+	InsideNestedObject = 0;
+	prevCharacter = 0;
 	SetArray(ResultName$,"");		// These are module-level arrays
 	SetArray(ResultValue$,"");		//
 
@@ -780,62 +750,64 @@ FUNCTION ParseObject(STRING Result$)
 		switch(character) //examine it
 		{
 			case ('{'):
-			{
-				CurlyBracketCount = CurlyBracketCount + 1;
+			{			
+				IF (IsEven(DoubleQuotesCount))
+				{
+					NumStartBrackets = NumStartBrackets + 1;
+					SkipCharacter = 1;
 
-				IF (CurlyBracketCount <= 1)
-					IF (IsEven(DoubleQuotesCount))
-						SkipCharacter = 1;
+					IF (NumStartBrackets-NumEndBrackets=2)
+						InsideNestedObject=1;
+				}
 			}
 			case ('}'):
-			{
-				IF (CurlyBracketCount <= 1)
-					IF (IsEven(DoubleQuotesCount))
-						SkipCharacter = 1;	
+			{				 
+				IF (IsEven(DoubleQuotesCount)) // Outside a string
+				{
+					NumEndBrackets = NumEndBrackets + 1;
+					SkipCharacter = 1;	
 
-				CurlyBracketCount = CurlyBracketCount - 1;               					
+             		IF (NumStartBrackets-NumEndBrackets=1)
+						InsideNestedObject=0;
+				}
+				
 			}
 
             case (DBLQUOTE): // " (double quotes)
 			{
-				IF (CurlyBracketCount <= 1)
-					IF (prevCharacter != BACKSLASH) // Avoid case where double quote is escaped (\")
-					{
-        	    		DoubleQuotesCount = DoubleQuotesCount + 1;
-						SkipCharacter = 1;
-					}
+				IF (!InsideNestedObject && prevCharacter != BACKSLASH) // Avoid case where double quote is escaped (\")
+				{
+       	    		DoubleQuotesCount = DoubleQuotesCount + 1;
+					SkipCharacter = 1;
+				}
 			}
 			case (','):
 			{
-				IF (CurlyBracketCount <= 1)
-					// Ignore the comma that seperates individual array items
-					IF (IsEven(DoubleQuotesCount))
-					{
-						InItemName = 1;
-						SkipCharacter = 1;
-						outputPosition = 1;
-						NameValueCount = NameValueCount+1;
-					}
+				IF (!InsideNestedObject && IsEven(DoubleQuotesCount))
+				{
+					InItemName = 1;
+					SkipCharacter = 1;
+					outputPosition = 1;
+					NameValueCount = NameValueCount+1;
+				}
 					
 			}
             case (':'):
 			{
-				IF (CurlyBracketCount <= 1)
-					IF (IsEven(DoubleQuotesCount))
-					{
-						InItemName = 0;
-						SkipCharacter = 1;
-						outputPosition = 1;			
-					}
+				IF (!InsideNestedObject && IsEven(DoubleQuotesCount))
+				{
+					InItemName = 0;
+					SkipCharacter = 1;
+					outputPosition = 1;			
+				}
 			}
 			case (BACKSLASH):
 			{
-				IF (CurlyBracketCount <= 1)
-	            	IF (IsOdd(DoubleQuotesCount)) // Inside a string
-					{
-						IF (prevCharacter != BACKSLASH)	// Avoid case where backslash is escaped (\\)		
-							SkipCharacter = 1;
-					}
+            	IF (IsOdd(DoubleQuotesCount)) // Inside a string
+				{
+					IF (prevCharacter != BACKSLASH)	// Avoid case where backslash is escaped (\\)		
+						SkipCharacter = 1;
+				}
 
 			}
 		}
@@ -852,6 +824,9 @@ FUNCTION ParseObject(STRING Result$)
             outputPosition = outputPosition + 1;
 		}         
         
+		//#IF_DEFINED DEBUG PRINT("ParseObject: %c, InItemName (%d), SkipCharacter(%d), outputPosition(%d), NumStartBrackets(%d), InsideNestedObject(%d)"
+		//		, character, InItemName, SkipCharacter, outputPosition, NumStartBrackets, InsideNestedObject); #ENDIF 
+
 		// store previous character
 		prevCharacter = character;   
 		 
@@ -871,6 +846,8 @@ FUNCTION ParseObject(STRING Result$)
 /*
     Update metadata using JSON result object that contains an array of
 	one or at most 2 items: "[{...}]" or "[{...},{...}]"
+
+	Called From ParseJSONResult;
 */
 FUNCTION GetMetadataFromResponse(STRING Response$)
 {
@@ -888,7 +865,9 @@ FUNCTION GetMetadataFromResponse(STRING Response$)
 	ListItemBookends[0] = Find("{", Response$, ItemsArrayBookends[0]);    
 	ListItemBookends[1] = Find("}", Response$, ListItemBookends[0]);    
 
-	Item$ = MID(Response$, ListItemBookends[0], ListItemBookends[1] - ListItemBookends[0]);  
+	Item$ = MID(Response$, ListItemBookends[0], ListItemBookends[1] - ListItemBookends[0]); 
+	#IF_DEFINED DEBUG PRINT("GetMetadataFromResponse: %s...", LEFT(Item$, 10)); #ENDIF 
+	#IF_DEFINED DEBUG PRINT("GetMetadataFromResponse: ...%s", RIGHT(Item$, 10)); #ENDIF 
 	ParseObject(Item$);
 	CALL GetMetadataFromList(0);
                 
@@ -913,39 +892,40 @@ FUNCTION GetMetadataFromResponse(STRING Response$)
 	Typical form of announcement message:
 	{}
 */
-FUNCTION ParseAnnouncementMessage(STRING Announcement$)
+FUNCTION ParseNotification(STRING Notification$)
 {
 	INTEGER Ind[2];			//Index variables used to parse the response 
-    STRING Message$[100];
+    STRING EventName$[100];
+	STRING Data$[100];		// The contents of the Data object
 	STRING TempSpeed$[3];
 	
-	Ind[0] = FIND("message", Announcement$);
-	Ind[1] = FIND(":", Announcement$, Ind[0]) + 1;
-	Ind[2] = FIND(",", Announcement$, Ind[1]);
+	//Find name of Notified event. e.g. OnPlay or OnPause
+	Ind[0] = FIND("|", Notification$)-1;
+	EventName$ = LEFT(Notification$, Ind[0]);
 
-	Message$ = MID(Announcement$, Ind[1], Ind[2] - Ind[1]);
+	//Find Data object
+	Ind[0] = FIND("{", Notification$);
+	Data$ = RIGHT(Notification$, LEN(Notification$) - Ind[0] + 1);
 
-	#IF_DEFINED DEBUG 	
-		PRINT("Message: %s\n", Message$);
-    #ENDIF
+	#IF_DEFINED DEBUG PRINT("Notification Event: %s, Data: %s", EventName$,Data$); #ENDIF
 
-	If(Find("Action", Message$) || Find("PlayBackSeek",Message$) 
-						|| Find("MediaChanged",Message$)
-						|| Find("QueueNextItem", Message$) 
-						|| Find("NewSong", Message$)
-						|| Find("NewPlayCount", Message$)
-						|| Find("ApplicationStop", Message$)
-						|| Find("ApplicationStart", Message$)
-						|| Find("Sleep", Message$))
+	If(Find("Action", EventName$) || Find("PlayBackSeek",EventName$) 
+						|| Find("MediaChanged",EventName$)
+						|| Find("QueueNextItem", EventName$) 
+						|| Find("NewSong", EventName$)
+						|| Find("NewPlayCount", EventName$)
+						|| Find("OnQuit", EventName$)
+						|| Find("ApplicationStart", EventName$)
+						|| Find("Sleep", EventName$))
 	{
 		// Do Nothing
 	}
-	Else If(Find("SpeedChanged", Message$))
+	Else If(Find("SpeedChanged", EventName$))
 	{                
-		Ind[0] = FIND("speed", Announcement$);
-		Ind[1] = FIND(":", Announcement$, Ind[0]) + 1;
-		Ind[2] = FIND("}", Announcement$, Ind[1]) - 1;
-		TempSpeed$ = TRIM(mid(Announcement$, Ind[1], Ind[2] - Ind[1])); 
+		Ind[0] = FIND("speed", Notification$);
+		Ind[1] = FIND(":", Notification$, Ind[0]) + 1;
+		Ind[2] = FIND("}", Notification$, Ind[1]) - 1;
+		TempSpeed$ = TRIM(mid(Notification$, Ind[1], Ind[2] - Ind[1])); 
 
 		if (Find("-",TempSpeed$)) 
 			PlaySpeed 	= -(atoi(TempSpeed$));
@@ -954,7 +934,7 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		
 		MakeString(PlayingSpeed$,"%dx",PlaySpeed); 
 	}	
-	Else If(Find("PlaybackStarted", Message$))
+	Else If(Find("OnPlay", EventName$))
 	{
 		PauseFb		= 0; 
 		StopFb		= 0; 
@@ -963,7 +943,7 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
 		PlayStatus$ = "Playing";
 	}
-	Else If(Find("PlaybackPaused", Message$)) 
+	Else If(Find("OnPause", EventName$)) 
 	{
 		StopFb			= 0; 
 		PlayFb			= 0; 
@@ -971,7 +951,7 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		PlayingSpeed$ 	= ""; 
 		PlayStatus$ = "Paused";
 	}
-	Else If(Find("PlaybackEnded", Message$) || Find("PlaybackStopped", Message$))
+	Else If(Find("OnStop", EventName$))
 	{
 		PlayFb					= 0; 
 		PauseFb					= 0;
@@ -980,7 +960,7 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		PlayStatus$ = "Stopped";
 		CALL Initialize_Outputs();
 	}
-	Else If(Find("PlaybackResumed", Message$))
+	Else If(Find("PlaybackResumed", EventName$))
 	{
 		PauseFb					= 0; 
 		StopFb					= 0; 
@@ -989,19 +969,22 @@ FUNCTION ParseAnnouncementMessage(STRING Announcement$)
 		PlayStatus$ = "Playing";
 		Makestring(PlayingSpeed$, "%dx", PlaySpeed);
 	}
-	Else If(Find("StartUp", Message$) > 0)
+	Else If(Find("StartUp", EventName$))
 	{
 		CALL Initialize_Outputs();
 	}
 	Else
-		PRINT("XBMC.usp: Unknown announcement: %s\n", LEFT(Announcement$,200));
+		PRINT("XBMC.usp: Unknown Notification: %s\n", LEFT(Notification$,200));
 }
 
 /*
   	Take the raw JSON result string and send it to the correct parsing function
+
+	Called from ProcessResponse()
 */
 FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 {
+	// REQUESTIDs defined in Common_Functions.usl
 	IF (id = REQUESTID_GETACTIVEPLAYERS)
 	{
 		CALL ParseObject(Result$);
@@ -1037,6 +1020,10 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 	}
 	ELSE IF (id = REQUESTID_GETTIME_PERCENTAGE)
 	{
+		#IF_DEFINED DEBUG 	
+			PRINT ("Result(REQUESTID_GETTIME_PERCENTAGE): %s", Result$);
+	    #ENDIF
+
 		// XBMC does not return JSON in this case
 		CurrentPercentage$ = Round(Result$,0)+"%";
 		Progress_Percentage = AtoI(Round(Result$,0));
@@ -1044,8 +1031,10 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 	ELSE IF (ID >= REQUESTID_MOVIELIBRARY_GETMOVIES
 				&& ID <= REQUESTID_PLAYLIST_PLAYALLLIST)
     {
-        // Do Nothing.
-		// Handled by XBMC-Browse		
+		// Should be handled by XBMC-Browse		
+		GenerateUserError("%s: Invalid REQUESTID, should be handled by XBMC-Browse. id=%d, Result=%s", 
+				GetSymbolInstanceName(), id, LEFT(Result$,100));
+
 	}
 	ELSE IF (FIND("OK", Result$) || (FIND("success", Result$) && FIND("true", Result$)))
 	{
@@ -1077,10 +1066,10 @@ INTEGER_FUNCTION GetRequestID(STRING IN$)
     INTEGER Ind[1];		// Indices used in parsing input string
 	STRING ID$[10];
 	
-	Ind[0] = FIND("id\x22:", IN$)+ 4;
-	Ind[1] = FIND(",", IN$, Ind[0]) - 1; 
+	Ind[0] = FIND("|", IN$)+1;
+	Ind[1] = FIND("|", IN$, Ind[0]) - 1; 
 	ID$ = MID(IN$, Ind[0], Ind[1] - Ind[0] + 1);
-
+    #IF_DEFINED DEBUG  Print("XBMC.usp:ID %s", ID$); #ENDIF
 	RETURN (AtoI(ID$));
 }
 
@@ -1094,71 +1083,70 @@ FUNCTION ProcessResponse(STRING Response$)
 {
 	INTEGER ID;  				// The request id. It is used to match the response
 								// with the request that it is replying to.
+	INTEGER ResponseType;		
 	INTEGER Ind[2];				//Index variables used to parse the response  
 
-	#IF_DEFINED DEBUG  Print("Payload Received (%d bytes): %s", LEN(Response$), LEFT(Response$,200)); #ENDIF
+	#IF_DEFINED DEBUG  Print("XBMC.usp:Payload Received (%d bytes): %s", LEN(Response$), LEFT(Response$,200)); #ENDIF
 
 	// Process the JSON payload, which is now in the Response$ variable
-	Ind[0] = FIND ("result", Response$);
-	IF (Ind[0])
-	{
-
-		// Determine request id
-        ID = GetRequestID(Response$);
-              
-		// 'result' string within XBMC Response
-		Ind[0] = FIND ("{", Response$, Ind[0]);
-		IF (Ind[0])
-			Ind[1] = REVERSEFIND ("}}", Response$);
-		ELSE
-		{
-			// To capture the case of GetPercentage() which doesn't return a result object...
-			// instead it returns a number as the result e.g. "{id:7,jsonrpc:2.0,result:5.6578436456}"
-            Ind[0] = FIND (":", Response$, FIND ("result", Response$)) + 1;
-			Ind[1] = REVERSEFIND ("}", Response$);
-		}
-		IF (Ind[1]=0)
-			Ind[1] = LEN(Response$);
-
-		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
-
-		IF (ID)
-			CALL ParseJSONResult(ID, Response$);  	
-	}
+	ResponseType = AtoI(LEFT( Response$ ,1));
 	// Announcement?
-	ELSE IF (FIND ("Announcement", Response$))
+	IF (ResponseType = JSON_NOTIFY)
 	{
-       	Ind[0] = FIND (":", Response$, FIND ("params", Response$)) + 1;
-		Ind[1] = REVERSEFIND ("}", Response$);
+       	Ind[0] = FIND ("|", Response$) + 1;
+		Ind[1] = FIND ("}", Response$, Ind[0]);
 		IF (Ind[1]=0)
 			Ind[1] = LEN(Response$);
 		
 		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
-
-        CALL ParseAnnouncementMessage(Response$);
+        #IF_DEFINED DEBUG  Print("XBMC.usp:NotificationParameters: %s", LEFT(Response$,200)); #ENDIF
+        CALL ParseNotification(Response$);
 	}
-	// JSON error?
-	ELSE IF (FIND ("error", Response$))
+	ELSE 
 	{
 		// Determine request id
         ID = GetRequestID(Response$);
-              
-		// 'error' string within XBMC Response
-        Ind[0] = FIND (":", Response$, FIND ("error", Response$)) + 1;
-		Ind[1] = REVERSEFIND ("}}", Response$);
-		IF (Ind[1]=0)
-			Ind[1] = LEN(Response$);
 
-		Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
-                 
-		IF (ID)
-			CALL ParseJSONError(ID, Response$);
-		ELSE 
-			Print("XBMC.usp: id:%d error:%s", ID, LEFT(Response$,200));
-	}
-	ELSE
-	{
-		Print("XBMC.usp (ProcessResponse): Unrecognised Payload: %s", LEFT(Response$,190));
+		IF (ResponseType = JSON_RESULT)
+		{	              
+			// 'result' string within XBMC Response
+			Ind[0] = FIND ("{", Response$, 2);
+			IF (Ind[0])
+				Ind[1] = REVERSEFIND ("}", Response$);
+			ELSE
+			{
+				// To capture the case of GetPercentage() which doesn't return a result object...
+				// instead it returns a number as the result e.g. "{id:7,jsonrpc:2.0,result:5.6578436456}"
+	            Ind[0] = FIND (":", Response$, FIND ("result", Response$)) + 1;
+				Ind[1] = REVERSEFIND ("}", Response$);
+			}
+			IF (Ind[1]=0)
+				Ind[1] = LEN(Response$);
+	
+			Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
+	        //#IF_DEFINED DEBUG  Print("XBMC.usp:Payload Received Result: %s", LEFT(Response$,200)); #ENDIF
+			IF (ID)
+				CALL ParseJSONResult(ID, Response$);  	
+		}
+        ELSE IF (ResponseType = JSON_ERROR)
+		{              
+			// 'error' string within XBMC Response
+	        Ind[0] = FIND (":", Response$, FIND ("error", Response$)) + 1;
+			Ind[1] = REVERSEFIND ("}}", Response$);
+			IF (Ind[1]=0)
+				Ind[1] = LEN(Response$);
+	
+			Response$ = MID(Response$, Ind[0], Ind[1] - Ind[0] + 1);
+	        //#IF_DEFINED DEBUG  Print("XBMC.usp:Payload Received (%d bytes): %s", LEN(Response$), LEFT(Response$,200)); #ENDIF         
+			IF (ID)
+				CALL ParseJSONError(ID, Response$);
+			ELSE 
+				Print("XBMC.usp: id:%d error:%s", ID, LEFT(Response$,200));
+		}
+		ELSE
+		{
+			Print("XBMC.usp (ProcessResponse): Unrecognised Response Type (%d), Body: %s", ResponseType, LEFT(Response$,100));
+		}
 	}	
     
 	TCPBlocker = 0;
@@ -1441,11 +1429,11 @@ CHANGE Seek_Time
 Function Main()
 {     
 	    
-	STRING Xbmc$[BUFFER_SIZE]; 	// The response from XBMC
+	STRING Xbmc$[BUFFER_SIZE]; 	// The response from XBMC. Buffer_Size is 40000
 
                        
 	// This line must be before WaitForInitializationComplete()
-	// This IP address is passed to XBMC-ES via this output
+	// This IP address is passed to XBMC-ES.usp via this output
 	IPAddress$ = XBMC_IPAddr$;
 
 	List_PageNumber = 0;
