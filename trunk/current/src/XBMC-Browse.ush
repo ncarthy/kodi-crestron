@@ -471,7 +471,7 @@
   Expand2=expand_separately
   OffsetOutputs=7
   ProgramTree=Logic
-  SymbolTree=32
+  SymbolTree=41
   Hint=Browse/search the XBMC catalogs for video and music.
   PdfHelp=
   HelpID= 
