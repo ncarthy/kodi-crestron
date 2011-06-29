@@ -588,9 +588,14 @@ STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
 		tmpCoverPath = "http://" + XBMC_IPAddr$ + ":"+ XBMC_HttpPort$ + "/";
 	}
 	IF (UseJPG)
-		tmpCoverPath = tmpCoverPath + "vfs:" + LEFT(uri$, LEN(uri$) - 4) + ".jpg";
+	{
+		/* 	Hack/workaround for Crestron TP's to display .tbn files. 
+			Tested with XPanel and 8x. Mobile Pro/ProG/Android R2 work either way.
+		*/
+		tmpCoverPath = tmpCoverPath + "vfs/" + uri$ + "?image.jpg" ;
+    }
 	ELSE
-		tmpCoverPath = tmpCoverPath + "vfs:" + uri$;
+		tmpCoverPath = tmpCoverPath + "vfs/" + uri$;
     RETURN (tmpCoverPath);
 }
 

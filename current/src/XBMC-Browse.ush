@@ -6,8 +6,8 @@
   Sgntr=UserSPlus
   RelVrs=1
   IntStrVrs=1
-  SPlusVrs=3.03.13
-  InclDatVrs=1.69
+  SPlusVrs=3.03.16
+  InclDatVrs=2.08.47
   CrossCplrVrs=1.3
 [END]
 [BEGIN]
@@ -498,6 +498,7 @@
   SmplCOutputList2Cue1=ai#
   SPlus2CompiledName=S2_XBMC_Browse
   SymJam=NonExclusive
+  FileName=XBMC-Browse.ush
   Usl1=Common_Functions.usl
 [END]
 [BEGIN]
