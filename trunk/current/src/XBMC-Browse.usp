@@ -434,7 +434,7 @@ STRING_FUNCTION MovieBrowseParameters()
 	// \x22 is a double-quote (")
 	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
 	MAKESTRING (Params$, 
-		"{\x22fields\x22:[%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22title\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
+		"{\x22fields\x22:[%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22videotitle\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
 								,"\x22title\x22"
 								,"\x22thumbnail\x22"
 								,"\x22genre\x22"
