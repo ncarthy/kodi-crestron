@@ -348,20 +348,7 @@ FUNCTION ConnectToXbmc()
 {
 	INTEGER count;
 	count = 0;
-    
-	IF ( ConnectionStatus <> 2 )
-	{
 
-		// open the connection			// '1' = always attempt to reconnect.
-	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_TcpPort$), 1);
-	
-		// wait for the connection to be established
-		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
-		{
-			delay( 20 );
-			count = count + 1;
-		}
-    } 
 
 	// Initialize module variables
 	// Do this to reset module during disconnect/reconnect.
@@ -387,6 +374,22 @@ FUNCTION ConnectToXbmc()
 	NumberOfTvShows = 0;
 	NumberOfTvShowSeasons = 0;
 	NumberOfTvShowEpisodes = 0;
+
+    
+	IF ( ConnectionStatus <> 2 )
+	{
+
+		// open the connection			// '1' = always attempt to reconnect.
+	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_TcpPort$), 1);
+	
+		// wait for the connection to be established
+		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
+		{
+			delay( 20 );
+			count = count + 1;
+		}
+    } 
+
                   
 	// Reset all flags
 	SocketBusy = OFF;
@@ -1436,9 +1439,9 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 					ELSE
 						setString(chr(character), ResponsePropertyPosition, ResponsePropertyValue[ResponsePropertyNumber]);
 	
-					#IF_DEFINED 
+					#IF_DEFINED DEBUG
 						IF (NumStartBrackets >= 3)
-							DEBUG PRINT("%c, PropertyNumber(%d), InName(%d), PropertyName(%s), PropertyValue(%s)"
+							PRINT("%c, PropertyNumber(%d), InName(%d), PropertyName(%s), PropertyValue(%s)"
 							, character, ResponsePropertyNumber, InResponsePropertyName
 							, ResponsePropertyName[ResponsePropertyNumber]
 							, ResponsePropertyValue[ResponsePropertyNumber]); 
@@ -1480,8 +1483,7 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 		{
 
 			// Test for the end of the entire message (using count of curly brackets)
-			IF (NumStartBrackets > 0 && NumEndBrackets > 0 
-				&& NumStartBrackets = NumEndBrackets)
+			IF (NumEndBrackets > 0 && NumStartBrackets = NumEndBrackets)
 			{
            
 				IF (ResponseType = 0)

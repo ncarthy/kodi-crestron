@@ -49,7 +49,7 @@ Comments:
 #USER_LIBRARY "Common_Functions"
 
 /*****    DEFINE NEW CONSTANTS    *******/
-//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
 #DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds 
 #DEFINE_CONSTANT BUFFER_SIZE 40000      // large!
@@ -213,6 +213,7 @@ Function SetVideoStatus(INTEGER Status)
 	if (Status = ON)
 	{
 		ActivePlayer = ACTIVEPLAYER_VIDEO;
+		StopFB = OFF;
 		PlayFb = ON;
 		IsPlaying = 1;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (video)", ActivePlayer); #ENDIF
@@ -230,6 +231,7 @@ Function SetAudioStatus(INTEGER Status)
 {
 	if (Status = ON)
 	{
+		StopFB = OFF;
 		PlayFb = ON;
 		IsPlaying = 1;
 		ActivePlayer = ACTIVEPLAYER_AUDIO;
@@ -250,6 +252,7 @@ Function SetSlideShowStatus(INTEGER Status)
 	if (Status = ON)
 	{
 		ActivePlayer 	= ACTIVEPLAYER_SLIDESHOW;
+		StopFB = OFF;
 		PlayFb 			= ON;
 		IsPlaying 		= 1;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (slideshow)", ActivePlayer); #ENDIF
@@ -1090,8 +1093,6 @@ FUNCTION ParseNotification(STRING Notification$)
 		Ind[1] = LEN(Data$) - 1 - Ind[0];
 		TempType$ = mid(Data$,Ind[0],Ind[1]);
 
-		print ("TempType$ = %s",TempType$);
-
 		if (TempType$ = "episode")
 		{
 			Currently_Playing_Type = TYPE_SERIES;
@@ -1196,7 +1197,10 @@ FUNCTION ParseNotification(STRING Notification$)
 		CurrentTime$  = ConvertToTime( Position_Seconds);
 	}
 	Else
+	{
+		GenerateUserError("XBMC.usp: Unknown Notification: %s\n", LEFT(Notification$,200));
 		PRINT("XBMC.usp: Unknown Notification: %s\n", LEFT(Notification$,200));
+	}
 }
 
 /*
@@ -1274,6 +1278,7 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 */
 FUNCTION ParseJSONError(INTEGER id, STRING Result$)
 {
+	GenerateUserError("XBMC.usp: id:%d error:'%s'", id, LEFT(Result$,100));
 	Print("XBMC.usp: id:%d error:'%s'", id, LEFT(Result$,100));
 }
       
@@ -1359,11 +1364,15 @@ FUNCTION ProcessResponse(STRING Response$)
 	        //#IF_DEFINED DEBUG  Print("XBMC.usp:Payload Received (%d bytes): %s", LEN(Response$), LEFT(Response$,200)); #ENDIF         
 			IF (ID)
 				CALL ParseJSONError(ID, Response$);
-			ELSE 
-				Print("XBMC.usp: id:%d error:%s", ID, LEFT(Response$,200));
+			ELSE
+			{
+				GenerateUserError("XBMC.usp: id:%d error:%s", ID, LEFT(Response$,200));
+				Print("XBMC.usp: id:%d error:%s", ID, LEFT(Response$,200));	
+			}
 		}
 		ELSE
 		{
+			GenerateUserError("XBMC.usp (ProcessResponse): Unrecognised Response Type (%d), Body: %s", ResponseType, LEFT(Response$,100));
 			Print("XBMC.usp (ProcessResponse): Unrecognised Response Type (%d), Body: %s", ResponseType, LEFT(Response$,100));
 		}
 	}	
@@ -1489,13 +1498,6 @@ CHANGE Seek_Time
 
 PUSH isConnected
 {
-	/*
-		Workaround / Hack
-		Don't think this should really be needed but it seems the first JSON command sent returns data with an ID of 0,
-		So we PING then do a UpdateMetadata. Need to investigate further and report to XBMC devs if its a bug on their end.
-	*/
-	CALL SendJsonCommand (REQUESTID_PING, "JSONRPC.Ping", "");
-
 
 	// Update the info whenever the Socket connects to syncronize states.
 	Wait(100)
