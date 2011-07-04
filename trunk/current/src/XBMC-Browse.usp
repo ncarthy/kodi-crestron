@@ -52,7 +52,7 @@ Comments:
 /* Response Types for different JSON-RPC commands are defined in Common_Functions.usl*/  
 
 /*****    DEFINE NEW CONSTANTS    *******/
-//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
 #DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 200 
@@ -69,6 +69,7 @@ Comments:
 #DEFINE_CONSTANT MUSIC_SONG_LIST                     7  
 #DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums                                                        
 
+#DEFINE_CONSTANT SPECIAL_SEASON						 65535
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -258,7 +259,7 @@ SIGNED_INTEGER ConnectionStatus;	// Status of XBMC socket, used to determine if
 INTEGER List_PageNumber;			// The (zero-based) current page number of the list;
 INTEGER List_Total;					// The total number of items in the current browse list
 INTEGER List_IDs[10];				// The ids of the items in the browse list
-INTEGER SeasonNumber[10];			// The number of the TV show seasons listed
+INTEGER SeasonNumber[50];			// The number of the TV show seasons listed
 INTEGER OldShowListPage,OldSeasonListPage,OldArtistListPage,OldAlbumListPage;
 INTEGER TvShowID, TvShowSeasonID, TvShowEpisodeID, AlbumID, ArtistID;
 INTEGER PlaylistIDs[100];			// The songids/movieids etc. of the current playlist
@@ -697,7 +698,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 					IF (LEN(Values$[i]))
 						Movies[NumberOfMovies].Set = 1;		
 					ELSE
-						Movies[NumberOfMovies].Set = 1;		
+						Movies[NumberOfMovies].Set = 0;		
 				}
 			}
 		
@@ -733,7 +734,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 			FOR (i = 1 TO Count)
 			{		
 		    	IF (Names$[i] = "tvshowid") TvShows[NumberOfTvShows].id = AtoI(Values$[i]);
-				ELSE IF(Names$[i] = "showtitle") TvShows[NumberOfTvShows].label = Values$[i];
+				ELSE IF(Names$[i] = "title") TvShows[NumberOfTvShows].label = Values$[i];
 				ELSE IF(Names$[i] = "genre") TvShows[NumberOfTvShows].genre = Values$[i];
 				ELSE IF(Names$[i] = "thumbnail") TvShows[NumberOfTvShows].thumbnail = Values$[i];
 				ELSE IF(Names$[i] = "year") TvShows[NumberOfTvShows].year = Values$[i];
@@ -744,8 +745,9 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 			{
 				List_IDs[NumberOfTvShows] = TvShows[NumberOfTvShows].id;
 				Thumb$[NumberOfTvShows] = ThumbnailUri(TvShows[NumberOfTvShows].thumbnail,UseJpgExtension);
-				Name$[NumberOfTvShows] = TvShows[NumberOfTvShows].label;
+	
 				SeriesOrArtistName$[NumberOfTvShows] = TvShows[NumberOfTvShows].label;
+
 				Genre$[NumberOfTvShows] = TvShows[NumberOfTvShows].genre;
 				Year$[NumberOfTvShows] = TvShows[NumberOfTvShows].year;
 				IF (TvShows[NumberOfTvShows].Playcount)
@@ -764,20 +766,39 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		CASE (TV_SEASON_LIST) 	: 
 		{
 			NumberOfTvShowSeasons = NumberOfTvShowSeasons+1; 
-		
+
+			ArraySize = GetNumArrayCols(TvShowSeasons);
+			IF (NumberOfTvShowSeasons > ArraySize)
+				ResizeArray(TvShowSeasons, ArraySize+10);
+
 			FOR (i = 1 TO Count)
 			{		
 		    	IF (Names$[i] = "season")
-				{ 
-					List_IDs[NumberOfTvShowSeasons] = AtoI(Values$[i]);
-					TvShowSeasons[NumberOfTvShowSeasons] = List_IDs[NumberOfTvShowSeasons];
+				{ 					
+					if (Values$[i] = "0")
+						TvShowSeasons[NumberOfTvShowSeasons] = SPECIAL_SEASON;
+                    ELSE
+						TvShowSeasons[NumberOfTvShowSeasons] = AtoI(Values$[i]);
+
                  	Break;
 				}
 			}
 		
 			IF (NumberOfTvShowSeasons <= StepAmount)
 			{
-				IF(Names$[i] = "season") SeasonOrAlbumName$[NumberOfTvShowSeasons] = "Season " + Values$[i];
+				IF(Names$[i] = "season") {
+					if (Values$[i] = "0")
+					{
+						SeasonOrAlbumName$[NumberOfTvShowSeasons] = "Specials";
+						List_IDs[NumberOfTvShowSeasons] = SPECIAL_SEASON;
+					}
+					ELSE
+					{
+						SeasonOrAlbumName$[NumberOfTvShowSeasons] = "Season " + Values$[i];
+						List_IDs[NumberOfTvShowSeasons] = AtoI(Values$[i]);
+					}
+
+				}
 			}
 
 			List_Total = NumberOfTvShowSeasons;
@@ -1562,7 +1583,7 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
 			,id ,Method, Arguments);
 	}
-    Print("SendJsonCommand (%s)", Command$);
+
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
 	{
@@ -1679,7 +1700,9 @@ FUNCTION RepopulateOutputList(INTEGER start)
 				{                               
 					List_IDs[i] = TvShows[j].id;
 					Thumb$[i] = ThumbnailUri(TvShows[j].thumbnail,UseJpgExtension);
-					Name$[i] = TvShows[j].label;
+					
+ 					SeriesOrArtistName$[i] = TvShows[j].label;
+
 					Genre$[i] = TvShows[j].genre;
 					Year$[i] = TvShows[j].year;
 					IF (TvShows[j].Playcount)
@@ -1697,7 +1720,12 @@ FUNCTION RepopulateOutputList(INTEGER start)
 				j = start+i-1;
 				IF (j <= end)
 				{      
-					SeasonOrAlbumName$[NumberOfTvShowSeasons] = "Season " + ItoA(TvShowSeasons[i]);        
+					List_IDs[i] = TvShowSeasons[j];
+					if (TvShowSeasons[j] = SPECIAL_SEASON)
+						SeasonOrAlbumName$[i] = "Specials";        
+					ELSE					
+						SeasonOrAlbumName$[i] = "Season " + ItoA(TvShowSeasons[j]);        
+
 				}
 			}
 
@@ -2077,7 +2105,12 @@ CHANGE SelectedItem
 			{
 		        List_CurrentScreen = TV_EPISODE_LIST;
 				OldSeasonListPage = List_PageNumber;
-				TvShowSeasonID = List_IDs[SelectedItem];
+
+				IF (List_IDs[SelectedItem] = SPECIAL_SEASON)
+					TvShowSeasonID = 0;
+				else				
+					TvShowSeasonID = List_IDs[SelectedItem];
+
 				List_PageNumber = 0;
 				List_Total = 0;
 				NumberOfTvShowEpisodes = 0;
