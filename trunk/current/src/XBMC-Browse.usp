@@ -52,7 +52,7 @@ Comments:
 /* Response Types for different JSON-RPC commands are defined in Common_Functions.usl*/  
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
 #DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 200 
@@ -212,6 +212,8 @@ STRUCTURE 	ListItem //Generic list item
 	STRING 	thumbnail[MAX_FILENAME_LENGTH];
 	STRING  year[10];
 	INTEGER Playcount;
+	INTEGER season;
+	INTEGER episode;
 };
 STRUCTURE 	MovieListItem 
 {
@@ -250,6 +252,7 @@ STRUCTURE 	Limits
 	INTEGER total;
 };
 
+
    
 /*******************************************************************************************
   GLOBAL VARIABLES
@@ -264,6 +267,7 @@ INTEGER OldShowListPage,OldSeasonListPage,OldArtistListPage,OldAlbumListPage;
 INTEGER TvShowID, TvShowSeasonID, TvShowEpisodeID, AlbumID, ArtistID;
 INTEGER PlaylistIDs[100];			// The songids/movieids etc. of the current playlist
 INTEGER TCPBlocker[1];				// Semaphore for incomplete JSON packets.
+INTEGER List_Position[10];			// Position of this item in the master lists
 
 // Albums/Movies/Artists etc. are loaded all at the start
 DYNAMIC AlbumListItem Albums[100];
@@ -313,7 +317,9 @@ INTEGER outputArrayItemPosition;
 STRING 	outputStringName[20][MAX_SERIAL_STRING_LENGTH];
 STRING 	outputStringValue[20][2000];
 
-
+STRING SelectedSeriesName$[MAX_SERIAL_STRING_LENGTH];
+STRING SelectedGenre$[50];
+STRING SelectedYear$[10];
 
 /*******************************************************************************************
   Socket Functions
@@ -552,7 +558,6 @@ STRING_FUNCTION EpisodeDetailsParameters(INTEGER episodeid)
 		PRINT("EpisodeDetailsParameters: %s" ,LEFT(Params$,200));
 	#ENDIF
 
-
 	RETURN (Params$);
 }
 
@@ -704,6 +709,8 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfMovies <= StepAmount)
 			{
+				List_Position[NumberOfMovies] = NumberOfMovies;
+
 				List_IDs[NumberOfMovies] = Movies[NumberOfMovies].id;
 				Thumb$[NumberOfMovies] = ThumbnailUri(Movies[NumberOfMovies].thumbnail,UseJpgExtension);
 				Name$[NumberOfMovies] = Movies[NumberOfMovies].label;
@@ -743,6 +750,8 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfTvShows <= StepAmount)
 			{
+				List_Position[NumberOfTvShows] = NumberOfTvShows;
+
 				List_IDs[NumberOfTvShows] = TvShows[NumberOfTvShows].id;
 				Thumb$[NumberOfTvShows] = ThumbnailUri(TvShows[NumberOfTvShows].thumbnail,UseJpgExtension);
 	
@@ -786,6 +795,11 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfTvShowSeasons <= StepAmount)
 			{
+				SeriesOrArtistName$[NumberOfTvShowSeasons] 	= SelectedSeriesName$;
+				Genre$[NumberOfTvShowSeasons] 				= SelectedGenre$;
+                Year$[NumberOfTvShowSeasons]				= SelectedYear$;
+
+				List_Position[NumberOfTvShowSeasons] = NumberOfTvShowSeasons;
 				IF(Names$[i] = "season") {
 					if (Values$[i] = "0")
 					{
@@ -819,6 +833,8 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 			{		
 		    	IF (Names$[i] = "episodeid") TvShowEpisodes[NumberOfTvShowEpisodes].id = AtoI(Values$[i]);
 				ELSE IF(Names$[i] = "label") TvShowEpisodes[NumberOfTvShowEpisodes].label = Values$[i];
+				ELSE IF(Names$[i] = "season") TvShowEpisodes[NumberOfTvShowEpisodes].season = AtoI(Values$[i]);
+				ELSE IF(Names$[i] = "episode") TvShowEpisodes[NumberOfTvShowEpisodes].episode = AtoI(Values$[i]);
 				ELSE IF(Names$[i] = "studio") TvShowEpisodes[NumberOfTvShowEpisodes].genre = Values$[i];
 				ELSE IF(Names$[i] = "thumbnail") TvShowEpisodes[NumberOfTvShowEpisodes].thumbnail = ThumbnailUri(Values$[i],UseJpgExtension);
 				ELSE IF(Names$[i] = "firstaired") TvShowEpisodes[NumberOfTvShowEpisodes].year = Values$[i];
@@ -827,12 +843,16 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfTvShowEpisodes <= StepAmount)
 			{
+				List_Position[NumberOfTvShowEpisodes] = NumberOfTvShowEpisodes;
 				List_IDs[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].id;
 				Thumb$[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].thumbnail;
 				Name$[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].label;
-				SeriesOrArtistName$[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].label;
-				Genre$[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].genre;
-				Year$[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].year;
+				EpisodeOrTrackNum$[NumberOfTvShowEpisodes] 	= "Episode " + ItoA(TvShowEpisodes[NumberOfTvShowEpisodes].episode);
+				SeasonOrAlbumName$[NumberOfTvShowEpisodes]	= "Season " + ItoA(TvShowEpisodes[NumberOfTvShowEpisodes].season);				
+				SeriesOrArtistName$[NumberOfTvShowEpisodes] 	= SelectedSeriesName$;
+				Genre$[NumberOfTvShowEpisodes] 					= SelectedGenre$;
+				Year$[NumberOfTvShowEpisodes] 					= SelectedYear$;
+
 				IF (TvShowEpisodes[NumberOfTvShowEpisodes].Playcount)
 					Watched[NumberOfTvShowEpisodes] = ON;
 				ELSE
@@ -869,6 +889,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfAlbums <= StepAmount)
 			{
+				List_Position[NumberOfAlbums] = NumberOfAlbums;
 				List_IDs[NumberOfAlbums] = Albums[NumberOfAlbums].id;
 		        SeasonOrAlbumName$[NumberOfAlbums] = Albums[NumberOfAlbums].label;
 				Thumb$[NumberOfAlbums] = ThumbnailUri(Albums[NumberOfAlbums].thumbnail,UseJpgExtension);
@@ -904,6 +925,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfArtists <= StepAmount)
 			{
+				List_Position[NumberOfArtists] = NumberOfArtists;
 				List_IDs[NumberOfArtists] = Artists[NumberOfArtists].id;
 				Thumb$[NumberOfArtists] = ThumbnailUri(Artists[NumberOfArtists].thumbnail,UseJpgExtension);
 				Name$[NumberOfArtists] = Artists[NumberOfArtists].label;
@@ -950,6 +972,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfArtistAlbums <= StepAmount)
 			{
+				List_Position[NumberOfArtistAlbums] = NumberOfArtistAlbums;
 				List_IDs[NumberOfArtistAlbums] = ArtistAlbums[NumberOfArtistAlbums].id;
 		        SeasonOrAlbumName$[NumberOfArtistAlbums] = ArtistAlbums[NumberOfArtistAlbums].label;
 				Thumb$[NumberOfArtistAlbums] = ArtistAlbums[NumberOfArtistAlbums].thumbnail;
@@ -997,6 +1020,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		
 			IF (NumberOfSongs <= StepAmount)
 			{
+				List_Position[NumberOfSongs] = NumberOfSongs;
 				List_IDs[NumberOfSongs] = Songs[NumberOfSongs].id;
 				Thumb$[NumberOfSongs] = Songs[NumberOfSongs].thumbnail;
 				Name$[NumberOfSongs] = Songs[NumberOfSongs].label;
@@ -1041,6 +1065,7 @@ FUNCTION AssignDetailsData(INTEGER Count, STRING Names$[], STRING Values$[])
         ELSE IF(Names$[i] = "episode") EpisodeOrTrackNum$[SelectedItem] = "Episode "+Values$[i];
 		ELSE IF(Names$[i] = "firstaired") Year$[SelectedItem] = "First aired on: "+Values$[i];
 		ELSE IF(Names$[i] = "season") SeasonOrAlbumName$[SelectedItem] = "Season " + Values$[i];	
+		ELSE if(Names$[i] = "thumbnail") Thumb$[SelectedItem] = ThumbnailUri(Values$[i],UseJpgExtension);
 		ELSE IF(Names$[i] = "plot")
 		{
 			SendPlotAsIndirectText(Values$[i]);
@@ -1683,6 +1708,9 @@ FUNCTION RepopulateOutputList(INTEGER start)
 					Name$[i] = Movies[j].label;
 					Genre$[i] = Movies[j].genre;
 					Year$[i] = Movies[j].year;
+ 
+					List_Position[i] = j;
+
 					IF (Movies[j].Playcount)
 						Watched[i] = ON;
 					ELSE
@@ -1705,6 +1733,9 @@ FUNCTION RepopulateOutputList(INTEGER start)
 
 					Genre$[i] = TvShows[j].genre;
 					Year$[i] = TvShows[j].year;
+
+					List_Position[i] = j;
+
 					IF (TvShows[j].Playcount)
 						Watched[i] = ON;
 					ELSE
@@ -1721,6 +1752,12 @@ FUNCTION RepopulateOutputList(INTEGER start)
 				IF (j <= end)
 				{      
 					List_IDs[i] = TvShowSeasons[j];
+                    
+					SeriesOrArtistName$[i] = SelectedSeriesName$;
+					Genre$[i]				= SelectedGenre$;
+					Year$[i]				= SelectedYear$;
+					List_Position[i] = j;
+
 					if (TvShowSeasons[j] = SPECIAL_SEASON)
 						SeasonOrAlbumName$[i] = "Specials";        
 					ELSE					
@@ -1741,8 +1778,13 @@ FUNCTION RepopulateOutputList(INTEGER start)
 					List_IDs[i] = TvShowEpisodes[j].id;
 					Thumb$[i] = TvShowEpisodes[j].thumbnail;
 					Name$[i] = TvShowEpisodes[j].label;
-					Genre$[i] = TvShowEpisodes[j].genre;
-					Year$[i] = TvShowEpisodes[j].year;
+
+					List_Position[i] = j;
+					Genre$[i]				= SelectedGenre$;
+					Year$[i]				= SelectedYear$;
+					EpisodeOrTrackNum$[i] 	= "Episode " + ItoA(TvShowEpisodes[j].episode);
+					SeasonOrAlbumName$[i]	= "Season " + ItoA(TvShowEpisodes[j].season);
+
 					IF (TvShowEpisodes[j].Playcount)
 						Watched[i] = ON;
 					ELSE
@@ -1764,6 +1806,7 @@ FUNCTION RepopulateOutputList(INTEGER start)
 					Genre$[i] = Albums[j].genre;
 					SeriesOrArtistName$[i] = Albums[j].artist;
 					Year$[i] = Albums[j].year;
+					List_Position[i] = j;
 				}
 			}
 			Break;
@@ -1778,6 +1821,7 @@ FUNCTION RepopulateOutputList(INTEGER start)
 					List_IDs[i] = Artists[j].id;
 					Thumb$[i] = ThumbnailUri(Artists[j].thumbnail,UseJpgExtension);
 					Name$[i] = Artists[j].label;
+					List_Position[i] = j;
 				}
 			}
 			Break;
@@ -1794,6 +1838,7 @@ FUNCTION RepopulateOutputList(INTEGER start)
 					Name$[i] = ArtistAlbums[j].label;
 					Genre$[i] = ArtistAlbums[j].genre;
 					Year$[i] = ArtistAlbums[j].year;
+					List_Position[i] = j;
 				}
 			}
 			Break;
@@ -1813,7 +1858,7 @@ FUNCTION RepopulateOutputList(INTEGER start)
 		      		SeasonOrAlbumName$[i] = Songs[i].album;
 		      		EpisodeOrTrackNum$[i] = Songs[i].trackno;
 		        	Runtime$[i] = Songs[i].duration;
-
+					List_Position[i] = j;
 				}
 			}
 			Break;
@@ -2089,6 +2134,10 @@ CHANGE SelectedItem
 		}
 		CASE (TV_SHOW_LIST) 	: 
 		{
+			SelectedSeriesName$ =    TvShows[List_Position[SelectedItem]].label;  
+            SelectedGenre$      =    TvShows[List_Position[SelectedItem]].genre;
+			SelectedYear$       =    TvShows[List_Position[SelectedItem]].year;
+
 	        List_CurrentScreen = TV_SEASON_LIST;
 			OldShowListPage = List_PageNumber;
 			TvShowID = List_IDs[SelectedItem];
