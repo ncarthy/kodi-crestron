@@ -848,7 +848,12 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 				Thumb$[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].thumbnail;
 				Name$[NumberOfTvShowEpisodes] = TvShowEpisodes[NumberOfTvShowEpisodes].label;
 				EpisodeOrTrackNum$[NumberOfTvShowEpisodes] 	= "Episode " + ItoA(TvShowEpisodes[NumberOfTvShowEpisodes].episode);
-				SeasonOrAlbumName$[NumberOfTvShowEpisodes]	= "Season " + ItoA(TvShowEpisodes[NumberOfTvShowEpisodes].season);				
+
+				if (TvShowEpisodes[NumberOfTvShowEpisodes].season) 
+					SeasonOrAlbumName$[NumberOfTvShowEpisodes]	= "Season " + ItoA(TvShowEpisodes[NumberOfTvShowEpisodes].season);				
+				else
+					SeasonOrAlbumName$[NumberOfTvShowEpisodes]	= "Special";				
+				
 				SeriesOrArtistName$[NumberOfTvShowEpisodes] 	= SelectedSeriesName$;
 				Genre$[NumberOfTvShowEpisodes] 					= SelectedGenre$;
 				Year$[NumberOfTvShowEpisodes] 					= SelectedYear$;
@@ -1783,7 +1788,11 @@ FUNCTION RepopulateOutputList(INTEGER start)
 					Genre$[i]				= SelectedGenre$;
 					Year$[i]				= SelectedYear$;
 					EpisodeOrTrackNum$[i] 	= "Episode " + ItoA(TvShowEpisodes[j].episode);
-					SeasonOrAlbumName$[i]	= "Season " + ItoA(TvShowEpisodes[j].season);
+					
+					if (TvShowEpisodes[j].season)
+						SeasonOrAlbumName$[i]	= "Season " + ItoA(TvShowEpisodes[j].season);
+                    ELSE
+						SeasonOrAlbumName$[i]	= "Special";
 
 					IF (TvShowEpisodes[j].Playcount)
 						Watched[i] = ON;
