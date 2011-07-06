@@ -1,5 +1,18 @@
 xbmc-crestron history
 
+0.4 06-Jul-2011
+JSON parsing code updated to new xbmc JSON interface
+* Minor fixes for Tv Show metadata
+* Added FFW, REV buttons
+* Workaround for displaying .tbn thumbnails on regular touchpanels/xpanels. You
+should no longer need the renaming script. You still need to set UseJpgExtension
+to use this feature.
+* Corrected some of notification parsing.
+* Cleaned up test program
+* Cleaned up XBMC V2
+* Added progress_bar (% expressed as 0-65535)
+* Various other minor fixes.
+
 0.3 03-Jan-2010
 SMS search enabled
 * Can browse for albums now supported
