@@ -5,6 +5,7 @@
   * Switch on Xbmc HTTP server and event server:
     * From the Xbmc main menu navigate to System > Network
     * Select "Allow control of XBMC via HTTP"
+    * Set the Web Interface to "JSONRPC Debug Interface"
     * Select both "Allow programs on this system to control XBMC" and "Allow other programs on this system to control XBMC"
   * If you suspect that a firewall is preventing you from communicating to Xbmc then open ports 8080, 9090 and 9777 on the Xbmc machine. Maybe first try disabling the firewall to see if that helps.
   * The VT Pro-e project requires at least version 4.2 of [http://www.crestron.com VisionTools]
