@@ -571,9 +571,10 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, STRING Sort
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
+	"{%s\x22fields\x22:[%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
 				,AdditionalParameters
 				,"\x22artist\x22"
+				,"\x22label\x22"
 				,"\x22thumbnail\x22"
 				,"\x22genre\x22"
 				,"\x22year\x22"
@@ -581,6 +582,30 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, STRING Sort
 
 	RETURN (Params$);
 }
+
+/*
+  	Return a string containing the xbmc parameter list for Artists
+*/
+STRING_FUNCTION ArtistsParameters(STRING SortMethod) 
+{
+	STRING Params$[1024];
+
+	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
+	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
+	MAKESTRING (Params$, 
+	"{\x22fields\x22:[%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
+				,"\x22thumbnail\x22"
+				,"\x22genre\x22"
+				,SortMethod);
+
+	#IF_DEFINED DEBUG
+		PRINT("ArtistsParameters: %s" ,LEFT(Params$,200));
+	#ENDIF
+
+
+	RETURN (Params$);
+}
+
 
 
 /*
@@ -925,6 +950,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 			{		
 		    	IF (Names$[i] = "artistid") Artists[NumberOfArtists].id = AtoI(Values$[i]);
 				ELSE IF(Names$[i] = "label") Artists[NumberOfArtists].label = Values$[i];
+				ELSE IF(Names$[i] = "genre") Artists[NumberOfArtists].genre = Values$[i];
 				ELSE IF(Names$[i] = "thumbnail") Artists[NumberOfArtists].thumbnail = Values$[i];
 			}
 		
@@ -1620,6 +1646,10 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 			,id ,Method, Arguments);
 	}
 
+	#IF_DEFINED DEBUG
+		PRINT("SendJsonCommand: %s" ,LEFT(Command$,200));
+	#ENDIF
+
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
 	{
@@ -1945,10 +1975,9 @@ FUNCTION RepopulateMediaList()
 		CASE (MUSIC_ARTIST_LIST)  : 
 		{ 
 			method = "AudioLibrary.GetArtists"; 
- 			//Params$ = AudioPlaylistParameters("", "artist");
+ 			Params$ = ArtistsParameters("label");
 
-			CALL SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETARTISTS, method, 
-				"{\x22sort\x22:{\x22method\x22:\x22label\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:true}}");
+			CALL SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETARTISTS, method, Params$);
 			BREAK;
 		}
 		CASE (MUSIC_ARTIST_CHOOSE_LIST)  : 
