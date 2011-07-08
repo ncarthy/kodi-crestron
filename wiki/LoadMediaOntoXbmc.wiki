@@ -1,13 +1,15 @@
 #summary Steps required to load media onto Xbmc.
 
-= Movies and Tv Shows=
+  * Change mode to File mode
+  * Add a folder (On a NAS or local) as a source. Best to keep different media types in different folders.
+  * For videos set type of content
+  * Scan item to library using context menu
+  * When scan complete change mode to Library Mode
 
-Add your content here.
+=== Movies and Tv Shows===
 
+More information at http://wiki.xbmc.org/index.php?title=Video_Library
 
-= Music=
+=== Music===
 
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+More information at http://wiki.xbmc.org/index.php?title=Music_Library
