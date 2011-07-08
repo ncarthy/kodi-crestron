@@ -314,8 +314,8 @@ Limits	ListLimits;
 INTEGER InArrayItemName;
 INTEGER InArrayNameValueNumber;
 INTEGER outputArrayItemPosition;
-STRING 	outputStringName[20][MAX_SERIAL_STRING_LENGTH];
-STRING 	outputStringValue[20][2000];
+STRING 	outputStringName[25][MAX_SERIAL_STRING_LENGTH];
+STRING 	outputStringValue[25][2000];
 
 STRING SelectedSeriesName$[MAX_SERIAL_STRING_LENGTH];
 STRING SelectedGenre$[50];
@@ -1046,7 +1046,9 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 }
 
 /*
+    Assign the returned name/value pairs to Outputs
 
+	Called from ProcessResponse()
 */
 FUNCTION AssignDetailsData(INTEGER Count, STRING Names$[], STRING Values$[])
 {	
@@ -1079,7 +1081,9 @@ FUNCTION AssignDetailsData(INTEGER Count, STRING Names$[], STRING Values$[])
 }
       
 /*
+	Process the returned limits JSON object
 
+	Called from ProcessResponse()
 */
 FUNCTION ProcessLimitsObject()
 {
@@ -1198,7 +1202,7 @@ FUNCTION PrepareOutputString()
 }
 
 /*
-
+    REset the variables that hold name/value pairs during processing
 */
 FUNCTION ResetNameValueVariables()
 {
@@ -1490,13 +1494,13 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 					ELSE
 						setString(chr(character), ResponsePropertyPosition, ResponsePropertyValue[ResponsePropertyNumber]);
 	
-					#IF_DEFINED DEBUG
+					/*#IF_DEFINED DEBUG
 						IF (NumStartBrackets >= 3)
 							PRINT("%c, PropertyNumber(%d), InName(%d), PropertyName(%s), PropertyValue(%s)"
 							, character, ResponsePropertyNumber, InResponsePropertyName
 							, ResponsePropertyName[ResponsePropertyNumber]
 							, ResponsePropertyValue[ResponsePropertyNumber]); 
-					#ENDIF
+					#ENDIF*/
 		
 					ResponsePropertyPosition = ResponsePropertyPosition + 1;
 				}
@@ -1591,6 +1595,8 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 
 /*
 	Send the JSON-RPC command via the TCP socket
+
+	No authentication
 */
 Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 {
@@ -2595,7 +2601,7 @@ RELEASE Connect
 }
 
 /*
-  	A JSON command has been received from another module
+  	A JSON command has been received from Xbmc.usp
 	-> Send it to the xbmc socket
 */
 CHANGE Tx$

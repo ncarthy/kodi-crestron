@@ -49,7 +49,7 @@ Comments:
 #USER_LIBRARY "Common_Functions"
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
 #DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds 
 #DEFINE_CONSTANT BUFFER_SIZE 40000      // large!
@@ -510,7 +510,9 @@ FUNCTION GetActivePlayersFromResponse()
 
       
 /*
-
+     The Xbmc JSON api sends time information in the format:
+		{"hours":0, "minutes":53, "seconds": 34, "milliseconds":567}
+	...Convert it to an integer number of seconds ignoring milliseconds
 */
 INTEGER_FUNCTION ConvertTimeObjectToSeconds(STRING TimeObject$)
 {
@@ -1196,10 +1198,13 @@ FUNCTION ParseNotification(STRING Notification$)
   		Position_Seconds = (AtoL(TempTime$) / 1000);
 		CurrentTime$  = ConvertToTime( Position_Seconds);
 	}
+	Else if (Find("Screensaver", EventName$) || Find("OnUpdate", EventName$))
+	{
+        // Do Nothing
+	}
 	Else
 	{
 		GenerateUserError("XBMC.usp: Unknown Notification: %s\n", LEFT(Notification$,200));
-		PRINT("XBMC.usp: Unknown Notification: %s\n", LEFT(Notification$,200));
 	}
 }
 
@@ -1469,7 +1474,7 @@ push IsPlayingOnExternalPlayer
 CHANGE Seek_Percentage
 {
 	STRING Time$[10];
-	MAKESTRING(Time$, "%d", Seek_Percentage);
+	MAKESTRING(Time$, "{\x22value\x22:%d.0}", Seek_Percentage);
     
 	IF (IsPlaying)
 	{
