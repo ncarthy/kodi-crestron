@@ -602,7 +602,6 @@ STRING_FUNCTION ArtistsParameters(STRING SortMethod)
 		PRINT("ArtistsParameters: %s" ,LEFT(Params$,200));
 	#ENDIF
 
-
 	RETURN (Params$);
 }
 
@@ -630,6 +629,7 @@ STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
     }
 	ELSE
 		tmpCoverPath = tmpCoverPath + "vfs/" + uri$;
+
     RETURN (tmpCoverPath);
 }
 
@@ -836,7 +836,6 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 						SeasonOrAlbumName$[NumberOfTvShowSeasons] = "Season " + Values$[i];
 						List_IDs[NumberOfTvShowSeasons] = AtoI(Values$[i]);
 					}
-
 				}
 			}
 
@@ -950,7 +949,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 			{		
 		    	IF (Names$[i] = "artistid") Artists[NumberOfArtists].id = AtoI(Values$[i]);
 				ELSE IF(Names$[i] = "label") Artists[NumberOfArtists].label = Values$[i];
-				ELSE IF(Names$[i] = "genre") Artists[NumberOfArtists].genre = Values$[i];
+				ELSE IF(Names$[i] = "genre") Artists[NumberOfArtists].genre =  LEFT(Values$[i],50);
 				ELSE IF(Names$[i] = "thumbnail") Artists[NumberOfArtists].thumbnail = Values$[i];
 			}
 		
@@ -992,7 +991,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 			{		
 		    	IF (Names$[i] = "albumid") ArtistAlbums[NumberOfArtistAlbums].id = AtoI(Values$[i]);
 				ELSE IF(Names$[i] = "label") ArtistAlbums[NumberOfArtistAlbums].label = Values$[i];
-				ELSE IF(Names$[i] = "genre") ArtistAlbums[NumberOfArtistAlbums].genre = Values$[i];
+				ELSE IF(Names$[i] = "genre") ArtistAlbums[NumberOfArtistAlbums].genre =  LEFT(Values$[i],50);
 				ELSE IF(Names$[i] = "thumbnail") 
 				{
 					ArtistAlbums[NumberOfArtistAlbums].thumbnail = ThumbnailUri(Values$[i],UseJpgExtension);
@@ -2305,19 +2304,16 @@ PUSH List_Back
 		{ 
 			List_CurrentScreen = TV_SEASON_LIST;
 			TvShowDetails = OFF; // Just in case
-			List_PageNumber = 0;
-			List_Total = 0;
-			NumberOfTvShowSeasons = 0;
-			RepopulateMediaList();
-			TERMINATEEVENT;
+			List_PageNumber = OldSeasonListPage;
+			List_Total = NumberOfTvShowSeasons;
 		}
 		CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
 		{ 
             List_PageNumber = OldArtistListPage;
 			List_CurrentScreen = MUSIC_ARTIST_LIST;
 			IsSongList = OFF;
-			IsArtistList = ON;
 			IsAlbumList = OFF;
+			IsArtistList = ON;
 			List_Total = NumberOfArtists;
 		}
 		CASE (MUSIC_SONG_LIST)  : 
@@ -2337,8 +2333,8 @@ PUSH List_Back
 				List_CurrentScreen = MUSIC_ARTIST_CHOOSE_LIST;
 				List_Total = NumberOfArtistAlbums;
 				IsSongList = OFF;
-				IsArtistList = ON;
 				IsAlbumList = OFF;
+				IsArtistList = ON;
 			}
 			ELSE IF (AlbumID)
 			{
@@ -2394,7 +2390,7 @@ PUSH List_PageMinus
 	IF (List_PageNumber) 
 	{
 		List_PageNumber = List_PageNumber - 1;
-
+    
 		CALL RepopulateOutputList(0);
 	}
 }
@@ -2408,26 +2404,23 @@ PUSH List_PagePlus
 
 	IF (List_Total)
 	{
-		IF (List_PageNumber*StepAmount > List_Total)
-		{
+		IF (List_PageNumber*StepAmount >= List_Total)
          	List_PageNumber = (List_Total - (List_Total MOD StepAmount))/StepAmount;
-		}
+		ELSE
+			CALL RepopulateOutputList(0);
 	}
-
-	CALL RepopulateOutputList(0);
 }
 
 PUSH List_Movies
 {
-
 	List_CurrentScreen = MOVIE_TITLE_LIST;
-    IsMovieList = ON;
 	IsTvShowList = OFF;
 	IsAlbumList = OFF;
 	IsArtistList = OFF;
 	IsSongList = OFF;
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
+    IsMovieList = ON;
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
@@ -2444,12 +2437,12 @@ PUSH List_TvShows
 {
 	List_CurrentScreen = TV_SHOW_LIST;
     IsMovieList = OFF;
-	IsTvShowList = ON;
 	IsAlbumList = OFF;
 	IsArtistList = OFF;
 	IsSongList = OFF;
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
+	IsTvShowList = ON;
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
@@ -2466,9 +2459,9 @@ PUSH List_Albums
 	List_CurrentScreen = MUSIC_ALBUM_LIST;
     IsMovieList = OFF;
 	IsTvShowList = OFF;
-	IsAlbumList = ON;
 	IsArtistList = OFF;
 	IsSongList = OFF;
+	IsAlbumList = ON;
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
@@ -2487,8 +2480,8 @@ PUSH List_Artists
     IsMovieList = OFF;
 	IsTvShowList = OFF;
 	IsAlbumList = OFF;
-	IsArtistList = ON;
 	IsSongList = OFF;
+	IsArtistList = ON;
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
@@ -2508,9 +2501,9 @@ PUSH List_Songs
 	IsTvShowList = OFF;
 	IsAlbumList = OFF;
 	IsArtistList = OFF;
-	IsSongList = ON;
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
+	IsSongList = ON;
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
