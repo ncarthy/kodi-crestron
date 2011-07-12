@@ -1066,7 +1066,7 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 			List_Total = NumberOfSongs;
 			Break;		
 		}
-        DEFAULT: Print("XBMC.usp: (FUNCTION AssignListData): Invalid ListID (%d)", List_CurrentScreen);
+        DEFAULT: Print("XBMC-Browse.usp: (FUNCTION AssignListData): Invalid ListID (%d)", List_CurrentScreen);
 	}
 }
 
@@ -1296,7 +1296,10 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 							IF (ResponseType = 0)
 								DetermineIdAndResponseType();
                             
-							IF ((ExternalRequest || ResponseType = JSON_NOTIFY) && !InNestedObject)
+							IF ( !InNestedObject && 
+									(ExternalRequest || ResponseType = JSON_NOTIFY || 
+										(ResponseID>0 && ResponseId <= REQUESTID_GETTIME_PERCENTAGE) )
+								)
 							{
                                 PrepareOutputString();
 								SendToOutput = 1;
