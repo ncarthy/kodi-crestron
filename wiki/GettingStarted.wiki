@@ -35,6 +35,6 @@ What follows are instructions for getting the demo XPanel project working.
   * Run the XPanel and begin testing. If you notice errors in the Toolbox debug view please email me a screenshot.
 
 = Troubleshooting=
-  * Ensure you have correctly loaded your media libraries onto the Xbmc application
+  * Ensure you have [LoadMediaOntoXbmc correctly loaded your media libraries] onto the Xbmc application
   * Use a recent nightly version of xbmc and the latest version of this project
   * For debug output uncomment the debug constant at the top of the SIMPL+ files. This greatly increases debug output to the Toolbox debugger
