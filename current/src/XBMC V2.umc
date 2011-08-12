@@ -16,7 +16,7 @@ S0Nd=1
 S1Nd=2
 SLNd=3
 PrNm=XBMC V2.umc
-DbVr=26.05.021.00
+DbVr=27.00.010.00
 DvcDbVr=35.05.004.00
 PgmNm=Andrew Drummond
 CltNm=XBMC V2
@@ -111,13 +111,56 @@ Sy1=0
 Mx1=0
 ]
 [
+ObjTp=Bw
+H=1
+Lx=0
+Ly=0
+Rx=549
+Ry=1434
+Xm=-1
+Ym=-1
+SH=6
+Z=100
+P=1545
+Ht=4
+Hi=74
+]
+[
+ObjTp=Bw
+H=1
+Lx=1098
+Ly=0
+Rx=1647
+Ry=1434
+Xm=-1
+Ym=-1
+SH=29
+Z=100
+Ht=4
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=549
+Ly=0
+Rx=1098
+Ry=1434
+Xm=-1
+Ym=-1
+SH=18
+Z=100
+Ht=4
+Hi=5
+]
+[
 ObjTp=Symbol
 Name=XBMC V2
 Code=1
 SmplCName=XBMC V2.umc
 Smpl-C=3
 CompilerTimePrecision=Single_Or_Double_Precision
-Exclusions=1,19,20,21,88,89,167,168,179,216,225,248,249,266,302,305,310,213,214,215,217,226,267,718,756,854,
+Exclusions=1,19,20,21,88,89,167,168,179,216,225,248,249,266,302,305,310,213,214,215,217,226,267,718,756,854,1766,2567,2574,2590,2651,2655,2817,
 Hint=XBMC V2
 SMWRev=2.07.04
 TIORev=0
@@ -1029,7 +1072,7 @@ OutputCue70=[Plot_of_Selected_Movie$]
 OutputCue71=[~UNUSED~]
 OutputCue72=[IsPlayingOnExternalPlayer_fb]
 OutputCue73=[~UNUSED~]
-OutputCue74=[~UNUSED~]
+OutputCue74=[IsConnected]
 OutputCue75=[~UNUSED~]
 OutputCue76=[~UNUSED~]
 OutputCue77=[~UNUSED~]
@@ -1735,7 +1778,7 @@ O70=103
 O71=133
 O72=109
 O73=133
-O74=133
+O74=114
 O75=133
 O76=133
 O77=133
@@ -4081,7 +4124,7 @@ SgTp=4
 [
 ObjTp=Sg
 H=114
-Nm=IsConnected
+Nm=[IsConnected]
 ]
 [
 ObjTp=Sg
