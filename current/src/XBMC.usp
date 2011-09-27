@@ -50,18 +50,9 @@ Comments:
 
 /*****    DEFINE NEW CONSTANTS    *******/
 //#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
-#DEFINE_CONSTANT JSON_DELAY 	30		// Delay between JSON calls in 1/100th of second
-#DEFINE_CONSTANT GATHER_TIMEOUT 1000    // 10 seconds 
 #DEFINE_CONSTANT BUFFER_SIZE 40000      // large!
                                                           
 /* NB: REQUESTIDs defined in Common_Functions.usl */
-
-/* ActivePlayer IDs */
-#DEFINE_CONSTANT ACTIVEPLAYER_NONE						0
-#DEFINE_CONSTANT ACTIVEPLAYER_AUDIO						1
-#DEFINE_CONSTANT ACTIVEPLAYER_SLIDESHOW					2
-#DEFINE_CONSTANT ACTIVEPLAYER_VIDEO						4
-
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -204,6 +195,7 @@ STRING ResultValue$[21][2000];
 INTEGER NameValueCount;
 
 INTEGER PlayingOnExternalPlayer;	// =1 when video is playing on an external player (e.g. mpc-hc), 0 otherwise
+INTEGER Paused; 
 
 /*
   	Set the video outputs to appropiate state depending on current status
@@ -212,15 +204,12 @@ Function SetVideoStatus(INTEGER Status)
 {
 	if (Status = ON)
 	{
-		ActivePlayer = ACTIVEPLAYER_VIDEO;
+		ActivePlayer = XBMC_ACTIVEPLAYER_VIDEO;
 		StopFB = OFF;
 		PlayFb = ON;
 		IsPlaying = 1;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (video)", ActivePlayer); #ENDIF
-	}
-	else
-	{
-		ActivePlayer = ActivePlayer & 251; // switch off the 3rd bit
+		Currently_Playing_Type = TYPE_MOVIE;
 	}
 }
 
@@ -234,13 +223,9 @@ Function SetAudioStatus(INTEGER Status)
 		StopFB = OFF;
 		PlayFb = ON;
 		IsPlaying = 1;
-		ActivePlayer = ACTIVEPLAYER_AUDIO;
+		ActivePlayer = XBMC_ACTIVEPLAYER_AUDIO;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (audio)", ActivePlayer); #ENDIF
 		Currently_Playing_Type = TYPE_AUDIO; 
-	}
-	else
-	{
-		ActivePlayer = ActivePlayer & 254; // switch off the 1st bit
 	}
 }
   
@@ -251,17 +236,14 @@ Function SetSlideShowStatus(INTEGER Status)
 {
 	if (Status = ON)
 	{
-		ActivePlayer 	= ACTIVEPLAYER_SLIDESHOW;
+		ActivePlayer 	= XBMC_ACTIVEPLAYER_SLIDESHOW;
 		StopFB = OFF;
 		PlayFb 			= ON;
 		IsPlaying 		= 1;
 		#IF_DEFINED DEBUG PRINT("ActivePlayer: %d (slideshow)", ActivePlayer); #ENDIF
 		Currently_Playing_Type = TYPE_PICTURES; //Pictures
 	}
-	else
-	{
-		ActivePlayer = ActivePlayer & 253; // switch off the 2nd bit
-	}
+
 }
  
 /*
@@ -274,6 +256,7 @@ Function WaitforSocketToClear()
      	delay(1);
 	}
 }
+       
 
 /*******************************************************************************************
   XBMC Response logic
@@ -281,21 +264,18 @@ Function WaitforSocketToClear()
 /*
   	Return a string containing the xbmc parameter list for Video Playlists
 */
-STRING_FUNCTION VideoPlaylistParameters(STRING AdditionalParameters, INTEGER start, INTEGER end
+STRING_FUNCTION VideoPlaylistParameters(INTEGER start, INTEGER end
 											,STRING SortMethod) 
 {
 	STRING Params$[1024];
 
-	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
-								, AdditionalParameters
+	"{\x22playlistid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
+								, XBMC_ACTIVEPLAYER_VIDEO
 								,"\x22title\x22"
-								,"\x22originaltitle\x22"
 								,"\x22director\x22"
 								,"\x22tagline\x22"
 								,"\x22genre\x22"
-								,"\x22showtitle\x22"
 								,"\x22runtime\x22"
 								,"\x22year\x22"
 								,"\x22rating\x22"
@@ -313,22 +293,23 @@ STRING_FUNCTION VideoPlaylistParameters(STRING AdditionalParameters, INTEGER sta
 								,end 
 					);
  
-	#IF_DEFINED DEBUG PRINT( "VideoPlaylistParameters:%s", LEFT(Params$,200)  ); #ENDIF
+	#IF_DEFINED DEBUG PRINT( "VideoPlaylistParameters:%s...", LEFT(Params$,100)  ); #ENDIF
+	#IF_DEFINED DEBUG PRINT( "VideoPlaylistParameters:...%s", RIGHT(Params$,100)  ); #ENDIF
+
 
 	RETURN (Params$);
 }
 /*
   	Return a string containing the xbmc parameter list for Audio Playlists
 */
-STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, INTEGER start, INTEGER end
+STRING_FUNCTION AudioPlaylistParameters(INTEGER start, INTEGER end
 											,STRING SortMethod) 
 {
 	STRING Params$[1024];
 
-	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	MAKESTRING (Params$, 
-	"{%s\x22fields\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
-								, AdditionalParameters
+	"{\x22playlistid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
+								, XBMC_ACTIVEPLAYER_AUDIO
 								,"\x22title\x22"
 								,"\x22artist\x22"
 								,"\x22album\x22"
@@ -446,7 +427,7 @@ FUNCTION Initialize_Outputs()
 	Currently_Playing_Type = TYPE_NONE;
 
 	PlaylistPosition = 0;
-	ActivePlayer = ACTIVEPLAYER_NONE;
+	ActivePlayer = XBMC_ACTIVEPLAYER_NONE;
 	PauseFb = OFF;
 	PlayFb = OFF;
 	RewindFB = OFF;
@@ -462,7 +443,7 @@ FUNCTION Initialize_Outputs()
 	Update IsVideo, IsAudio and IsSlideshow digital outputs from the GetActivePlayers response
 
 	The original JSON would have been of the form (ignoring whitespace):
-	 				{"audio":false,"picture":false,"video":true}
+	 				{playerid:0, "type":"audio"}
 	
 	The ParseObject method has already transferred the names and values to 
 	the ResultName$ and ResultValue$ arrays.
@@ -472,30 +453,30 @@ FUNCTION GetActivePlayersFromResponse()
 {
 	INTEGER i;
 
-	FOR (i = 1 TO 3)
+	FOR (i = 1 TO 2)
 	{
-		IF (ResultName$[i] = "audio")
-			IF (ResultValue$[i] = "true")
-				SetAudioStatus(ON);
-			ELSE
-				SetAudioStatus(OFF);
-
-		ELSE IF (ResultName$[i] = "video")	
-			IF (ResultValue$[i] = "true")
-				SetVideoStatus(ON);
-			ELSE
-				SetVideoStatus(OFF);
-		ELSE IF (ResultName$[i] = "picture")	
-			IF (ResultValue$[i] = "true")
-				SetSlideShowStatus(ON);
-			ELSE
+		IF (ResultName$[i] = "playerid")
+			IF (ResultValue$[i] = XBMC_ACTIVEPLAYER_AUDIO_s)
+			{
 				SetSlideShowStatus(OFF);
-		ELSE
-			PRINT ("XBMC.usp (GetActivePlayersFromResponse): Unknown ResultName (%s)", LEFT(ResultName$[i], 20));
-				    	
+				SetVideoStatus(OFF);
+				SetAudioStatus(ON);
+			}
+			ELSE IF (ResultValue$[i] = XBMC_ACTIVEPLAYER_VIDEO_s)
+			{
+				SetSlideShowStatus(OFF);
+				SetAudioStatus(OFF);
+				SetVideoStatus(ON);
+			}
+			ELSE IF (ResultName$[i] = XBMC_ACTIVEPLAYER_SLIDESHOW_s)	
+			{
+				SetVideoStatus(OFF);
+				SetAudioStatus(OFF);
+				SetSlideShowStatus(ON);
+			}		    	
 	}
 	
-	IF (!ActivePlayer) 
+	IF (ActivePlayer = XBMC_ACTIVEPLAYER_NONE) 
 	{
 		PauseFb = OFF;
 		StopFb = ON;
@@ -511,7 +492,7 @@ FUNCTION GetActivePlayersFromResponse()
       
 /*
      The Xbmc JSON api sends time information in the format:
-		{"hours":0, "minutes":53, "seconds": 34, "milliseconds":567}
+		"hours":0, "minutes":53, "seconds": 34, "milliseconds":567
 	...Convert it to an integer number of seconds ignoring milliseconds
 */
 INTEGER_FUNCTION ConvertTimeObjectToSeconds(STRING TimeObject$)
@@ -639,7 +620,7 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 		{
 	     	IF (ResultName$[i] = "file") CurrentFilename$ = RIGHT(ResultValue$[i],255); //SIMPL strings can only be 255 chars long
 			ELSE IF(ResultName$[i] = "title") CurrentTitle$ = ResultValue$[i];
-			ELSE IF(ResultName$[i] = "track") CurrentTrackNumber$ = ResultValue$[i];
+			ELSE IF(ResultName$[i] = "track") CurrentTrackNumber$ = ItoA(AtoI(ResultValue$[i]) % 65536);
 			ELSE IF(ResultName$[i] = "artist") CurrentArtist$ = ResultValue$[i];
 	 		ELSE IF(ResultName$[i] = "album") CurrentAlbum$ = ResultValue$[i];
 			ELSE IF(ResultName$[i] = "genre") CurrentGenre$ = ResultValue$[i];
@@ -667,7 +648,7 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 				Position_Seconds = ConvertTimeObjectToSeconds(ResultValue$[i]);
 				CurrentTime$ = ConvertToTime(Position_Seconds);
 			}
-			ELSE IF(ResultName$[i] = "total") 
+			ELSE IF(ResultName$[i] = "totaltime") 
 			{
 				Duration_Seconds = ConvertTimeObjectToSeconds(ResultValue$[i]);
 				CurrentDuration$ = ConvertToTime(Duration_Seconds);	
@@ -679,13 +660,15 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 					PlayingOnExternalPlayer = 1;
 				}
 			}
-			ELSE IF(ResultName$[i] = "Playlist.position")
+			ELSE IF(ResultName$[i] = "percentage") 
+			{
+				CurrentPercentage$ = Round(ResultValue$[i],0)+"%";
+				Progress_Percentage = AtoI(Round(ResultValue$[i],0));
+				Progress_Bar		= (65535/100) * Progress_Percentage;
+			}
+			ELSE IF(ResultName$[i] = "position")
 			{
 				PlaylistPosition = AtoI(ResultValue$[i]);
-	            IF (PlaylistPosition)
-					PlaylistPosition = PlaylistPosition -1; // make it zero-based    	
-				ELSE
-					CALL Initialize_Outputs();
 	            #IF_DEFINED DEBUG PRINT("PlaylistPosition: %d", PlaylistPosition); #ENDIF
 			}
 		}
@@ -910,8 +893,7 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 	
 	WHILE (SocketIsBusy || TCPBlocker)
 	{		
-		IF (id = REQUESTID_GETTIME_SECONDS ||
-				id = REQUESTID_GETTIME_PERCENTAGE)
+		IF (id = REQUESTID_GETPLAYERPROPERTIES)
 			RETURN;
 
      	Delay(2);
@@ -967,24 +949,40 @@ FUNCTION GetActivePlayers()
 	CALL SendJsonCommand (REQUESTID_GETACTIVEPLAYERS, "Player.GetActivePlayers", "");
 }
 /*
-	Retrieve current playlist position
+	Retrieve current player info
 */
-FUNCTION GetCurrentPlaylistPositionAndInfoLabels()
+FUNCTION GetPlayerProperties(INTEGER FullPropertyList)
 {
 	STRING Params$[1024];
 
-	MAKESTRING(Params$, "{\x22labels\x22:[%s,%s,%s,%s]}"
-								,"\x22Playlist.position\x22" // \x22 is a double quote (")
-								,"\x22musicplayer.bitrate\x22"
-								,"\x22musicplayer.codec\x22"
-								,"\x22videoplayer.videocodec\x22"
+	IF (FullPropertyList)
+		MAKESTRING(Params$, "{\x22playerid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
+								, ActivePlayer
+								,"\x22type\x22"
+								,"\x22partymode\x22"
+								,"\x22speed\x22"
+								,"\x22time\x22"
+								,"\x22percentage\x22"
+								,"\x22totaltime\x22"
+								,"\x22playlistid\x22"
+								,"\x22position\x22"
+								,"\x22repeat\x22"
+								,"\x22shuffled\x22"
+								,"\x22currentaudiostream\x22"
+								,"\x22currentsubtitle\x22"
 			);
-						  					      
- 	CALL SendJsonCommand (REQUESTID_GETINFOLABELS, "System.GetInfoLabels", Params$);
+	ELSE
+		MAKESTRING(Params$, "{\x22playerid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s]}"
+								, ActivePlayer
+								,"\x22time\x22"
+								,"\x22percentage\x22"
+								,"\x22totaltime\x22"
+								,"\x22playlistid\x22"
+								,"\x22position\x22"
+			);
 
-	// Note:
-	// Usable info labels defined in http://wiki.xbmc.org/?title=InfoLabels
-	// and implemented in TranslateSingleString in GUIInfoManager.cpp (xbmc src code)
+						  					      
+ 	CALL SendJsonCommand (REQUESTID_GETPLAYERPROPERTIES, "Player.GetProperties", Params$);
 }
 
 /*
@@ -992,25 +990,14 @@ FUNCTION GetCurrentPlaylistPositionAndInfoLabels()
 */
 FUNCTION GetCurrentTime()
 {
-	// If playing on an external player then don't use this function
-	IF(IsPlayingOnExternalPlayer) RETURN;	
+	// If Playback is paused or content is playing on an external player then don't use this function
+	IF(IsPlayingOnExternalPlayer || Paused) RETURN;	
 
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO) //audio
-	{
-		CALL SendJsonCommand (REQUESTID_GETTIME_SECONDS, 
-										"AudioPlayer.GetTime", "");
-		WaitforSocketToClear();
-		CALL SendJsonCommand (REQUESTID_GETTIME_PERCENTAGE, 
-									"AudioPlayer.GetPercentage","");
-	}
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-	{
+	#IF_DEFINED DEBUG PRINT("XBMC.usp(GetCurrentTime()): ActivePlayer: %d", ActivePlayer); #ENDIF
 
-		CALL SendJsonCommand (REQUESTID_GETTIME_SECONDS, 
-											"VideoPlayer.GetTime", "");
-		WaitforSocketToClear();		
-		CALL SendJsonCommand (REQUESTID_GETTIME_PERCENTAGE, 
-									"VideoPlayer.GetPercentage", "");
+	IF (ActivePlayer = XBMC_ACTIVEPLAYER_AUDIO || ActivePlayer = XBMC_ACTIVEPLAYER_VIDEO)
+	{
+		CALL GetPlayerProperties(0);
 	}
 	ELSE
 	{
@@ -1033,24 +1020,24 @@ FUNCTION UpdateMetadata()
 	WaitforSocketToClear();
     
 	IF (IsPlaying)
-		CALL GetCurrentPlaylistPositionAndInfoLabels();
+		CALL GetPlayerProperties(1);
 	ELSE
 		CALL Initialize_Outputs();
 
 	WaitforSocketToClear();
   	
 	// only return the current item and one more
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO)
+	IF (ActivePlayer = XBMC_ACTIVEPLAYER_AUDIO)
 	{
     	CALL SendJsonCommand (REQUESTID_AUDIOPLAYLIST_GETITEMS, 
-									"AudioPlaylist.GetItems", 
-									AudioPlaylistParameters("", 
+									"Playlist.GetItems", 
+									AudioPlaylistParameters( 
 								PlaylistPosition, PlaylistPosition+2, "track"));
 	}
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO)
+	ELSE IF (ActivePlayer = XBMC_ACTIVEPLAYER_VIDEO)
 	{
 		CALL SendJsonCommand (REQUESTID_VIDEOPLAYLIST_GETITEMS, 
-			"VideoPlaylist.GetItems", VideoPlaylistParameters("",
+			"Playlist.GetItems", VideoPlaylistParameters(
 								PlaylistPosition,PlaylistPosition+1,"sorttitle"));		
 	}
 
@@ -1067,9 +1054,9 @@ FUNCTION ParseNotification(STRING Notification$)
 {
 	INTEGER Ind[2];			//Index variables used to parse the response 
     STRING EventName$[100];
-	STRING Data$[100];		// The contents of the Data object
+	STRING Data$[300];		// The contents of the Data object
 	STRING TempSpeed$[3];
-	STRING TempTime$[10];
+	STRING TempTime$[100];
 	STRING TempType$[10];
 
 	//Find name of Notified event. e.g. OnPlay or OnPause
@@ -1084,16 +1071,18 @@ FUNCTION ParseNotification(STRING Notification$)
 
 	IF (Find("OnPlay", EventName$))		// OnPlay now supplies the play speed as well
 	{
-    	// Notification Event: Player.OnPlay, Data: {"data":{"id":3682,"speed":2,"type":"episode"}
+    	// Notification Event: Player.OnPlay, Data: {"data":{"id":3682,"type":"song"},"player":{"playerid":0,"speed":1}}
     
 		/* 
 			type			
 			Valid types are  "unknown", "movie", "episode", "musicvideo", "song"
 
 		*/
+
 		Ind[0] = Find("type",Data$) + 7;
-		Ind[1] = LEN(Data$) - 1 - Ind[0];
-		TempType$ = mid(Data$,Ind[0],Ind[1]);
+		Ind[1] = Find("\x22",Data$, Ind[0]);
+		TempType$ = mid(Data$,Ind[0],Ind[1] - Ind[0]);
+		#IF_DEFINED DEBUG PRINT("Playback Started, type=%s.", TempType$); #ENDIF        
 
 		if (TempType$ = "episode")
 		{
@@ -1143,7 +1132,8 @@ FUNCTION ParseNotification(STRING Notification$)
         	}
 		}
 
-		PauseFb		= OFF; 
+		PauseFb		= OFF;
+		Paused		= OFF; 
 		StopFb		= OFF; 
 		PlayFb		= ON; 
 
@@ -1159,20 +1149,24 @@ FUNCTION ParseNotification(STRING Notification$)
 	}
 	Else If(Find("OnPause", EventName$)) 
 	{
+		#IF_DEFINED DEBUG PRINT("Playback Paused."); #ENDIF
 		FastForwardFB 	= OFF;
 		FastForwardFB 	= OFF;
 		StopFb			= OFF; 
 		PlayFb			= OFF; 
 		PauseFb			= ON; 
+		Paused			= ON;
 		PlayingSpeed$ 	= ""; 
 		PlayStatus$ 	= "Paused";
 	}
 	Else If(Find("OnStop", EventName$))
 	{
+		#IF_DEFINED DEBUG PRINT("Playback Stopped."); #ENDIF
 		FastForwardFB 	= OFF;
 		FastForwardFB 	= OFF;
 		PlayFb			= OFF; 
 		PauseFb			= OFF;
+		Paused			= OFF;
 		StopFb			= ON; 
 		PlayingSpeed$ 	= ""; 
 		PlayStatus$ 	= "Stopped";
@@ -1180,10 +1174,12 @@ FUNCTION ParseNotification(STRING Notification$)
 	}
 	Else If(Find("OnQuit", EventName$))
 	{
+		#IF_DEFINED DEBUG PRINT("Xbmc Application has quit."); #ENDIF
 		FastForwardFB 	= OFF;
 		FastForwardFB 	= OFF;
 		PlayFb			= OFF; 
 		PauseFb			= OFF;
+		Paused			= OFF;
 		StopFb			= ON; 
 		PlayingSpeed$ 	= ""; 
 		PlayStatus$ 	= "Stopped";
@@ -1191,14 +1187,16 @@ FUNCTION ParseNotification(STRING Notification$)
 	}
 	Else if(Find("OnSeek", EventName$))
 	{
-		// Notification Event: Player.OnSeek, Data: {"data":{"seekoffset":23678,"time":141116}
+		// Notification Event: Player.OnSeek, Data: {"data":{"seekoffset":time_object,"time":time_object}
 		Ind[0] = Find("time",Data$) + 6;
-		Ind[1] = LEN(Data$) - Ind[0];
-        TempTime$ = mid(Data$, Ind[0], Ind[1] );
-  		Position_Seconds = (AtoL(TempTime$) / 1000);
-		CurrentTime$  = ConvertToTime( Position_Seconds);
+		Ind[1] = Find("}",Data$,Ind[0]);
+        TempTime$ = mid(Data$, Ind[0], Ind[1] - Ind[0]);
+        #IF_DEFINED DEBUG PRINT("Playback has jumped to %s", TempTime$); #ENDIF 
+		Position_Seconds = ConvertTimeObjectToSeconds(TempTime$);
+		CurrentTime$ = ConvertToTime(Position_Seconds);
 	}
-	Else if (Find("Screensaver", EventName$) || Find("OnUpdate", EventName$))
+	Else if (Find("Screensaver", EventName$) || Find("OnUpdate", EventName$)
+				|| Find("OnSpeedChanged", EventName$))
 	{
         // Do Nothing
 	}
@@ -1221,7 +1219,7 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 		CALL ParseObject(Result$);
 		CALL GetActivePlayersFromResponse();
 	}
-	ELSE IF (id = REQUESTID_GETINFOLABELS)
+	ELSE IF (id = REQUESTID_GETPLAYERPROPERTIES)
 	{
 		CALL ParseObject(Result$);
 		CALL GetMetadataFromList(0);
@@ -1234,7 +1232,7 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 	{
 		CALL GetMetadataFromResponse(Result$);
 	}
-	ELSE IF (id = REQUESTID_GETTIME_SECONDS)
+/*	ELSE IF (id = REQUESTID_GETTIME_SECONDS)
 	{
 		#IF_DEFINED DEBUG 	
 			PRINT ("Result(REQUESTID_GETTIME_SECONDS): %s", Result$);
@@ -1255,7 +1253,7 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 		CurrentPercentage$ = Round(Result$,0)+"%";
 		Progress_Percentage = AtoI(Round(Result$,0));
 		Progress_Bar		= (65535/100) * Progress_Percentage;
-	}
+	}*/
 	ELSE IF (ID >= REQUESTID_MOVIELIBRARY_GETMOVIES
 				&& ID <= REQUESTID_PLAYLIST_PLAYALLLIST)
     {
@@ -1323,7 +1321,7 @@ FUNCTION ProcessResponse(STRING Response$)
 	IF (ResponseType = JSON_NOTIFY)
 	{
        	Ind[0] = FIND ("|", Response$) + 1;
-		Ind[1] = FIND ("}", Response$, Ind[0]);
+		Ind[1] = REVERSEFIND ("}", Response$, REVERSEFIND ("}", Response$)-1);
 		IF (Ind[1]=0)
 			Ind[1] = LEN(Response$);
 		
@@ -1384,6 +1382,20 @@ FUNCTION ProcessResponse(STRING Response$)
     
 	TCPBlocker = 0;
 }
+
+/*
+	Send a seek command to the Player
+*/
+FUNCTION SendStringSeekCommand(INTEGER RequestID, STRING Command$)
+{
+	STRING Params$[100];
+	MAKESTRING(Params$, "{\x22playerid\x22:%d, \x22value\x22:\x22%s\x22}", ActivePlayer, Command$);
+
+	CALL SendJsonCommand (RequestID, "Player.Seek", Params$);
+
+
+}
+
   
 /********************************************************************************
 *
@@ -1393,53 +1405,33 @@ FUNCTION ProcessResponse(STRING Response$)
 
 push PlayNext
 {
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO)
+/*	IF (ActivePlayer = XBMC_ACTIVEPLAYER_AUDIO)
 		CALL SendJsonCommand (REQUESTID_SKIPNEXT, "AudioPlaylist.SkipNext","");
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO)
-		CALL SendJsonCommand (REQUESTID_SKIPNEXT, "VideoPlaylist.SkipNext", "");
+	ELSE IF (ActivePlayer = XBMC_ACTIVEPLAYER_VIDEO)
+		CALL SendJsonCommand (REQUESTID_SKIPNEXT, "VideoPlaylist.SkipNext", "");*/
 }
 push PlayPrev
 {
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
+/*	IF (ActivePlayer = XBMC_ACTIVEPLAYER_AUDIO) 
 		CALL SendJsonCommand (REQUESTID_SKIPPREV, "AudioPlaylist.SkipPrev","");
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-		CALL SendJsonCommand (REQUESTID_SKIPPREV, "VideoPlaylist.SkipPrev", "");
+	ELSE IF (ActivePlayer = XBMC_ACTIVEPLAYER_VIDEO) 
+		CALL SendJsonCommand (REQUESTID_SKIPPREV, "VideoPlaylist.SkipPrev", "");*/
 } 
 push JumpFwd_Sm
 {
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
-		CALL SendJsonCommand (REQUESTID_SMALLSKIPFORWARD, 
-									"AudioPlayer.SmallSkipForward","");
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-		CALL SendJsonCommand (REQUESTID_SMALLSKIPFORWARD, 
-									"VideoPlayer.SmallSkipForward", "");
+	CALL SendStringSeekCommand (REQUESTID_SMALLSKIPFORWARD, "smallforward");
 }
 push JumpFwd_Lg
 {
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
-		CALL SendJsonCommand (REQUESTID_LARGESKIPFORWARD, 
-									"AudioPlayer.BigSkipForward","");
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-		CALL SendJsonCommand (REQUESTID_LARGESKIPFORWARD, 
-									"VideoPlayer.BigSkipForward", "");
+	CALL SendStringSeekCommand (REQUESTID_LARGESKIPFORWARD, "bigforward");
 }
 push JumpBack_Sm
 {
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
-		CALL SendJsonCommand (REQUESTID_SMALLSKIPBACKWARD, 
-									"AudioPlayer.SmallSkipBackward","");
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-		CALL SendJsonCommand (REQUESTID_SMALLSKIPBACKWARD, 
-									"VideoPlayer.SmallSkipBackward", "");
+	CALL SendStringSeekCommand (REQUESTID_SMALLSKIPBACKWARD, "smallbackward");
 }
 push JumpBack_Lg
 {
-	IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
-		CALL SendJsonCommand (REQUESTID_LARGESKIPBACKWARD, 
-									"AudioPlayer.BigSkipBackward","");
-	ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-		CALL SendJsonCommand (REQUESTID_LARGESKIPBACKWARD, 
-									"VideoPlayer.BigSkipBackward", "");
+	CALL SendStringSeekCommand (REQUESTID_LARGESKIPBACKWARD, "bigbackward");
 }    
 push CheckCurrentlyPlaying
 {
@@ -1473,15 +1465,13 @@ push IsPlayingOnExternalPlayer
 
 CHANGE Seek_Percentage
 {
-	STRING Time$[10];
-	MAKESTRING(Time$, "{\x22value\x22:%d.0}", Seek_Percentage);
+	STRING Params$[100];
     
 	IF (IsPlaying)
 	{
-		IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
-			CALL SendJsonCommand (30, "AudioPlayer.SeekPercentage",Time$);
-		ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-			CALL SendJsonCommand (30, "VideoPlayer.SeekPercentage", Time$);
+		MAKESTRING(Params$, "{\x22playerid\x22:%d, \x22value\x22:%d.0}", ActivePlayer, Seek_Percentage);
+
+		CALL SendJsonCommand (REQUESTID_TIME_PERCENTAGE, "Player.Seek", Params$);	
 	}
 
 }
@@ -1493,10 +1483,10 @@ CHANGE Seek_Time
     
 	IF (IsPlaying)
 	{
-		IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
+/*		IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
 			CALL SendJsonCommand (31, "AudioPlayer.SeekTime",Time$);
 		ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-			CALL SendJsonCommand (31, "VideoPlayer.SeekTime", Time$);
+			CALL SendJsonCommand (31, "VideoPlayer.SeekTime", Time$);*/
 	}
 }
 
