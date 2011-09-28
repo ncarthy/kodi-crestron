@@ -1144,13 +1144,13 @@ FUNCTION ProcessLimitsObject()
 		}
 	}
     
-	/*
+	
 	IF (ListLimits.total)
 	    IF (ListLimits.total > StepAmount)
 			MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, ListLimits.total);
 		ELSE
 			MAKESTRING (List_Summary$, "1 to %d of %d", ListLimits.total, ListLimits.total);
- 	*/
+ 	
 }
 
 /*
@@ -1338,7 +1338,7 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 									}
 	
 								}
-				
+/*				
 							#IF_DEFINED 
 								DEBUG PRINT("Limits: %c, SendToOutput(%d), StartBrackets(%d), EndBrackets(%d), InLimitsObject(%d), InNestedObject(%d)"
 									, character, SendToOutput, NumStartBrackets, NumEndBrackets, InLimitsObject, InNestedObject); 
@@ -1349,6 +1349,7 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 								DEBUG PRINT("Limits: %c, ResponsePropertyNumber(%d), ResponsePropertyName[ResponsePropertyNumber](%s)"
 									, character, ResponsePropertyNumber, ResponsePropertyName[ResponsePropertyNumber]); 
 							#ENDIF
+*/
     						}            	
                              
 						}
@@ -1643,6 +1644,10 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 	IF (IsConnected = OFF)
 		RETURN;
 
+	// don't send anything if a long running query is already in progress
+	IF (Loading = ON)
+		RETURN;
+
     IF (LEN(Arguments) = 0)
 	{
 		// \x22 is a double quote (")
@@ -1660,6 +1665,13 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 	#IF_DEFINED DEBUG
 		PRINT("SendJsonCommand: %s" ,LEFT(Command$,200));
 	#ENDIF
+                   
+	// If the Socket is busy then set a flag to get control of it
+	WHILE (SocketBusy)
+	{
+    	Loading = ON;
+		Delay(1);
+	}
 
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
@@ -2642,15 +2654,17 @@ CHANGE Tx$
 
 	Command$ = GATHER("\n", Tx$, GATHER_TIMEOUT);
     
-	SocketBusy = ON;
-	ExternalRequest = ON;
-	
-    SocketSend(XBMC, Command$);
-
-	WAIT (200) //2-SEC TIMEOUT
+    IF (SocketBusy || Loading)
 	{
-		IF (!Loading)
-			SocketBusy = OFF;
+		#IF_DEFINED DEBUG PRINT("Quitting Command: %s" ,LEFT(Command$,50)); #ENDIF
+
+    	TERMINATEEVENT; //Be Harsh, can't risk cross threading mixup with long-running Browse queries
+    }
+	ELSE
+    { 
+		SocketBusy = ON;
+		ExternalRequest = ON;
+		SocketSend(XBMC, Command$);
 	}
 }
 
