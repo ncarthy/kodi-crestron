@@ -468,12 +468,12 @@ FUNCTION GetActivePlayersFromResponse()
 				SetAudioStatus(OFF);
 				SetVideoStatus(ON);
 			}
-			ELSE IF (ResultName$[i] = XBMC_ACTIVEPLAYER_SLIDESHOW_s)	
+			ELSE IF (ResultValue$[i] = XBMC_ACTIVEPLAYER_SLIDESHOW_s)	
 			{
 				SetVideoStatus(OFF);
 				SetAudioStatus(OFF);
 				SetSlideShowStatus(ON);
-			}		    	
+			}		 			
 	}
 	
 	IF (ActivePlayer = XBMC_ACTIVEPLAYER_NONE) 
@@ -889,20 +889,7 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 	STRING Command$[16384];
 
 	IF (IsConnected = OFF)
-		RETURN;
-	
-	WHILE (SocketIsBusy || TCPBlocker)
-	{		
-		IF (id = REQUESTID_GETPLAYERPROPERTIES)
-			RETURN;
-
-     	Delay(2);
-	}
-	TCPBlocker = 1;
-	Wait(200) // 2-second timeout
-	{
-    	TCPBlocker = 0; 	
-	}                      
+		RETURN;                   
 
     IF (LEN(Arguments) = 0)
 	{
@@ -917,6 +904,19 @@ Function SendJsonCommand(INTEGER id,  STRING Command , STRING Arguments)
 			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
 			,id ,Command, Arguments);
 	}	
+
+	WHILE (SocketIsBusy || TCPBlocker)
+	{		
+		IF (id = REQUESTID_GETPLAYERPROPERTIES)
+			RETURN;
+
+     	Delay(2);
+	}
+	TCPBlocker = 1;
+	Wait(200) // 2-second timeout
+	{
+    	TCPBlocker = 0; 	
+	}   
                      
 	#IF_DEFINED DEBUG  
 		Print("SendJsonCommand (%d bytes): %s", LEN(Command$), LEFT(Command$,200)); 
