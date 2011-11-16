@@ -1,5 +1,11 @@
 xbmc-crestron history
 
+0.5 16-Nov-2011
+JSON parsing code updated to amended xbmc JSON interface
+* Replaced SIMPL+ SMS module with SIMPL SMS module (SMS Multipress.umc)
+* Corrected error where track numbers sometimes showed as 65536
+* Changed logic so that when lon-running queries are in progress all other requests are dropped
+
 0.4 06-Jul-2011
 JSON parsing code updated to new xbmc JSON interface
 * Minor fixes for Tv Show metadata
