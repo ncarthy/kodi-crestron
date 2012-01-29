@@ -32,6 +32,13 @@ Comments:
 	designed this way so that one module could control the flow of requests
 	and replies to prevent messages getting jammed.
 
+	***** ******* *****
+
+	A note on the replacement of '}' with \x7D in MAKESTRING function calls
+	There is a bug in the MC3 firmware that is having issue with the curly brackets 
+	in MAKESTRING. It has been confirmed with TB Support.  It can be worked around 
+	by replacing trailing instances of '}' with \x7D. Reported by Josh Haskell.
+
 */
 
 #SYMBOL_NAME "XBMC-Browse"
@@ -450,7 +457,7 @@ STRING_FUNCTION MovieBrowseParameters()
 								,"\x22year\x22"
 								,"\x22playcount\x22"
 								,"\x22set\x22"
-								,"\x7D\x7D"
+								,"\x7D\x7D" // MC3 bug fix
 					);
 
 	RETURN (Params$);
@@ -470,7 +477,7 @@ STRING_FUNCTION TvShowBrowseParameters(STRING SortMethod)
 								,"\x22year\x22"
 								,"\x22playcount\x22"
 								,SortMethod
-								,"\x7D\x7D"
+								,"\x7D\x7D" // MC3 bug fix
 					);
 
 	RETURN (Params$);
@@ -501,7 +508,7 @@ STRING_FUNCTION MovieDetailsParameters(INTEGER movieid)
 								,"\x22lastplayed\x22"
 								,"\x22mpaa\x22"
 								,"\x22file\x22"
-								,"\x7D"
+								,"\x7D" // MC3 bug fix
 					);
 	RETURN (Params$);
 }
@@ -526,7 +533,7 @@ STRING_FUNCTION TvShowDetailsParameters(INTEGER tvshowid, INTEGER seasonid, STRI
 								,"\x22firstaired\x22"
 								,"\x22playcount\x22"
 								,SortMethod
-								,"\x7D\x7D"
+								,"\x7D\x7D" // MC3 bug fix
 					);
 	RETURN (Params$);
 }
@@ -555,7 +562,7 @@ STRING_FUNCTION EpisodeDetailsParameters(INTEGER episodeid)
 								,"\x22episode\x22"
 								,"\x22firstaired\x22"
 								,"\x22playcount\x22"
-								,"\x7D"
+								,"\x7D" // MC3 bug fix
 					);
 
 	#IF_DEFINED DEBUG
@@ -582,7 +589,8 @@ STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, STRING Sort
 				,"\x22genre\x22"
 				,"\x22year\x22"
 				,SortMethod
-				,"\x7D\x7D");
+				,"\x7D\x7D" // MC3 bug fix
+				);
 
 
 	RETURN (Params$);
@@ -602,7 +610,8 @@ STRING_FUNCTION ArtistsParameters(STRING SortMethod)
 				,"\x22thumbnail\x22"
 				,"\x22genre\x22"
 				,SortMethod
-				,"\x7D\x7D");
+				,"\x7D\x7D" // MC3 bug fix
+				);
 
 	#IF_DEFINED DEBUG
 		PRINT("ArtistsParameters: %s" ,LEFT(Params$,200));
@@ -2055,11 +2064,13 @@ FUNCTION GetPlayAllPlaylist()
 	IF (AlbumID)
 		MAKESTRING(Params$, 
 					"{\x22albumid\x22:%d,\x22properties\x22:[%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22track\x22%s", 
-					AlbumID,"\x22title\x22","\x22album\x22","\x22duration\x22","\x22track\x22","\x7D\x7D");
+					AlbumID,"\x22title\x22","\x22album\x22","\x22duration\x22","\x22track\x22","\x7D\x7D" // MC3 bug fix
+					);
 	ELSE IF (ArtistID)
 		MAKESTRING(Params$, 
 					"{\x22artistid\x22:%d,\x22properties\x22:[%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22label\x22%s", 
-					ArtistID, "\x22title\x22","\x22album\x22","\x22duration\x22","\x22track\x22","\x7D\x7D");
+					ArtistID, "\x22title\x22","\x22album\x22","\x22duration\x22","\x22track\x22","\x7D\x7D" // MC3 bug fix
+					);
  
 	#IF_DEFINED DEBUG          
 		PRINT ("AudioLibrary.GetSongs: %s", Params$);
@@ -2094,12 +2105,14 @@ FUNCTION Play()
 		{
 			MovieDetails = OFF;
         	MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22movieid\x22:%d%s",
-									XBMC_ACTIVEPLAYER_VIDEO, List_IDs[SelectedItem],"\x7D\x7D");
+									XBMC_ACTIVEPLAYER_VIDEO, List_IDs[SelectedItem],"\x7D\x7D" // MC3 bug fix
+						);
 		}
 		CASE (TV_EPISODE_LIST)  : 
 		{
         	MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22episodeid\x22:%d%s", 
-										XBMC_ACTIVEPLAYER_VIDEO, List_IDs[SelectedItem],"\x7D\x7D");
+										XBMC_ACTIVEPLAYER_VIDEO, List_IDs[SelectedItem],"\x7D\x7D" // MC3 bug fix
+						);
 		}
 		CASE (MUSIC_SONG_LIST)  : 
 		{
@@ -2112,7 +2125,8 @@ FUNCTION Play()
                 WHILE (PlaylistIDs[loop])	
 				{
                 	MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22songid\x22:%d%s", 
-										XBMC_ACTIVEPLAYER_AUDIO, PlaylistIDs[loop], "\x7D\x7D");
+										XBMC_ACTIVEPLAYER_AUDIO, PlaylistIDs[loop], "\x7D\x7D" // MC3 bug fix
+								);
 
                         
 					SendJsonCommand(REQUESTID_PLAYLIST_ADD, "Playlist.Add", Parameter$);
@@ -2124,7 +2138,8 @@ FUNCTION Play()
 				IF (ItemNumberZeroBased<0) ItemNumberZeroBased=0; 
 				IF (ItemNumberZeroBased>(NumberOfSongs-1)) ItemNumberZeroBased=(NumberOfSongs-1); 
                 MAKESTRING(Parameter$, "{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d%s"
-												, XBMC_ACTIVEPLAYER_AUDIO, ItemNumberZeroBased,"\x7D\x7D");
+												, XBMC_ACTIVEPLAYER_AUDIO, ItemNumberZeroBased,"\x7D\x7D" // MC3 bug fix
+								);
 
 			    SendJsonCommand(REQUESTID_PLAYLIST_PLAY, "Player.Open", Parameter$);
 
@@ -2139,7 +2154,8 @@ FUNCTION Play()
 			{
 				// Play One Song
         		MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22songid\x22:%d%s", 
-										XBMC_ACTIVEPLAYER_AUDIO, List_IDs[SelectedItem],"\x7D\x7D");
+										XBMC_ACTIVEPLAYER_AUDIO, List_IDs[SelectedItem],"\x7D\x7D" // MC3 bug fix
+								);
 			}
 			
 		}
@@ -2150,7 +2166,8 @@ FUNCTION Play()
 	SendJsonCommand(REQUESTID_PLAYLIST_ADD, "Playlist.Add", Parameter$);
     WaitforSocketToClear();
     MAKESTRING(Parameter$, "{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d%s"
-												, XBMC_ACTIVEPLAYER_VIDEO, 0,"\x7D\x7D");
+												, XBMC_ACTIVEPLAYER_VIDEO, 0,"\x7D\x7D" // MC3 bug fix
+								);
 
 	SendJsonCommand(REQUESTID_PLAYLIST_PLAY, "Player.Open", Parameter$);
 
@@ -2426,7 +2443,7 @@ PUSH List_PagePlus
 	{
 		IF (List_PageNumber*StepAmount > List_Total)
 		{
-         	List_PageNumber = (List_Total - (List_Total MOD StepAmount))/StepAmount;
+         	List_PageNumber = (List_Total - (List_Total MOD StepAmount)) / StepAmount;
 		}
 	}
 

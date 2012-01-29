@@ -31,6 +31,14 @@ Comments:
 	XBMC-Browse.usp is responsible for all communication with the XBMC.exe.
 	It was designed this way so that one module could control the flow of
 	requests and replies to prevent messages getting jammed.
+                       
+	***** ******* *****
+
+	A note on the replacement of '}' with \x7D in MAKESTRING function calls
+	There is a bug in the MC3 firmware that is having issue with the curly brackets 
+	in MAKESTRING. It has been confirmed with TB Support.  It can be worked around 
+	by replacing trailing instances of '}' with \x7D. Reported by Josh Haskell.
+
 */
 
 #SYMBOL_NAME "XBMC"
@@ -270,7 +278,7 @@ STRING_FUNCTION VideoPlaylistParameters(INTEGER start, INTEGER end
 	STRING Params$[1024];
 
 	MAKESTRING (Params$, 
-	"{\x22playlistid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
+	"{\x22playlistid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d%s"
 								, XBMC_ACTIVEPLAYER_VIDEO
 								,"\x22title\x22"
 								,"\x22director\x22"
@@ -291,6 +299,7 @@ STRING_FUNCTION VideoPlaylistParameters(INTEGER start, INTEGER end
 								,SortMethod
 								,start
 								,end 
+								,"\x7D\x7D" // MC3 firmware bug workaround
 					);
  
 	#IF_DEFINED DEBUG PRINT( "VideoPlaylistParameters:%s...", LEFT(Params$,100)  ); #ENDIF
@@ -308,7 +317,7 @@ STRING_FUNCTION AudioPlaylistParameters(INTEGER start, INTEGER end
 	STRING Params$[1024];
 
 	MAKESTRING (Params$, 
-	"{\x22playlistid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d}}"
+	"{\x22playlistid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22},\x22limits\x22:{\x22start\x22:%d,\x22end\x22:%d%s"
 								, XBMC_ACTIVEPLAYER_AUDIO
 								,"\x22title\x22"
 								,"\x22artist\x22"
@@ -322,6 +331,7 @@ STRING_FUNCTION AudioPlaylistParameters(INTEGER start, INTEGER end
 								,SortMethod
 								,start
 								,end 
+								,"\x7D\x7D" // MC3 firmware bug workaround
 					);
 	#IF_DEFINED DEBUG PRINT( "AudioPlaylistParameters:%s", LEFT(Params$,200)  ); #ENDIF
 
@@ -956,7 +966,7 @@ FUNCTION GetPlayerProperties(INTEGER FullPropertyList)
 	STRING Params$[1024];
 
 	IF (FullPropertyList)
-		MAKESTRING(Params$, "{\x22playerid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
+		MAKESTRING(Params$, "{\x22playerid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]%s"
 								, ActivePlayer
 								,"\x22type\x22"
 								,"\x22partymode\x22"
@@ -970,15 +980,17 @@ FUNCTION GetPlayerProperties(INTEGER FullPropertyList)
 								,"\x22shuffled\x22"
 								,"\x22currentaudiostream\x22"
 								,"\x22currentsubtitle\x22"
+								,"\x7D" // MC3 bug fix
 			);
 	ELSE
-		MAKESTRING(Params$, "{\x22playerid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s]}"
+		MAKESTRING(Params$, "{\x22playerid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s]%s"
 								, ActivePlayer
 								,"\x22time\x22"
 								,"\x22percentage\x22"
 								,"\x22totaltime\x22"
 								,"\x22playlistid\x22"
 								,"\x22position\x22"
+								,"\x7D" // MC3 bug fix
 			);
 
 						  					      
@@ -1389,7 +1401,8 @@ FUNCTION ProcessResponse(STRING Response$)
 FUNCTION SendStringSeekCommand(INTEGER RequestID, STRING Command$)
 {
 	STRING Params$[100];
-	MAKESTRING(Params$, "{\x22playerid\x22:%d, \x22value\x22:\x22%s\x22}", ActivePlayer, Command$);
+	MAKESTRING(Params$, "{\x22playerid\x22:%d, \x22value\x22:\x22%s\x22%s", ActivePlayer, Command$, "\x7D" // MC3 bug fix
+				);
 
 	CALL SendJsonCommand (RequestID, "Player.Seek", Params$);
 
@@ -1405,17 +1418,19 @@ FUNCTION SendStringSeekCommand(INTEGER RequestID, STRING Command$)
 
 push PlayNext
 {
-/*	IF (ActivePlayer = XBMC_ACTIVEPLAYER_AUDIO)
-		CALL SendJsonCommand (REQUESTID_SKIPNEXT, "AudioPlaylist.SkipNext","");
-	ELSE IF (ActivePlayer = XBMC_ACTIVEPLAYER_VIDEO)
-		CALL SendJsonCommand (REQUESTID_SKIPNEXT, "VideoPlaylist.SkipNext", "");*/
+	STRING Params$[100];
+	MAKESTRING(Params$, "{\x22playerid\x22:%d%s", ActivePlayer, "\x7D" // MC3 bug fix
+				);
+
+	CALL SendJsonCommand (REQUESTID_SKIPNEXT, "Player.GoNext",Params$);
 }
 push PlayPrev
 {
-/*	IF (ActivePlayer = XBMC_ACTIVEPLAYER_AUDIO) 
-		CALL SendJsonCommand (REQUESTID_SKIPPREV, "AudioPlaylist.SkipPrev","");
-	ELSE IF (ActivePlayer = XBMC_ACTIVEPLAYER_VIDEO) 
-		CALL SendJsonCommand (REQUESTID_SKIPPREV, "VideoPlaylist.SkipPrev", "");*/
+	STRING Params$[100];
+	MAKESTRING(Params$, "{\x22playerid\x22:%d%s", ActivePlayer, "\x7D" // MC3 bug fix
+				);
+
+	CALL SendJsonCommand (REQUESTID_SKIPNEXT, "Player.GoPrevious",Params$);
 } 
 push JumpFwd_Sm
 {
@@ -1469,7 +1484,8 @@ CHANGE Seek_Percentage
     
 	IF (IsPlaying)
 	{
-		MAKESTRING(Params$, "{\x22playerid\x22:%d, \x22value\x22:%d.0}", ActivePlayer, Seek_Percentage);
+		MAKESTRING(Params$, "{\x22playerid\x22:%d, \x22value\x22:%d.0%s", ActivePlayer, Seek_Percentage, "\x7D" // MC3 bug fix
+					);
 
 		CALL SendJsonCommand (REQUESTID_TIME_PERCENTAGE, "Player.Seek", Params$);	
 	}
@@ -1478,15 +1494,35 @@ CHANGE Seek_Percentage
 
 CHANGE Seek_Time
 {
-	STRING Time$[10];
-	MAKESTRING(Time$, "%d", Seek_Time);
+	/* Seek_Time is the number of seconds to Seek to */
+	/* We need to convert that to a JSON time object */
+	/* The JSON time object is in hours, minutes, seconds and milliseconds */
+
+	INTEGER Hours;
+	INTEGER Minutes;
+	INTEGER Seconds;
+	INTEGER Milliseconds;
+	INTEGER TotalMinutes;
+	STRING Params$[250];
+
+	Milliseconds = 0; // Ignore milliseconds
+	Seconds = Seek_Time % 60;
+	TotalMinutes = (Seek_Time - Seconds) / 60;
+	Minutes = TotalMinutes % 60;
+	Hours = (TotalMinutes - Minutes) / 60;
     
 	IF (IsPlaying)
 	{
-/*		IF (ActivePlayer = ACTIVEPLAYER_AUDIO) 
-			CALL SendJsonCommand (31, "AudioPlayer.SeekTime",Time$);
-		ELSE IF (ActivePlayer = ACTIVEPLAYER_VIDEO) 
-			CALL SendJsonCommand (31, "VideoPlayer.SeekTime", Time$);*/
+		MAKESTRING(Params$, "{\x22playerid\x22:%d, \x22value\x22:{\x22hours\x22:%d,\x22minutes\x22:%d,\x22seconds\x22:%d,\x22milliseconds\x22:%d%s"
+					, ActivePlayer
+					, Hours
+					, Minutes
+					, Seconds
+					, MilliSeconds
+					, "\x7D\x7D" // MC3 bug fix
+					);
+
+		CALL SendJsonCommand (REQUESTID_SEEKTIME, "Player.Seek", Params$);
 	}
 }
 
