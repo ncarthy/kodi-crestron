@@ -5,4 +5,4 @@ XBMC stores image files (thumbnails, fanart etc.) with a .tbn extension. Xpanel 
 
 I wrote a simple .NET console program that did the copying. A version can be found in the utils directory. Run it from a Cmd.exe window. It requires .NET 2.0 
 
-Use the latest nightly version of XBMC for best results (http://mirrors.xbmc.org/nightlies/). Remember the XBMC JSON api is still bleeding edge!
+You no longer need to use the latest nightly version of XBMC for best results: The Eden release has all the functionality needed.
