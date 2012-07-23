@@ -20,7 +20,7 @@ What follows are instructions for getting the demo XPanel project working.
     * `Item_Count`: is the number of items in a browse list that will be shown at one time. Minimum 1, maximum 10. Leave it at 6 for the XPanel project to function correctly.
     * `Name`: The name of the controller, as seen by Xbmc. Can be any string.
     * `Address`: The IP address of the Xbmc
-    * `httpport`: The port that Xbmc's HTTP server is listening on (usually 8080)    
+    * `httpport`: The port that Xbmc's HTTP server is listening on (usually 8080 but might be 80... check what port was set in "Preliminaries" above )    
     * `tcpport`: The port that Xbmc's TCP server is listening on (usually 9090). This server does not have any authentication capability at present.
     * `Polltime`: The interval between polling Xbmc for currently-playing metadata. During playback the module also polls Xbmc every 2 seconds to get percentage completed.
     * `UseJpgExtension`: Usually this is set to 1. Xbmc thumbnails are files with the extension '.tbn'. Set this to 1 if you want the thumbnails to have extension '.jpg' instead. There is more information in the README in the download.
