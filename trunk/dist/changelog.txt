@@ -1,10 +1,16 @@
 xbmc-crestron history
 
+0.6 23-Jul-2012
+* Provide "Loading" feedback in the form of a scrollbar
+* Bug Fix: Names of TV Shows were not showing up.
+* When adding items to a Playlist use the JSON Batch Request command structure
+* Bug Fix: Fixed error where lists fail to load due to interference with Metadata requests
+
 0.5 16-Nov-2011
 JSON parsing code updated to amended xbmc JSON interface
 * Replaced SIMPL+ SMS module with SIMPL SMS module (SMS Multipress.umc)
 * Corrected error where track numbers sometimes showed as 65536
-* Changed logic so that when lon-running queries are in progress all other requests are dropped
+* Changed logic so that when long-running queries are in progress all other requests are dropped
 
 0.4 06-Jul-2011
 JSON parsing code updated to new xbmc JSON interface
