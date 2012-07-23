@@ -99,13 +99,13 @@ DIGITAL_OUTPUT  IsConnected ,
 				ClearCurrentlyPlaying; // Tell XBMC.usp to clear the currently-playing metadata
 
 DIGITAL_OUTPUT _SKIP_, SocketBusy; // HIGH when a JSON reply is being received;
-DIGITAL_OUTPUT Loading, _SKIP_; // HIGH when a JSON reply is being received;
-
+DIGITAL_OUTPUT Loading; // HIGH when a JSON reply is being received;
+ANALOG_OUTPUT ScrollBarPercentage; // Percentage (0-99) user has moved through the media list (feedback for scroll bar)
+ANALOG_OUTPUT LoadingMediaPercentage; // Progress report on loading media library from 0-99
 
 DIGITAL_OUTPUT _SKIP_, Watched[10];		// HIGH when item has already been watched.
                  	
-STRING_OUTPUT 	_SKIP_,
-				PlotSelected$,					// The plot of the selected movie or TV showList_Summary$
+STRING_OUTPUT 	PlotSelected$,					// The plot of the selected movie or TV showList_Summary$
 				_SKIP_,
 				List_Summary$,					// e.g. 7 to 12 of 15
 				_SKIP_,
@@ -284,20 +284,27 @@ DYNAMIC ListItem TvShows[50];
 DYNAMIC INTEGER TvShowSeasons[10];
 DYNAMIC ListItem TvShowEpisodes[50];
 DYNAMIC ListItem ArtistAlbums[15];
-
-INTEGER NumberOfAlbums;
-INTEGER NumberOfArtists;
+                       
+NONVOLATILE INTEGER NumberOfAlbums; // The number of albums in Xbmc library. Max 65535. Will retaint value between sessions
+NONVOLATILE INTEGER NumberOfArtists; // The number of artists in Xbmc library. Max 65535. Will retaint value between sessions
 INTEGER NumberOfSongs;
-INTEGER NumberOfMovies;
-INTEGER NumberOfTvShows;
+NONVOLATILE INTEGER NumberOfMovies; // Will retain value between sessions
+NONVOLATILE INTEGER NumberOfTvShows; // Max 65535. Will retain value between sessions (over loss of hardware power)
 INTEGER NumberOfTvShowSeasons;
 INTEGER NumberOfTvShowEpisodes;
 INTEGER NumberOfArtistAlbums;
+INTEGER CurrentAlbumNumber;
+INTEGER CurrentArtistNumber;
+INTEGER CurrentMovieNumber;
+INTEGER CurrentTvShowNumber;
+
 
 // Variables used in parsing response from XBMC
 // They are module-level because the response might come in several parts
 INTEGER ExternalRequest;			// When HIGH any data received from XBMC is to be
 									// sent to Rx$ rather than processed internally.
+INTEGER BatchRequest;    			// When HIGH a JSON batch request has been submitted to XBMC. 
+									// Any response data received from XBMC will be ignored.
 
 INTEGER ResponseId;					// The value of the "id" in the response. If =0 then its an announcement.
 INTEGER ResponseType;				// An error, result or notification (constants defined in Common_Functions.usl)
@@ -380,14 +387,20 @@ FUNCTION ConnectToXbmc()
 	InArrayObject = 0;
 	InArrayItemName = 1;
 
-	NumberOfMovies = 0;
-	NumberOfAlbums = 0;
-	NumberOfArtists = 0;
 	NumberOfSongs = 0;
-	NumberOfTvShows = 0;
 	NumberOfTvShowSeasons = 0;
 	NumberOfTvShowEpisodes = 0;
+	CurrentMovieNumber = 0;
+	CurrentAlbumNumber = 0;
+	CurrentArtistNumber = 0;
+	CurrentTvShowNumber = 0;
 
+
+	ScrollBarPercentage = 0;
+	LoadingMediaPercentage = 0;
+
+	// Set flag to deny access from Xbmc.usp
+	SocketBusy = ON;
     
 	IF ( ConnectionStatus <> 2 )
 	{
@@ -638,7 +651,7 @@ STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
 	}
 	IF (UseJPG)
 	{
-		/* 	Hack/workaround for Crestron TP's to display .tbn files. 
+		/* 	Hack/workaround for Crestron TP's inability to display .tbn files. 
 			Tested with XPanel and 8x. Mobile Pro/ProG/Android R2 work either way.
 		*/
 		tmpCoverPath = tmpCoverPath + "vfs/" + uri$ + "?image.jpg" ;
@@ -710,7 +723,6 @@ FUNCTION Initialize_OutputArrays()
 	PlotSelected$ = "";
 }
 
-
 /*
  	Assign the metadata stored in the STRUCTURE arrays and send to STRING outputs
 */
@@ -723,95 +735,92 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 	{
 		CASE (MOVIE_TITLE_LIST) :
 		{
-			NumberOfMovies = NumberOfMovies+1; 
+			CurrentMovieNumber = CurrentMovieNumber+1; 
+			IF (CurrentMovieNumber > NumberOfMovies)
+				NumberOfMovies = CurrentMovieNumber;
                 
 			// REsize structure array
 			ArraySize = GetNumStructureArrayCols(Movies);
-			IF (NumberOfMovies > ArraySize)
+			IF (CurrentMovieNumber > ArraySize)
 				ResizeStructureArray(Movies, ArraySize+50);
 		
 			FOR (i = 1 TO Count)
 			{		
-		    	IF (Names$[i] = "movieid") Movies[NumberOfMovies].id = AtoI(Values$[i]);
-				ELSE IF(Names$[i] = "label") Movies[NumberOfMovies].label = Values$[i];
-				ELSE IF(Names$[i] = "genre") Movies[NumberOfMovies].genre = Values$[i];
-				ELSE IF(Names$[i] = "year") Movies[NumberOfMovies].year = Values$[i];
-				ELSE IF(Names$[i] = "thumbnail") Movies[NumberOfMovies].thumbnail = Values$[i];
-				ELSE IF(Names$[i] = "playcount") Movies[NumberOfMovies].Playcount = AtoI(Values$[i]);				
+		    	IF (Names$[i] = "movieid") Movies[CurrentMovieNumber].id = AtoI(Values$[i]);
+				ELSE IF(Names$[i] = "label") Movies[CurrentMovieNumber].label = Values$[i];
+				ELSE IF(Names$[i] = "genre") Movies[CurrentMovieNumber].genre = Values$[i];
+				ELSE IF(Names$[i] = "year") Movies[CurrentMovieNumber].year = Values$[i];
+				ELSE IF(Names$[i] = "thumbnail") Movies[CurrentMovieNumber].thumbnail = Values$[i];
+				ELSE IF(Names$[i] = "playcount") Movies[CurrentMovieNumber].Playcount = AtoI(Values$[i]);				
 				ELSE IF(Names$[i] = "set") 
 				{
 					IF (LEN(Values$[i]))
-						Movies[NumberOfMovies].Set = 1;		
+						Movies[CurrentMovieNumber].Set = 1;		
 					ELSE
-						Movies[NumberOfMovies].Set = 0;		
+						Movies[CurrentMovieNumber].Set = 0;		
 				}
 			}
 		
-			IF (NumberOfMovies <= StepAmount)
+			IF (CurrentMovieNumber <= StepAmount)
 			{
-				List_Position[NumberOfMovies] = NumberOfMovies;
+				List_Position[CurrentMovieNumber] = CurrentMovieNumber;
 
-				List_IDs[NumberOfMovies] = Movies[NumberOfMovies].id;
-				Thumb$[NumberOfMovies] = ThumbnailUri(Movies[NumberOfMovies].thumbnail,UseJpgExtension);
-				Name$[NumberOfMovies] = Movies[NumberOfMovies].label;
-				Year$[NumberOfMovies] = Movies[NumberOfMovies].year;
-				Genre$[NumberOfMovies] = Movies[NumberOfMovies].genre;
-				IF (Movies[NumberOfMovies].Playcount)
-					Watched[NumberOfMovies] = ON;
+				List_IDs[CurrentMovieNumber] = Movies[CurrentMovieNumber].id;
+				Thumb$[CurrentMovieNumber] = ThumbnailUri(Movies[CurrentMovieNumber].thumbnail,UseJpgExtension);
+				Name$[CurrentMovieNumber] = Movies[CurrentMovieNumber].label;
+				Year$[CurrentMovieNumber] = Movies[CurrentMovieNumber].year;
+				Genre$[CurrentMovieNumber] = Movies[CurrentMovieNumber].genre;
+				IF (Movies[CurrentMovieNumber].Playcount)
+					Watched[CurrentMovieNumber] = ON;
 				ELSE
-					Watched[NumberOfMovies] = OFF;
-				MAKESTRING (List_Summary$, "1 to %d of %d", NumberOfMovies, NumberOfMovies);
+					Watched[CurrentMovieNumber] = OFF;
 			}
-			ELSE
-			{
-				IF (NumberOfMovies % StepAmount = 0 )
-					MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfMovies);
-            
-			}
-			List_Total = NumberOfMovies;
+			LoadingMediaPercentage = MULDIV(CurrentMovieNumber, 100, NumberOfMovies); 
+			List_Total = CurrentMovieNumber;
 			Break;
 		}
 		CASE (TV_SHOW_LIST)		: 
 		{ 
-			NumberOfTvShows = NumberOfTvShows+1; 
+			CurrentTvShowNumber = CurrentTvShowNumber+1; 
+			IF (CurrentTvShowNumber > NumberOfTvShows)
+				NumberOfTvShows = CurrentTvShowNumber;
+
 
 			// REsize structure array
 			ArraySize = GetNumStructureArrayCols(TvShows);
-			IF (NumberOfTvShows > ArraySize)
+			IF (CurrentTvShowNumber > ArraySize)
 				ResizeStructureArray(TvShows, ArraySize+50);
 
 		
 			FOR (i = 1 TO Count)
 			{		
-		    	IF (Names$[i] = "tvshowid") TvShows[NumberOfTvShows].id = AtoI(Values$[i]);
-				ELSE IF(Names$[i] = "title") TvShows[NumberOfTvShows].label = Values$[i];
-				ELSE IF(Names$[i] = "genre") TvShows[NumberOfTvShows].genre = Values$[i];
-				ELSE IF(Names$[i] = "thumbnail") TvShows[NumberOfTvShows].thumbnail = Values$[i];
-				ELSE IF(Names$[i] = "year") TvShows[NumberOfTvShows].year = Values$[i];
-				ELSE IF(Names$[i] = "playcount") TvShows[NumberOfTvShows].Playcount = AtoI(Values$[i]);
+		    	IF (Names$[i] = "tvshowid") TvShows[CurrentTvShowNumber].id = AtoI(Values$[i]);
+				ELSE IF(Names$[i] = "label") TvShows[CurrentTvShowNumber].label = Values$[i];
+				ELSE IF(Names$[i] = "genre") TvShows[CurrentTvShowNumber].genre = Values$[i];
+				ELSE IF(Names$[i] = "thumbnail") TvShows[CurrentTvShowNumber].thumbnail = Values$[i];
+				ELSE IF(Names$[i] = "year") TvShows[CurrentTvShowNumber].year = Values$[i];
+				ELSE IF(Names$[i] = "playcount") TvShows[CurrentTvShowNumber].Playcount = AtoI(Values$[i]);
 			}
 		
-			IF (NumberOfTvShows <= StepAmount)
+			IF (CurrentTvShowNumber <= StepAmount)
 			{
-				List_Position[NumberOfTvShows] = NumberOfTvShows;
+				List_Position[CurrentTvShowNumber] = CurrentTvShowNumber;
 
-				List_IDs[NumberOfTvShows] = TvShows[NumberOfTvShows].id;
-				Thumb$[NumberOfTvShows] = ThumbnailUri(TvShows[NumberOfTvShows].thumbnail,UseJpgExtension);
+				List_IDs[CurrentTvShowNumber] = TvShows[CurrentTvShowNumber].id;
+				Thumb$[CurrentTvShowNumber] = ThumbnailUri(TvShows[CurrentTvShowNumber].thumbnail,UseJpgExtension);
 	
-				SeriesOrArtistName$[NumberOfTvShows] = TvShows[NumberOfTvShows].label;
+				SeriesOrArtistName$[CurrentTvShowNumber] = TvShows[CurrentTvShowNumber].label;
 
-				Genre$[NumberOfTvShows] = TvShows[NumberOfTvShows].genre;
-				Year$[NumberOfTvShows] = TvShows[NumberOfTvShows].year;
-				IF (TvShows[NumberOfTvShows].Playcount)
-					Watched[NumberOfTvShows] = ON;
+				Genre$[CurrentTvShowNumber] = TvShows[CurrentTvShowNumber].genre;
+				Year$[CurrentTvShowNumber] = TvShows[CurrentTvShowNumber].year;
+				IF (TvShows[CurrentTvShowNumber].Playcount)
+					Watched[CurrentTvShowNumber] = ON;
 				ELSE
-					Watched[NumberOfTvShows] = OFF;
-				MAKESTRING (List_Summary$, "1 to %d of %d", NumberOfTvShows, NumberOfTvShows);
+					Watched[CurrentTvShowNumber] = OFF;
 			}
-			ELSE
-				MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfTvShows);
-
-			List_Total = NumberOfTvShows;
+            
+			LoadingMediaPercentage = MULDIV(CurrentTvShowNumber, 100, NumberOfTvShows); 
+			List_Total = CurrentTvShowNumber;
 
 			Break;
 		}
@@ -916,78 +925,73 @@ FUNCTION AssignListData(INTEGER Count, STRING Names$[], STRING Values$[])
 		}
 		CASE (MUSIC_ALBUM_LIST)  : 
 		{ 
-			NumberOfAlbums = NumberOfAlbums+1; 
+			CurrentAlbumNumber = CurrentAlbumNumber+1; 
+			IF (CurrentAlbumNumber > NumberOfAlbums)
+				NumberOfAlbums = CurrentAlbumNumber;
 
 			// REsize structure array
 			ArraySize = GetNumStructureArrayCols(Albums);
-			IF (NumberOfAlbums > ArraySize)
+			IF (CurrentAlbumNumber > ArraySize)
 				ResizeStructureArray(Albums, ArraySize+50);
 
 		
 			FOR (i = 1 TO Count)
 			{		
-		    	IF (Names$[i] = "albumid") Albums[NumberOfAlbums].id = AtoI(Values$[i]);
-				ELSE IF(Names$[i] = "label") Albums[NumberOfAlbums].label = Values$[i];
-				ELSE IF(Names$[i] = "genre") Albums[NumberOfAlbums].genre = LEFT(Values$[i],50);
-				ELSE IF(Names$[i] = "thumbnail") Albums[NumberOfAlbums].thumbnail = Values$[i];
-				ELSE IF(Names$[i] = "year" && AtoI(Values$[i])) Albums[NumberOfAlbums].year = Values$[i];
-				ELSE IF(Names$[i] = "artist") Albums[NumberOfAlbums].artist = LEFT(Values$[i],50);
+		    	IF (Names$[i] = "albumid") Albums[CurrentAlbumNumber].id = AtoI(Values$[i]);
+				ELSE IF(Names$[i] = "label") Albums[CurrentAlbumNumber].label = Values$[i];
+				ELSE IF(Names$[i] = "genre") Albums[CurrentAlbumNumber].genre = LEFT(Values$[i],50);
+				ELSE IF(Names$[i] = "thumbnail") Albums[CurrentAlbumNumber].thumbnail = Values$[i];
+				ELSE IF(Names$[i] = "year" && AtoI(Values$[i])) Albums[CurrentAlbumNumber].year = Values$[i];
+				ELSE IF(Names$[i] = "artist") Albums[CurrentAlbumNumber].artist = LEFT(Values$[i],50);
 
 			}
 		
-			IF (NumberOfAlbums <= StepAmount)
+			IF (CurrentAlbumNumber <= StepAmount)
 			{
-				List_Position[NumberOfAlbums] = NumberOfAlbums;
-				List_IDs[NumberOfAlbums] = Albums[NumberOfAlbums].id;
-		        SeasonOrAlbumName$[NumberOfAlbums] = Albums[NumberOfAlbums].label;
-				Thumb$[NumberOfAlbums] = ThumbnailUri(Albums[NumberOfAlbums].thumbnail,UseJpgExtension);
-				Name$[NumberOfAlbums] = Albums[NumberOfAlbums].label;
-				Genre$[NumberOfAlbums] = Albums[NumberOfAlbums].genre;
-				Year$[NumberOfAlbums] = Albums[NumberOfAlbums].year;
-				SeriesOrArtistName$[NumberOfAlbums] = Albums[NumberOfAlbums].artist;
-				MAKESTRING (List_Summary$, "1 to %d of %d", NumberOfAlbums, NumberOfAlbums);
+				List_Position[CurrentAlbumNumber] = CurrentAlbumNumber;
+				List_IDs[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].id;
+		        SeasonOrAlbumName$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].label;
+				Thumb$[CurrentAlbumNumber] = ThumbnailUri(Albums[CurrentAlbumNumber].thumbnail,UseJpgExtension);
+				Name$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].label;
+				Genre$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].genre;
+				Year$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].year;
+				SeriesOrArtistName$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].artist;
 			}
-			ELSE
-			{
-				IF (NumberOfAlbums % StepAmount = 0 )
-	                MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfAlbums);
-            }
-
+            
+			LoadingMediaPercentage = MULDIV(CurrentAlbumNumber, 100, NumberOfAlbums); 
 			List_Total = NumberOfAlbums;
 			Break;	
 		}
 		CASE (MUSIC_ARTIST_LIST)  : 
 		{
-			NumberOfArtists = NumberOfArtists+1; 
+			CurrentArtistNumber = CurrentArtistNumber+1;
+			IF (CurrentArtistNumber > NumberOfArtists)
+				NumberOfArtists = CurrentArtistNumber; 
 
 			// REsize structure array
 			ArraySize = GetNumStructureArrayCols(Artists);
-			IF (NumberOfArtists > ArraySize)
+			IF (CurrentArtistNumber > ArraySize)
 				ResizeStructureArray(Artists, ArraySize+50);
 
 		
 			FOR (i = 1 TO Count)
 			{		
-		    	IF (Names$[i] = "artistid") Artists[NumberOfArtists].id = AtoI(Values$[i]);
-				ELSE IF(Names$[i] = "label") Artists[NumberOfArtists].label = Values$[i];
-				ELSE IF(Names$[i] = "genre") Artists[NumberOfArtists].genre = Values$[i];
-				ELSE IF(Names$[i] = "thumbnail") Artists[NumberOfArtists].thumbnail = Values$[i];
+		    	IF (Names$[i] = "artistid") Artists[CurrentArtistNumber].id = AtoI(Values$[i]);
+				ELSE IF(Names$[i] = "label") Artists[CurrentArtistNumber].label = Values$[i];
+				ELSE IF(Names$[i] = "genre") Artists[CurrentArtistNumber].genre = Values$[i];
+				ELSE IF(Names$[i] = "thumbnail") Artists[CurrentArtistNumber].thumbnail = Values$[i];
 			}
 		
-			IF (NumberOfArtists <= StepAmount)
+			IF (CurrentArtistNumber <= StepAmount)
 			{
-				List_Position[NumberOfArtists] = NumberOfArtists;
-				List_IDs[NumberOfArtists] = Artists[NumberOfArtists].id;
-				Thumb$[NumberOfArtists] = ThumbnailUri(Artists[NumberOfArtists].thumbnail,UseJpgExtension);
-				Name$[NumberOfArtists] = Artists[NumberOfArtists].label;
-				MAKESTRING (List_Summary$, "1 to %d of %d", NumberOfArtists, NumberOfArtists);
+				List_Position[CurrentArtistNumber] = CurrentArtistNumber;
+				List_IDs[CurrentArtistNumber] = Artists[CurrentArtistNumber].id;
+				Thumb$[CurrentArtistNumber] = ThumbnailUri(Artists[CurrentArtistNumber].thumbnail,UseJpgExtension);
+				Name$[CurrentArtistNumber] = Artists[CurrentArtistNumber].label;
 			}
-			ELSE
-			{
-				IF (NumberOfArtists % StepAmount = 0 )
-					MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfArtists);
-            }
-			List_Total = NumberOfArtists;
+			
+			LoadingMediaPercentage = MULDIV(CurrentArtistNumber, 100, NumberOfArtists);
+			List_Total = CurrentArtistNumber;
 			Break;
 		}
 		CASE (MUSIC_ARTIST_CHOOSE_LIST)  : 
@@ -1161,11 +1165,57 @@ FUNCTION ProcessLimitsObject()
 	}
     
 	
-	IF (ListLimits.total)
-	    IF (ListLimits.total > StepAmount)
-			MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, ListLimits.total);
-		ELSE
-			MAKESTRING (List_Summary$, "1 to %d of %d", ListLimits.total, ListLimits.total);
+	IF (ListLimits.total)      
+	{	
+		CSWITCH (List_CurrentScreen)
+		{
+			CASE (MOVIE_TITLE_LIST) :
+			{			
+				IF (ListLimits.total != NumberOfMovies)
+					NumberOfMovies = ListLimits.total;  
+				MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfMovies);
+				Break;
+			}
+			CASE (TV_SHOW_LIST)		: 
+			{ 
+				IF (ListLimits.total != NumberOfTvShows)
+					NumberOfTvShows = ListLimits.total;        
+				MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfTvShows);
+				Break;
+			}
+			CASE (TV_SEASON_LIST) 	: 
+			{
+				Break;
+			}
+			CASE (TV_EPISODE_LIST)  : 
+			{ 
+				Break;
+			}
+			CASE (MUSIC_ALBUM_LIST)  : 
+			{ 
+				IF (ListLimits.total != NumberOfAlbums)
+					NumberOfAlbums = ListLimits.total;
+   				MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfAlbums);
+				Break;	
+			}
+			CASE (MUSIC_ARTIST_LIST)  : 
+			{
+				IF (ListLimits.total != NumberOfArtists)
+					NumberOfArtists = ListLimits.total;
+                MAKESTRING (List_Summary$, "1 to %d of %d", StepAmount, NumberOfArtists);
+				Break;
+			}
+			CASE (MUSIC_ARTIST_CHOOSE_LIST)  : 
+			{ 
+				Break;	
+			}
+			CASE (MUSIC_SONG_LIST)  : 
+			{
+				Break;		
+			}
+	        DEFAULT: Print("XBMC-Browse.usp: (FUNCTION ProcessLimitsObject): Invalid ListID (%d)", List_CurrentScreen);
+		}		
+	}
  	
 }
 
@@ -1354,8 +1404,8 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 									}
 	
 								}
-/*				
-							#IF_DEFINED 
+				
+							/*#IF_DEFINED 
 								DEBUG PRINT("Limits: %c, SendToOutput(%d), StartBrackets(%d), EndBrackets(%d), InLimitsObject(%d), InNestedObject(%d)"
 									, character, SendToOutput, NumStartBrackets, NumEndBrackets, InLimitsObject, InNestedObject); 
 							#ENDIF
@@ -1364,8 +1414,8 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 							#IF_DEFINED 
 								DEBUG PRINT("Limits: %c, ResponsePropertyNumber(%d), ResponsePropertyName[ResponsePropertyNumber](%s)"
 									, character, ResponsePropertyNumber, ResponsePropertyName[ResponsePropertyNumber]); 
-							#ENDIF
-*/
+							#ENDIF*/
+
     						}            	
                              
 						}
@@ -1453,7 +1503,9 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 			}
             case ('['):
 			{
-				IF (IsEven(DoubleQuotesCount) && SendToOutput =0)
+				IF (BatchRequest) 
+					SkipCharacter = 1;
+				ELSE IF (IsEven(DoubleQuotesCount) && SendToOutput =0)
 				{
 					SkipCharacter = 1;
 					InArrayObject = 1;
@@ -1465,7 +1517,12 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 			}
             case (']'):
 			{
-				IF (IsEven(DoubleQuotesCount) && SendToOutput =0)
+				IF (BatchRequest) 
+				{
+					SkipCharacter = 1;
+                    BatchRequest = OFF;
+				}
+				ELSE IF (IsEven(DoubleQuotesCount) && SendToOutput =0)
 				{
 					SkipCharacter = 1;
 					InArrayObject = 0;
@@ -1485,6 +1542,7 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 		}
         
         // Handle 2-byte UTF-8 characters
+		// ConvertUtf8ToAscii() is in CommonFunctions.usl
 		if (character > 126) // not ASCII
 		{						
 			if (prevCharacter < 127)
@@ -1494,8 +1552,6 @@ FUNCTION ProcessResponse(STRING fromBuffer)
                 ExtendedAscii = 92;
 				ExtendedAscii = ConvertUtf8ToAscii(prevCharacter, character); // This function is very simplistic
 				character = ExtendedAscii;
-
-				//ConvertUtf8ToAscii() is in CommonFunctions.usl
 			}
 		}
     
@@ -1512,7 +1568,7 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 					, InArrayNameValueNumber, outputStringName[InArrayNameValueNumber], outputStringValue[InArrayNameValueNumber]); 
 			}
 			ELSE
-				PRINT("%c, %d", character, SkipCharacter);
+				PRINT("%c - %d", character, SkipCharacter);
 		#ENDIF*/
 
 		//append the character
@@ -1634,7 +1690,11 @@ FUNCTION ProcessResponse(STRING fromBuffer)
 				ResponseType = 0;
 		
 				SocketBusy = OFF;
-				Loading = OFF;
+				
+				// External requests do not set the loading flag... 
+				//therefore they shouldn't unset it
+				IF (!ExternalRequest) Loading = OFF;  
+				
 				ExternalRequest = OFF;
 			}
         }
@@ -1646,15 +1706,13 @@ FUNCTION ProcessResponse(STRING fromBuffer)
   
 }
 
-
 /*
-	Send the JSON-RPC command via the TCP socket
+	Send a string to the XBMC Socket
 
 	No authentication
 */
-Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
+Function SendToSocket(STRING Command$)
 {
-	STRING Command$[16384];
     
 	// don't send anything if the socket isn't open
 	IF (IsConnected = OFF)
@@ -1663,24 +1721,6 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 	// don't send anything if a long running query is already in progress
 	IF (Loading = ON)
 		RETURN;
-
-    IF (LEN(Arguments) = 0)
-	{
-		// \x22 is a double quote (")
-		MAKESTRING (Command$, 
-			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
-			,id ,Method);
-	}
-	ELSE
-	{
-		MAKESTRING (Command$, 
-			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
-			,id ,Method, Arguments);
-	}
-
-	#IF_DEFINED DEBUG
-		PRINT("SendJsonCommand: %s" ,LEFT(Command$,200));
-	#ENDIF
                    
 	// If the Socket is busy then set a flag to get control of it
 	WHILE (SocketBusy)
@@ -1708,6 +1748,36 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 		}
 	}
 	                        
+}
+
+/*
+	Send the JSON-RPC command via the TCP socket
+
+	No authentication
+*/
+Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
+{
+	STRING Command$[16384];
+    
+    IF (LEN(Arguments) = 0)
+	{
+		// \x22 is a double quote (")
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
+			,id ,Method);
+	}
+	ELSE
+	{
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
+			,id ,Method, Arguments);
+	}
+
+	#IF_DEFINED DEBUG
+		PRINT("Xbmc-Browse: SendJsonCommand: %s" ,LEFT(Command$,200));
+	#ENDIF
+                   
+	SendToSocket(Command$);                     
 }
 
 /*
@@ -1768,11 +1838,15 @@ FUNCTION RepopulateOutputList(INTEGER start)
 	}
 
 	IF (end > List_Total) end = List_Total;
-		MAKESTRING(List_Summary$, "%d to %d of %d", start, end, List_Total);
+	
+	MAKESTRING(List_Summary$, "%d to %d of %d", start, end, List_Total);
+	ScrollBarPercentage = MULDIV(start, 100, List_Total);
+	#IF_DEFINED DEBUG
+		PRINT("ScrollBarPercentage: %d (position:%d, list_total:%d)", ScrollBarPercentage, start, List_Total);
+	#ENDIF
 
 
-	CALL Initialize_OutputArrays();
-   
+	CALL Initialize_OutputArrays();   
 
 	CSWITCH (List_CurrentScreen)
 	{
@@ -2080,6 +2154,75 @@ FUNCTION GetPlayAllPlaylist()
 							"AudioLibrary.GetSongs", Params$);
 	
 }
+ 
+/*
+     Create a playlist on Xbmc using a JSON batch request ("[ {request1}, {request2},...]").
+	 Called from FUNCTION Play().
+*/
+FUNCTION CreatePlaylistOnXbmc()
+{
+	INTEGER i;
+	INTEGER NumberOfItems;
+	STRING Command$[256];
+	INTEGER CombinedLengthOfCommands;
+	STRING JSONCommand$[BUFFER_SIZE];
+	INTEGER ItemNumberZeroBased;
+             
+	NumberOfItems = 1;
+	CombinedLengthOfCommands = 1;
+     
+	// Determine how long the Playlist is.
+    WHILE (PlaylistIDs[NumberOfItems])	
+	{
+         NumberOfItems = NumberOfItems + 1;
+	}
+    NumberOfItems = NumberOfItems - 1;
+    
+	// Add the 'Playlist.Clear' command to the batch
+	MAKESTRING (Command$, 
+			"[{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d}},"
+			,REQUESTID_PLAYLIST_CLEAR ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Clear\x22"
+			, XBMC_ACTIVEPLAYER_AUDIO);
+	SETSTRING(Command$, 1, JSONCommand$);
+	CombinedLengthOfCommands = LEN(Command$);
+
+	// Loop and add each song to the playlist
+	FOR (i = 0 TO NumberOfItems-1)
+	{
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d,\x22item\x22:{\x22songid\x22:%d}}}"
+			,100+i ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Add\x22"
+			, XBMC_ACTIVEPLAYER_AUDIO, PlaylistIDs[i+1]);
+		       
+		// Add individual command to larger batch command string
+		SETSTRING(Command$, CombinedLengthOfCommands+1, JSONCommand$);		
+		CombinedLengthOfCommands = CombinedLengthOfCommands + LEN(Command$);
+
+		// Add comma		
+		SETSTRING(",", CombinedLengthOfCommands+1, JSONCommand$);
+		CombinedLengthOfCommands = CombinedLengthOfCommands + 1;
+    }
+       
+	// Calculate playlist position number (the position that play starts from)
+    ItemNumberZeroBased = SelectedItem-1+StepAmount*List_PageNumber;
+	IF (ItemNumberZeroBased<0) ItemNumberZeroBased=0; 
+	IF (ItemNumberZeroBased>(NumberOfSongs-1)) ItemNumberZeroBased=(NumberOfSongs-1); 
+
+	// Add the 'Play' command to the batch
+	MAKESTRING (Command$, 
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d}}}"
+			,REQUESTID_PLAYLIST_PLAY ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Player.Open\x22"
+			, XBMC_ACTIVEPLAYER_AUDIO, ItemNumberZeroBased);
+  	SETSTRING(Command$, CombinedLengthOfCommands+1, JSONCommand$);		
+	CombinedLengthOfCommands = CombinedLengthOfCommands + LEN(Command$);
+
+
+	SETSTRING("]", CombinedLengthOfCommands+1, JSONCommand$);                
+    
+	BatchRequest = ON;
+	SendToSocket(JSONCommand$);
+	
+}
 
 /*
 	Play the currently selected Movie, TV Episode or Album
@@ -2088,60 +2231,37 @@ FUNCTION GetPlayAllPlaylist()
 */
 FUNCTION Play()
 {
-    STRING Parameter$[256];
-	STRING Command$[25];
-	INTEGER loop;
-	INTEGER ItemNumberZeroBased;
+    STRING Command$[256];
+	STRING BatchCommand$[500];
+	INTEGER CombinedLengthOfCommands;
+	INTEGER PlayerID;
+	STRING  ItemType$[20];
 
-	Parameter$="";
-    loop = 1;
-      
-	// Stop Anything that's currently playing
-	//StopCurrentlyPlaying();
+	CombinedLengthOfCommands = 0;
 
 	SWITCH (List_CurrentScreen)
 	{
 		CASE (MOVIE_TITLE_LIST) :
 		{
 			MovieDetails = OFF;
-        	MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22movieid\x22:%d%s",
-									XBMC_ACTIVEPLAYER_VIDEO, List_IDs[SelectedItem],"\x7D\x7D" // MC3 bug fix
-						);
+            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+			ItemType$ = "movieid";
 		}
 		CASE (TV_EPISODE_LIST)  : 
 		{
-        	MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22episodeid\x22:%d%s", 
-										XBMC_ACTIVEPLAYER_VIDEO, List_IDs[SelectedItem],"\x7D\x7D" // MC3 bug fix
-						);
+            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+			ItemType$ = "episodeid";
 		}
 		CASE (MUSIC_SONG_LIST)  : 
-		{
-			SendJsonCommand(REQUESTID_PLAYLIST_CLEAR, 
-									"Playlist.Clear","{\x22playlistid\x22:0}");
-			WaitforSocketToClear();            			
+		{          			
+            PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+			ItemType$ = "songid";
 
             IF (AlbumID || ArtistID)
             {
-                WHILE (PlaylistIDs[loop])	
-				{
-                	MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22songid\x22:%d%s", 
-										XBMC_ACTIVEPLAYER_AUDIO, PlaylistIDs[loop], "\x7D\x7D" // MC3 bug fix
-								);
-
-                        
-					SendJsonCommand(REQUESTID_PLAYLIST_ADD, "Playlist.Add", Parameter$);
-                    WaitforSocketToClear();
-					loop = loop + 1;
-				}
+				CreatePlaylistOnXbmc();
 	                 
-    			ItemNumberZeroBased = SelectedItem-1+StepAmount*List_PageNumber;
-				IF (ItemNumberZeroBased<0) ItemNumberZeroBased=0; 
-				IF (ItemNumberZeroBased>(NumberOfSongs-1)) ItemNumberZeroBased=(NumberOfSongs-1); 
-                MAKESTRING(Parameter$, "{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d%s"
-												, XBMC_ACTIVEPLAYER_AUDIO, ItemNumberZeroBased,"\x7D\x7D" // MC3 bug fix
-								);
-
-			    SendJsonCommand(REQUESTID_PLAYLIST_PLAY, "Player.Open", Parameter$);
+				WaitforSocketToClear();
 
 			    // Wait 3 seconds before requesting metadata
 				WAIT(300)
@@ -2149,27 +2269,85 @@ FUNCTION Play()
 					PULSE(10, CheckCurrentlyPlaying);
 				}
 				RETURN; // Exit function
-			}
-			ELSE
-			{
-				// Play One Song
-        		MAKESTRING(Parameter$, "{\x22playlistid\x22:%d,\x22item\x22:{\x22songid\x22:%d%s", 
-										XBMC_ACTIVEPLAYER_AUDIO, List_IDs[SelectedItem],"\x7D\x7D" // MC3 bug fix
-								);
-			}
-			
+			}			
+		}
+	}
+    
+	SETSTRING("[", 1, BatchCommand$);
+	CombinedLengthOfCommands = 1;
+
+	// Add the 'Playlist.Clear' command to the batch: Clear any existing tracks.
+	MAKESTRING (Command$, 
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d}},"
+			,REQUESTID_PLAYLIST_CLEAR ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Clear\x22"
+			, XBMC_ACTIVEPLAYER_AUDIO);
+	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
+	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
+	MAKESTRING (Command$, 
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d}},"
+			,REQUESTID_PLAYLIST_CLEAR+50 ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Clear\x22"
+			, XBMC_ACTIVEPLAYER_VIDEO);
+	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
+	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
+
+
+	// Add the 'Playlist.Add' command to the batch: This adds the id of the movie/episode/song to the playlist
+	MAKESTRING (Command$, 
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d,\x22item\x22:{\x22%s\x22:%d}}},"
+			,REQUESTID_PLAYLIST_ADD ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Add\x22"
+			, PlayerID, ItemType$, List_IDs[SelectedItem]);
+	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
+	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
+
+	// Add the 'Playlist.Open' command to the batch
+	MAKESTRING (Command$, 
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d}}}"
+			,REQUESTID_PLAYLIST_PLAY ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Player.Open\x22"
+			, PlayerID, 0);
+	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
+	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
+
+	SETSTRING("]", CombinedLengthOfCommands+1, BatchCommand$);
+
+	// don't send anything if the socket isn't open
+	IF (IsConnected = OFF)
+		RETURN;
+
+	// don't send anything if a long running query is already in progress
+	IF (Loading = ON)
+		RETURN;
+     
+	// If the Socket is busy then set a flag to get control of it
+	WHILE (SocketBusy)
+	{
+    	Loading = ON;
+		Delay(1);
+	}
+
+    Print("%s", LEFT(BatchCommand$,100));
+    Print("%s", RIGHT(BatchCommand$,100));
+
+
+	// Send out the command in chunks
+	WHILE (LEN(BatchCommand$))
+	{
+		Loading = ON;
+		SocketBusy = ON;
+		BatchRequest = ON;
+
+		IF (LEN(BatchCommand$)>250)
+		{
+			// Send to socket in chunks
+			SocketSend(XBMC, REMOVEBYLENGTH(250, BatchCommand$));
+		}
+		ELSE
+		{
+			// send last chunk
+			SocketSend(XBMC, BatchCommand$);
+			BatchCommand$ = "";
 		}
 	}
 
-	SendJsonCommand(REQUESTID_PLAYLIST_CLEAR, "Playlist.Clear","{\x22playlistid\x22:1}");
-    WaitforSocketToClear();
-	SendJsonCommand(REQUESTID_PLAYLIST_ADD, "Playlist.Add", Parameter$);
-    WaitforSocketToClear();
-    MAKESTRING(Parameter$, "{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d%s"
-												, XBMC_ACTIVEPLAYER_VIDEO, 0,"\x7D\x7D" // MC3 bug fix
-								);
-
-	SendJsonCommand(REQUESTID_PLAYLIST_PLAY, "Player.Open", Parameter$);
 
     // Wait 3 seconds before requesting metadata
 	WAIT(300)
@@ -2464,9 +2642,9 @@ PUSH List_Movies
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
-	List_Total = NumberOfMovies;
+	List_Total = CurrentMovieNumber;
     
-	IF (NumberOfMovies)                            
+	IF (CurrentMovieNumber)                            
 		CALL RepopulateOutputList(0);
     ELSE		
 		CALL RepopulateMediaList();
@@ -2486,9 +2664,9 @@ PUSH List_TvShows
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
-	List_Total = NumberOfTvShows;
+	List_Total = CurrentTvShowNumber;
 
-	IF (NumberOfTvShows)                            
+	IF (CurrentTvShowNumber)                            
 		CALL RepopulateOutputList(0);
     ELSE		
 		CALL RepopulateMediaList();
@@ -2505,10 +2683,10 @@ PUSH List_Albums
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
-	List_Total = NumberOfAlbums;
+	List_Total = CurrentAlbumNumber;
 	ArtistID = 0;
     
-	IF (NumberOfAlbums)
+	IF (CurrentAlbumNumber)
 		CALL RepopulateOutputList(0);
     ELSE		
 		CALL RepopulateMediaList();
@@ -2525,10 +2703,10 @@ PUSH List_Artists
 	List_Summary$ = "";
 
 	List_PageNumber = 0;
-	List_Total = NumberOfArtists;
+	List_Total = CurrentArtistNumber;
 	AlbumID = 0;
     
-	IF (NumberOfArtists)
+	IF (CurrentArtistNumber)
 		CALL RepopulateOutputList(0);
     ELSE		
 		CALL RepopulateMediaList();
@@ -2571,13 +2749,15 @@ CHANGE SearchCriteria$
 	IF (LEN(SearchCriteria$))
 	{
 		Search$ = RemoveByLength(LEN(SearchCriteria$),SearchCriteria$);
-		PRINT("Search: %s (length:%d)", Search$, LEN(Search$));
+		#IF_DEFINED DEBUG
+			PRINT("Search: %s (length:%d)", Search$, LEN(Search$));
+		#ENDIF
 
 		SWITCH (List_CurrentScreen)
 		{
 			CASE (MOVIE_TITLE_LIST) : 
 			{ 
-				IF (NumberOfMovies)
+				IF (CurrentMovieNumber)
 				{
 					FOR (i = 1 TO NumberOfMovies)
 					{
@@ -2591,7 +2771,7 @@ CHANGE SearchCriteria$
 			}
 			CASE (TV_SHOW_LIST)		: 
 			{ 
-				IF (NumberOfTvShows)
+				IF (CurrentTvShowNumber)
 				{
 					FOR (i = 1 TO NumberOfTvShows)
 					{
@@ -2611,7 +2791,7 @@ CHANGE SearchCriteria$
 			}
 			CASE (MUSIC_ARTIST_LIST)  : 
 			{
-				IF (NumberOfArtists)
+				IF (CurrentArtistNumber)
 				{
 					FOR (i = 1 TO NumberOfArtists)
 					{
@@ -2629,7 +2809,7 @@ CHANGE SearchCriteria$
 			}
 			CASE (MUSIC_ALBUM_LIST)  : 
 			{
-				IF (NumberOfAlbums)
+				IF (CurrentAlbumNumber)
 				{
 					FOR (i = 1 TO NumberOfAlbums)
 					{						

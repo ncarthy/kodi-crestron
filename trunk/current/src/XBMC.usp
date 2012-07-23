@@ -203,7 +203,8 @@ STRING ResultValue$[21][2000];
 INTEGER NameValueCount;
 
 INTEGER PlayingOnExternalPlayer;	// =1 when video is playing on an external player (e.g. mpc-hc), 0 otherwise
-INTEGER Paused; 
+INTEGER Paused;
+
 
 /*
   	Set the video outputs to appropiate state depending on current status
@@ -1464,12 +1465,12 @@ PUSH Get_Time
 push UpdateMovies
 {
 	CALL SendJsonCommand (REQUESTID_VIDEOLIBRARY_SCAN, 
-								"VideoLibrary.ScanForContent", "");
+								"VideoLibrary.Scan", "");
 }  
 push UpdateMusic
 {
     CALL SendJsonCommand (REQUESTID_AUDIOLIBRARY_SCAN, 
-								"AudioLibrary.ScanForContent", "");
+								"AudioLibrary.Scan", "");
 
 } 
 push IsPlayingOnExternalPlayer
