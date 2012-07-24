@@ -1,7 +1,7 @@
 #summary Full instructions to get this project working on your system.
 
 = Preliminaries =
-  * Download and install the most recent version of Xbmc. Use the appropriate version from http://mirrors.xbmc.org/nightlies/ 
+  * Download and install the most recent version of Xbmc. Use the appropriate version from http://www.xbmc.org/download/ 
   * LoadMediaOntoXbmc
   * Switch on Xbmc HTTP server and event server:
     * From the Xbmc main menu navigate to System > Network
