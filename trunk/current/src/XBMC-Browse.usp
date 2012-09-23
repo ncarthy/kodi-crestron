@@ -2180,9 +2180,10 @@ FUNCTION CreatePlaylistOnXbmc()
     
 	// Add the 'Playlist.Clear' command to the batch
 	MAKESTRING (Command$, 
-			"[{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d}},"
+			"[{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d%s,"
 			,REQUESTID_PLAYLIST_CLEAR ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Clear\x22"
-			, XBMC_ACTIVEPLAYER_AUDIO);
+			, XBMC_ACTIVEPLAYER_AUDIO, "\x7D\x7D"); //23-09-12 Added MC3 bug fix
+
 	SETSTRING(Command$, 1, JSONCommand$);
 	CombinedLengthOfCommands = LEN(Command$);
 
@@ -2190,9 +2191,10 @@ FUNCTION CreatePlaylistOnXbmc()
 	FOR (i = 0 TO NumberOfItems-1)
 	{
 		MAKESTRING (Command$, 
-			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d,\x22item\x22:{\x22songid\x22:%d}}}"
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d,\x22item\x22:{\x22songid\x22:%d%s"
 			,100+i ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Add\x22"
-			, XBMC_ACTIVEPLAYER_AUDIO, PlaylistIDs[i+1]);
+			, XBMC_ACTIVEPLAYER_AUDIO, PlaylistIDs[i+1], "\x7D\x7D\x7D"); //23-09-12 Added MC3 bug fix
+
 		       
 		// Add individual command to larger batch command string
 		SETSTRING(Command$, CombinedLengthOfCommands+1, JSONCommand$);		
@@ -2210,9 +2212,9 @@ FUNCTION CreatePlaylistOnXbmc()
 
 	// Add the 'Play' command to the batch
 	MAKESTRING (Command$, 
-			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d}}}"
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d%s"
 			,REQUESTID_PLAYLIST_PLAY ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Player.Open\x22"
-			, XBMC_ACTIVEPLAYER_AUDIO, ItemNumberZeroBased);
+			, XBMC_ACTIVEPLAYER_AUDIO, ItemNumberZeroBased, "\x7D\x7D\x7D"); //23-09-12 Added MC3 bug fix
   	SETSTRING(Command$, CombinedLengthOfCommands+1, JSONCommand$);		
 	CombinedLengthOfCommands = CombinedLengthOfCommands + LEN(Command$);
 
@@ -2278,32 +2280,32 @@ FUNCTION Play()
 
 	// Add the 'Playlist.Clear' command to the batch: Clear any existing tracks.
 	MAKESTRING (Command$, 
-			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d}},"
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d%s,"
 			,REQUESTID_PLAYLIST_CLEAR ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Clear\x22"
-			, XBMC_ACTIVEPLAYER_AUDIO);
+			, XBMC_ACTIVEPLAYER_AUDIO, "\x7D\x7D"); //23-09-12 Added MC3 bug fix
 	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
 	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
 	MAKESTRING (Command$, 
-			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d}},"
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d%s,"
 			,REQUESTID_PLAYLIST_CLEAR+50 ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Clear\x22"
-			, XBMC_ACTIVEPLAYER_VIDEO);
+			, XBMC_ACTIVEPLAYER_VIDEO, "\x7D\x7D"); //23-09-12 Added MC3 bug fix
 	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
 	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
 
 
 	// Add the 'Playlist.Add' command to the batch: This adds the id of the movie/episode/song to the playlist
 	MAKESTRING (Command$, 
-			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d,\x22item\x22:{\x22%s\x22:%d}}},"
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22playlistid\x22:%d,\x22item\x22:{\x22%s\x22:%d%s,"
 			,REQUESTID_PLAYLIST_ADD ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Playlist.Add\x22"
-			, PlayerID, ItemType$, List_IDs[SelectedItem]);
+			, PlayerID, ItemType$, List_IDs[SelectedItem], "\x7D\x7D\x7D"); //23-09-12 Added MC3 bug fix
 	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
 	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
 
 	// Add the 'Playlist.Open' command to the batch
 	MAKESTRING (Command$, 
-			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d}}}"
+			"{\x22id\x22:%d,%s,%s,\x22params\x22:{\x22item\x22:{\x22playlistid\x22:%d,\x22position\x22:%d%s"
 			,REQUESTID_PLAYLIST_PLAY ,"\x22jsonrpc\x22:\x222.0\x22", "\x22method\x22:\x22Player.Open\x22"
-			, PlayerID, 0);
+			, PlayerID, 0, "\x7D\x7D\x7D"); //23-09-12 Added MC3 bug fix
 	SETSTRING(Command$, CombinedLengthOfCommands+1, BatchCommand$);
 	CombinedLengthOfCommands = CombinedLengthOfCommands+LEN(Command$);
 
