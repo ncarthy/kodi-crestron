@@ -1,7 +1,17 @@
 #summary quick tips if it isn't working for you
 
+=== Missing Thumbnails ===
+
+The problem is usually the port number...
+
+The JPGs are supplied by the Xbmc webserver directly, either port 8080 or port 80. The Eden version of xbmc uses port 80 but in the past it used 8080.
+
+You can check the JPG port number in the Xbmc Network settings page. (See attached image)
+
+In Crestron SIMPL project locate the XBMC V2 module in the project. In the detail view, at the bottom of this module you will see 9 parameters. Set the httpport to whatever port is on your Xbmc network setting page.
+
+http://www.neilcarthy.com/img/NetworkPort.png
+
 === Missing Details of Movies / TV Episodes ===
 
-In order to view details of movies and TV show episodes I make use of 2 JSON methods (`GetMovieDetails` and `GetEpisodeDetails`) that were not part of the Dharma release of xbmc. They are in the latest xbmc source code which is now hosted at https://github.com/xbmc/xbmc.
-
-These methods will be part of the upcoming Eden release.
+In order to view details of movies and TV show episodes I make use of 2 JSON methods (`GetMovieDetails` and `GetEpisodeDetails`) that were not part of the Dharma release of xbmc but they are in Eden. Always use the latest stable version of Xbmc from xbmc.org/download/
