@@ -15,3 +15,12 @@ http://www.neilcarthy.com/img/NetworkPort.png
 === Missing Details of Movies / TV Episodes ===
 
 In order to view details of movies and TV show episodes I make use of 2 JSON methods (`GetMovieDetails` and `GetEpisodeDetails`) that were not part of the Dharma release of xbmc but they are in Eden. Always use the latest stable version of Xbmc from xbmc.org/download/
+
+
+=== Problems compiling Xbmc-Browse.usp ===
+
+If you have problems compiling any of the modules for the MC3 then try:
+
+  * Use "Recompile All" in the Build Menu. 
+  * Try opening the Common_Functions.usl file in SIMPL+. 
+  * On Windows 7 you have to run SIMPL+ as an administrator.
