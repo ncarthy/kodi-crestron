@@ -36,3 +36,4 @@ What follows are instructions for getting the demo XPanel project working.
   * Ensure you have [LoadMediaOntoXbmc correctly loaded your media libraries] onto the Xbmc application
   * Use the Eden (v11.0) release of xbmc and the latest version of this project
   * For debug output uncomment the debug constant at the top of the SIMPL+ files. This greatly increases debug output to the Toolbox debugger
+  * More tips at [Troubleshooting]
