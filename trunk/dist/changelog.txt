@@ -1,5 +1,8 @@
 xbmc-crestron history
 
+0.7 07-Nov-2012
+* Populate bitrate and codec fields
+
 0.6 23-Jul-2012
 * Provide "Loading" feedback in the form of a scrollbar
 * Bug Fix: Names of TV Shows were not showing up.
