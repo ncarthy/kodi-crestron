@@ -1,5 +1,8 @@
 xbmc-crestron history
 
+0.7.1 07-Nov-2012
+* Small changes to make XBMC V2.umc to SB module
+
 0.7 07-Nov-2012
 * Populate bitrate and codec fields
 
