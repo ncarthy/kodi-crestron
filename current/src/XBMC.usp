@@ -109,6 +109,7 @@ STRING_OUTPUT 	_SKIP_,
 				NextTrackNumber$,				// Metadata about next item on playlist
 				PlayStatus$,					// 'Stopped', 'Playing', 'Paused'
 				PlayingSpeed$,                  // Speed of current audio/video playback (1x, 2x, 4x etc.)  
+				NumberAudioChannels$,			// number of channels in audio stream
 				_SKIP_,							
 				IPAddress$,						// This is passed to XBMC-ES module (EventServer module)
 				_SKIP_,
@@ -500,7 +501,48 @@ FUNCTION GetActivePlayersFromResponse()
 	}
 }
 
-      
+/*
+	Xbmc sends audio stream information in the format: 
+		"bitrate":839696,"channels":2,"codec":"FLAC" 
+	or similar.
+*/
+FUNCTION ParseAudioStreamObject(string AudioStreamObject$)
+{
+	INTEGER Index;
+	INTEGER IndexOfComma;
+	INTEGER IndexOfClosingQuotes;
+	STRING Value$[20];
+	
+	Index = FIND("bitrate", AudioStreamObject$);
+	IF (Index > 0)
+	{
+		Index = FIND(":", AudioStreamObject$, Index);
+		IndexOfComma = FIND(",", AudioStreamObject$, Index);
+		Value$ = MID(AudioStreamObject$, Index+1, IndexOfComma- Index -1);
+		MAKESTRING (CurrentAudioBitRate$, "%ldK", AtoL(Value$)/1000);
+	}	
+
+	Index = FIND("codec", AudioStreamObject$);
+	IF (Index > 0)
+	{
+		Index = FIND(":", AudioStreamObject$, Index);
+		Index = FIND("\x22", AudioStreamObject$, Index);
+		IndexOfClosingQuotes = FIND("\x22", AudioStreamObject$, Index+1);
+		Value$ = MID(AudioStreamObject$, Index+1, IndexOfClosingQuotes -Index -1);
+		MAKESTRING (AudioCodec$, "%s", Value$);
+	}
+
+	Index = FIND("channels", AudioStreamObject$);
+	IF (Index > 0)
+	{
+		Index = FIND(":", AudioStreamObject$, Index);
+		IndexOfComma = FIND(",", AudioStreamObject$, Index);
+		Value$ = MID(AudioStreamObject$, Index+1, IndexOfComma- Index -1);
+		MAKESTRING (NumberAudioChannels$, "%s", Value$);
+	}		
+
+}     
+
 /*
      The Xbmc JSON api sends time information in the format:
 		"hours":0, "minutes":53, "seconds": 34, "milliseconds":567
@@ -637,9 +679,6 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 			ELSE IF(ResultName$[i] = "genre") CurrentGenre$ = ResultValue$[i];
 			ELSE IF(ResultName$[i] = "director") CurrentDirector$ = ResultValue$[i];
 			ELSE IF(ResultName$[i] = "year") CurrentYear$ = ResultValue$[i];
-			ELSE IF(ResultName$[i] = "musicplayer.bitrate") CurrentAudioBitRate$ = ResultValue$[i];
-			ELSE IF(ResultName$[i] = "musicplayer.codec") AudioCodec$ = ResultValue$[i];
-			ELSE IF(ResultName$[i] = "videoplayer.videocodec") VideoCodec$ = ResultValue$[i];
 			ELSE IF(ResultName$[i] = "rating") CurrentRating$ = Round(ResultValue$[i],2);		
 	        ELSE IF(ResultName$[i] = "studio") CurrentStudio$ = ResultValue$[i];
 			ELSE IF(ResultName$[i] = "writer") CurrentWriter$ = ResultValue$[i];
@@ -682,6 +721,12 @@ FUNCTION GetMetadataFromList(INTEGER NextInPlaylist)
 				PlaylistPosition = AtoI(ResultValue$[i]);
 	            #IF_DEFINED DEBUG PRINT("PlaylistPosition: %d", PlaylistPosition); #ENDIF
 			}
+			ELSE IF(ResultName$[i] = "currentaudiostream")
+			{
+	            // Expecting result in the form: "bitrate":839696,"channels":2,"codec":"FLAC" or similar
+				ParseAudioStreamObject( ResultValue$[i] );
+			}
+
 		}
 	    
 		// Only update the String_output if the coverart has actually changed
@@ -1245,28 +1290,6 @@ FUNCTION ParseJSONResult(INTEGER id, STRING Result$)
 	{
 		CALL GetMetadataFromResponse(Result$);
 	}
-/*	ELSE IF (id = REQUESTID_GETTIME_SECONDS)
-	{
-		#IF_DEFINED DEBUG 	
-			PRINT ("Result(REQUESTID_GETTIME_SECONDS): %s", Result$);
-	    #ENDIF
-		
-		CALL ParseObject(Result$);
-
-		//Update the duration and time of the current track
-		CALL GetMetadataFromList(0);
-	}
-	ELSE IF (id = REQUESTID_GETTIME_PERCENTAGE)
-	{
-		#IF_DEFINED DEBUG 	
-			PRINT ("Result(REQUESTID_GETTIME_PERCENTAGE): %s", Result$);
-	    #ENDIF
-
-		// XBMC does not return JSON in this case
-		CurrentPercentage$ = Round(Result$,0)+"%";
-		Progress_Percentage = AtoI(Round(Result$,0));
-		Progress_Bar		= (65535/100) * Progress_Percentage;
-	}*/
 	ELSE IF (ID >= REQUESTID_MOVIELIBRARY_GETMOVIES
 				&& ID <= REQUESTID_PLAYLIST_PLAYALLLIST)
     {

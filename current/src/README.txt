@@ -1,8 +1,9 @@
-This VT Pro-e project requires at least version 4.2 of Crestron Visiontools Pro-e
+1. A note about thumbnails:
+XBMC stores image files (thumbnails, fanart etc.) with a .tbn extension. Xpanel and TPS-6X touchpanels do not recognise these files as image files. 
 
-A note about thumbnails:
-XBMC stores image files (thumbnails, fanart etc.) with a .tbn extension. Xpanel and TPS-6X touchpanels do not recognise these files as image files. The solution to this problem that I employed was to make a copy of the thumbnail file and save the new version with the extension .jpg. I then set the "UseJpgExtension" parameter on XBMC.umc to "1d".
+The solution to this problem was to append "?image.jpg" to the end of the image urls. This is not required for Android/iPad/iPhone but it doesn't affect their operation either. 
 
-I wrote a simple .NET console program that did the copying. A version can be found in the utils directory. Run it from a Cmd.exe window. It requires .NET 2.0 
+When the 'UseJpgExtension' parameter on XBMC v2.umc is set to "1d" then the "?image.jpg" string is appended. Otherwise not/
 
-You no longer need to use the latest nightly version of XBMC for best results: The Eden release has all the functionality needed.
+2. General Advice
+Use the Eden release of XBMC for best results.
