@@ -11,3 +11,5 @@ This code can be used in SystemBuilder, simply follow the steps below. The the m
   * Copy all the .usl .usp & .ush files into "User SIMPL+ Path" directory.
   * Copy XBMC V2.umc into the "User Module Path" directory. 
   * Open SB. Go to the Programming View, look in the User Logic Modules section of the Library pane.
+
+From http://tech.groups.yahoo.com/group/Crestron/message/127557
