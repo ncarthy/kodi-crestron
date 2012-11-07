@@ -296,6 +296,7 @@ FUNCTION GenerateHeader(INTEGER PacketType)
 FUNCTION Send(INTEGER PacketType)
 {
 	STRING Packet$[MAX_PACKET_SIZE];
+	SIGNED_INTEGER Return_Value;
 
     CALL GenerateHeader(PacketType);
     
@@ -304,10 +305,16 @@ FUNCTION Send(INTEGER PacketType)
 	ELSE
 		MAKESTRING(Packet$, "%s%s", Header$, LEFT(Payload$, PayloadLength));
 
-	IF (SOCKETSEND(EventServerUdp, Packet$) < 0)
+	Return_Value = SOCKETSEND(EventServerUdp, Packet$);
+	IF (Return_Value < 0)
 	{
-		PRINT ("Connect: %d", Connect);
-        PRINT ("IP address: %s", XBMC_IPAddr$);
+		IF (Connect = 0)
+			PRINT ("Not connected to Xbmc at %s. Socket Error number is %d", XBMC_IPAddr$, Return_Value);
+		ELSE
+		{
+			PRINT ("Connect: %d", Connect);
+			PRINT ("IP Address of Xbmc is %s. Socket Error number is %d", XBMC_IPAddr$, Return_Value);
+		}
 	}
 
 }
