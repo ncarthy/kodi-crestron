@@ -19,8 +19,8 @@ In order to view details of movies and TV show episodes I make use of 2 JSON met
 
 === Problems compiling Xbmc-Browse.usp ===
 
-If you have problems compiling any of the modules for the MC3 then try:
+If you have problems compiling any of the modules for the MC3 like "Getting Compile Error "Could Not Add (file name).lpz" then try these steps:
 
-  * Use "Recompile All" in the Build Menu. 
-  * Try opening the Common_Functions.usl file in SIMPL+. 
-  * On Windows 7 you have to run SIMPL+ as an administrator.
+  * Use "Recompile All" in the Build Menu, not F12. 
+  * Try opening the Common_Functions.usl file in SIMPL+ and compiling that first. 
+  * On Windows 7 I always run SIMPL+ as an administrator. (Right-click the icon and select "Run as administrator".
