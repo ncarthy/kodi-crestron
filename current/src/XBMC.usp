@@ -183,17 +183,6 @@ STRING CoverArtInternal$[512];					   	// Uri of coverart thumb. Stored internal
 												   	// is easily overloaded by dynamic graphic calls.
 INTEGER PlaylistPosition;						   	// The (zero-based) number of the track in the current playlist
 INTEGER ActivePlayer;							   	// 1 = audio, 2 = slideshow, 4 = video
-INTEGER List_PageNumber;						   	// The (zero-based) current page number of the list;
-INTEGER List_Total;								   	// The total number of items in the current browse list
-STRING List_Filename$[10][1024];				   	// The filenames of all the items in the current list
-INTEGER List_IDs[10];							   	// The ids of the items in the browse list
-INTEGER SeasonNumber[10];						   	// The number of the TV show seasons listed
-INTEGER OldShowListPage,OldSeasonListPage,OldArtistListPage,OldAlbumListPage;
-INTEGER TvShowID, TvShowSeasonID, TvShowEpisodeID, AlbumID, ArtistID;
-INTEGER PlaylistIDs[100];						   	// The songids/movieids etc. of the current playlist
-STRING List_Plot$[10][1024];						// An internal store of the Plot (which is a long string)
-												   	// done this way to circumvent limitation on length of
-												   	// indirect text to VT-Pro-e programs
 INTEGER TCPBlocker;									// Semaphore for incomplete JSON packets. A packet is not complete
 													// until we receive the '\n' delimiter.
 SIGNED_INTEGER PlaySpeed;							// Speed of current audio/video playback (1x, 2x, 4x etc.)
@@ -205,7 +194,6 @@ INTEGER NameValueCount;
 
 INTEGER PlayingOnExternalPlayer;	// =1 when video is playing on an external player (e.g. mpc-hc), 0 otherwise
 INTEGER Paused;
-
 
 /*
   	Set the video outputs to appropiate state depending on current status
@@ -1572,8 +1560,6 @@ Function Main()
 	// This line must be before WaitForInitializationComplete()
 	// This IP address is passed to XBMC-ES.usp via this output
 	IPAddress$ = XBMC_IPAddr$;
-
-	List_PageNumber = 0;
 
 	WaitForInitializationComplete();
      
