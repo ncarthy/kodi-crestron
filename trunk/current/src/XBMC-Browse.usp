@@ -268,7 +268,6 @@ SIGNED_INTEGER ConnectionStatus;	// Status of XBMC socket, used to determine if
 INTEGER List_PageNumber;			// The (zero-based) current page number of the list;
 INTEGER List_Total;					// The total number of items in the current browse list
 INTEGER List_IDs[10];				// The ids of the items in the browse list
-INTEGER SeasonNumber[50];			// The number of the TV show seasons listed
 INTEGER OldShowListPage,OldSeasonListPage,OldArtistListPage,OldAlbumListPage;
 INTEGER TvShowID, TvShowSeasonID, TvShowEpisodeID, AlbumID, ArtistID;
 INTEGER PlaylistIDs[100];			// The songids/movieids etc. of the current playlist
