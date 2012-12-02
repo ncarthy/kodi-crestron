@@ -1,0 +1,6 @@
+Developers:
+Neil <arduino@scpgwiki.com> (SIMPL+ module, maintainer)
+Andrew <thedroid@gmail.com> (SIMPL module, program and VT Pro-e project)
+Chris <chrisx29a@gmail.com> (HTTP basic authentication)
+
+
