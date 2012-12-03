@@ -1,0 +1,899 @@
+/*******************************************************************************************
+  SIMPL+ Module Information
+  (Fill in comments below)
+*******************************************************************************************/
+/*
+Dealer Name:
+System Name: XBMC
+System Number: 1.2
+Programmer: Neil Carthy (arduino@scpgwiki.com)
+Comments:                                             
+    
+	***** License *****
+
+	This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+	***** ******* *****
+
+*/
+
+#SYMBOL_NAME "XBMCMain"
+#CATEGORY "41" // Remote System Interface
+#HINT "Use the XBMC JSON-RPC interface to Browse/Control XBMC."  
+
+
+/////////////////////Compiler Directives
+#PRINT_TO_TRACE
+#ENABLE_DYNAMIC
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+#OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
+
+/* Request IDs for different JSON-RPC commands are defined in Common_Functions.usl*/
+/* Response Types for different JSON-RPC commands are defined in Common_Functions.usl*/  
+
+/*****    DEFINE NEW CONSTANTS    *******/
+#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+#DEFINE_CONSTANT MAX_FILENAME_LENGTH 200 
+#DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
+#DEFINE_CONSTANT BUFFER_SIZE 40000		// Socket buffer size
+#DEFINE_CONSTANT STORED_STRING_SIZE 10  // Size of each string in the temporary string store
+#DEFINE_CONSTANT STORED_STRING_RET_SIZE 5000 // The maximum size of strings that can be outputted from the store
+
+                                                      
+/* Types of List */ 
+#DEFINE_CONSTANT MOVIE_TITLE_LIST					 1
+#DEFINE_CONSTANT TV_SHOW_LIST                        2 
+#DEFINE_CONSTANT TV_SEASON_LIST                      3 
+#DEFINE_CONSTANT TV_EPISODE_LIST                     4
+#DEFINE_CONSTANT MUSIC_ARTIST_LIST                   5
+#DEFINE_CONSTANT MUSIC_ALBUM_LIST                    6
+#DEFINE_CONSTANT MUSIC_SONG_LIST                     7  
+#DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums                                                        
+
+#DEFINE_CONSTANT SPECIAL_SEASON						 65535
+
+/*******************************************************************************************
+  DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
+  (Uncomment and declare inputs and outputs as needed)
+*******************************************************************************************/
+DIGITAL_OUTPUT  IsConnected;
+DIGITAL_OUTPUT Loading; // HIGH when a JSON reply is being received;
+
+DIGITAL_OUTPUT _SKIP_, Watched[10];		// HIGH when item has already been watched.
+
+STRING_OUTPUT   _SKIP_,
+                PlotSelected$,					// The plot of the selected movie or TV showList_Summary$
+				_SKIP_,
+				Name$[10],
+				Year$[10],
+				Genre$[10],
+				Rating$[10],
+				Runtime$[10],
+				Director$[10],
+				Tagline$[10],
+				Thumb$[10],
+				Writer$[10],
+				EpisodeOrTrackNum$[10],
+				SeasonOrAlbumName$[10],
+				Studio$[10],
+				MPAA$[10],
+				SeriesOrArtistName$[10],
+				Fanart$[10],
+				Filename$[10];
+
+DIGITAL_INPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_;
+DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
+
+#IF_DEFINED DEBUG
+DIGITAL_INPUT RunAllTests;
+ANALOG_INPUT UnitTestNumber#;
+#ENDIF
+
+
+///////////////////////////// Parameters
+STRING_PARAMETER XBMC_IPAddr$[16];   //the ip of the XBMC server.
+STRING_PARAMETER XBMC_HttpPort$[5];	 //the port that the XBMC server lives on
+INTEGER_PARAMETER StepAmount;		 // Only return this many results from database at a time
+INTEGER_PARAMETER UseJpgExtension;	 // Use '.jpg' as thumbnail extension instead of '.tbn'
+STRING_PARAMETER LOGIN[30];			 // Username for http server (used to downlaod thumbnails) 
+STRING_PARAMETER PASSWORD[30];		 // Password for http server (used to downlaod thumbnails)
+STRING_PARAMETER XBMC_TcpPort$[5];	 //the port that the XBMC server lives on
+
+
+/*******************************************************************************************
+  Parameter Properties
+  (Uncomment and declare parameter properties as needed)
+*******************************************************************************************/
+#BEGIN_PARAMETER_PROPERTIES XBMC_IPAddr$ 
+    propDefaultValue = "";  
+    propShortDescription = "The IP Address of the XBMC HTTP server.";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES XBMC_HttpPort$
+   propDefaultValue = "";   
+   propShortDescription = "The port that the XBMC HTTP server is listening on. (NOT the tcp server)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES StepAmount
+	propValidUnits = unitDecimal;
+    propDefaultUnit = unitDecimal;
+    propDefaultValue = 10d;
+    propShortDescription = "Only return this many results from database at a time.";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES UseJpgExtension
+	propValidUnits = unitDecimal;
+    propDefaultUnit = unitDecimal;
+    propDefaultValue = 0d;
+    propShortDescription = "Use jpg as thumbnail extension instead of tbn";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES LOGIN
+   propDefaultValue = "xbmc";   
+   propShortDescription = "Login for HTTP Basic Authentication. Set 0d if no login. Max 30 chars.";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES PASSWORD
+   propDefaultValue = "xbmc";   
+   propShortDescription = "Password for HTTP Basic Authentication. Set 0d if no password. Max 30 chars.";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES XBMC_TcpPort$
+   propDefaultValue = "";   
+   propShortDescription = "The port that the XBMC JSON TCP server is listening on. (NOT the httpp server) (usu 9090)";
+#END_PARAMETER_PROPERTIES
+
+/*******************************************************************************************
+  SOCKETS
+*******************************************************************************************/
+TCP_CLIENT XBMC[BUFFER_SIZE];			// Socket for connecting to XBMC on TCP port 9090
+   
+/*******************************************************************************************
+  STRUCTURES
+*******************************************************************************************/
+STRUCTURE 	ListItem //Generic list item
+{
+	INTEGER id;
+	STRING  label[MAX_SERIAL_STRING_LENGTH];
+	STRING  genre[90];
+	STRING 	thumbnail[MAX_FILENAME_LENGTH];
+	STRING  year[10];
+	INTEGER Playcount;
+	INTEGER season;
+	INTEGER episode;
+};
+STRUCTURE 	MovieListItem 
+{
+	INTEGER id;
+	STRING  label[MAX_SERIAL_STRING_LENGTH];
+	STRING  genre[90];
+	STRING 	thumbnail[MAX_FILENAME_LENGTH];
+	STRING  year[10];
+	INTEGER Playcount;
+	INTEGER Set;	// =1 means part of a Movie Set
+};
+STRUCTURE 	AlbumListItem
+{
+	INTEGER id;
+	STRING  label[MAX_SERIAL_STRING_LENGTH];
+	STRING  genre[50];
+	STRING  artist[50];
+	STRING 	thumbnail[MAX_FILENAME_LENGTH];
+	STRING  year[10];
+	INTEGER Playcount;
+};
+STRUCTURE 	SongListItem
+{
+	INTEGER id;
+	STRING  label[MAX_SERIAL_STRING_LENGTH];
+	STRING  genre[50];
+	STRING  album[50];
+	STRING 	thumbnail[MAX_FILENAME_LENGTH];
+	STRING  duration[10];
+	STRING  trackno[6];
+};
+STRUCTURE 	Limits
+{
+	INTEGER start;
+	INTEGER end;
+	INTEGER total;
+};
+STRUCTURE 	StoredStringPosition
+{
+	// These are both zero-based even though strings are 1-based
+	INTEGER listIndex; //The number of the current array
+	INTEGER arrayPosition; //The position we have got to in the current array
+};
+
+
+   
+/*******************************************************************************************
+  GLOBAL VARIABLES
+*******************************************************************************************/
+SIGNED_INTEGER ConnectionStatus;	// Status of XBMC socket, used to determine if 
+									// the Connect event needs to reconnect or do nothing.
+INTEGER SocketLock;					// Locking flag that is set before any socket activity are submitted
+
+
+/*******************************************************************************************
+  "StoredStrings"
+  
+  A temporary storage of json strings received from Xbmc. These stored strings,
+  together with the array of tokens are then used to decode the JSON into useful data.
+  The strings are stored in a 2D array to get around the array size limit of 65535 characters
+*******************************************************************************************/
+     
+DYNAMIC STRING StoredStrings[1][STORED_STRING_SIZE]; 
+StoredStringPosition Store;
+
+// Update the StoredStringPosition structure after a string has
+// been added to the StoredStrings array
+FUNCTION Store_RecalculatePosition(INTEGER value)
+{
+	Store.arrayPosition = Store.arrayPosition + value;
+	if (Store.arrayPosition = STORED_STRING_SIZE)
+	{
+		Store.listIndex = Store.listIndex+1;
+		Store.arrayPosition = 0;
+
+		IF (Store.listIndex > GetNumArrayRows(StoredStrings)) 
+			ResizeArray(StoredStrings,Store.listIndex,STORED_STRING_SIZE);
+	}
+}
+
+FUNCTION Store_Store(STRING stringToAdd$, INTEGER numberOfBytes)
+{
+	INTEGER length;
+	INTEGER spareBytesInCurrentArray;
+	INTEGER lengthToCopy;
+
+	length = numberOfBytes;
+	spareBytesInCurrentArray = STORED_STRING_SIZE - Store.arrayPosition;
+	lengthToCopy = MIN(length, spareBytesInCurrentArray);
+
+	SETSTRING(LEFT(stringToAdd$,lengthToCopy)
+					,Store.arrayPosition+1
+					,StoredStrings[Store.listIndex]); 
+
+	length = length - lengthToCopy;
+	
+	Store_RecalculatePosition(lengthToCopy);
+
+	WHILE (length)
+	{
+		lengthToCopy = MIN(length, STORED_STRING_SIZE);
+
+		SETSTRING(MID(stringToAdd$,numberOfBytes-length+1,lengthToCopy)
+					,1
+					,StoredStrings[Store.listIndex]); 
+
+		length = length - lengthToCopy;
+
+		Store_RecalculatePosition(lengthToCopy);
+	}
+}
+            
+// start cannot be less than 1
+STRING_FUNCTION Store_Retrieve(INTEGER start, INTEGER length)
+{
+	INTEGER numberBytes;
+	STRING s$[STORED_STRING_RET_SIZE];
+	StoredStringPosition pStart;
+	INTEGER remainder;
+	INTEGER lengthToCopy;
+
+	if (start = 0)
+		GenerateUserError("In Store_Retrieve: start cannot be zero");
+
+	start = start-1;
+	numberBytes = length;
+
+	if (start < STORED_STRING_SIZE)
+	{
+	    pStart.listIndex = 0;
+		pStart.arrayPosition = start;
+	}
+	else
+	{
+	   remainder = start MOD STORED_STRING_SIZE;
+	   pStart.listIndex = (start - remainder) / STORED_STRING_SIZE;
+	   pStart.arrayPosition = remainder;
+	}
+		
+	lengthToCopy = MIN(
+					LEN(StoredStrings[pStart.listIndex])-pStart.arrayPosition
+					,length);
+	
+	SETSTRING(MID(StoredStrings[pStart.listIndex], pStart.arrayPosition+1, lengthToCopy)
+				, 1, s$);
+	
+	length = length - lengthToCopy;
+	
+	while (length)
+	{
+		pStart.listIndex = pStart.listIndex+1;
+		lengthToCopy = MIN(length, STORED_STRING_SIZE);
+		SETSTRING(MID(StoredStrings[pStart.listIndex], 1, lengthToCopy)
+					, numberBytes-length+1, s$);
+		length = length - lengthToCopy;
+	}
+
+	return (s$);
+}
+
+/*******************************************************************************************
+  Socket Functions
+*******************************************************************************************/
+/*
+  	Close the connection and wait for status to show 'disconnected'
+*/        
+FUNCTION DisconnectFromXbmc()
+{
+	INTEGER count;
+	count = 0;
+
+	IF ( ConnectionStatus <> 5 )
+	{
+		// close the connection
+	    ConnectionStatus = SocketDisconnectClient (XBMC);
+	
+		// wait for the connection to be established
+		while( ( ConnectionStatus <> 5 ) && ( count < 10 ) )
+		{
+			delay( 20 );
+			count = count + 1;
+		}
+    } 
+
+    IsConnected = OFF;
+}
+
+/*
+  	Establish a connection and wait for status to show 'connected'
+*/
+FUNCTION ConnectToXbmc()
+{
+	INTEGER count;
+	count = 0;
+    
+	IF ( ConnectionStatus <> 2 )
+	{
+
+		// open the connection			// '1' = always attempt to reconnect.
+	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_TcpPort$), 1);
+	
+		// wait for the connection to be established
+		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
+		{
+			delay( 20 );
+			count = count + 1;
+		}
+    } 
+}
+
+/*
+	DELAY until socket is clear
+*/
+Function WaitforSocketToClear()
+{
+	WHILE (Loading)
+	{
+     	delay(1);
+	}
+}
+
+SOCKETSTATUS XBMC 
+{
+	SIGNED_INTEGER Status;
+
+	Status = SocketGetStatus();
+    
+	IF (Status = 2)
+		IsConnected = ON;
+	ELSE
+		IsConnected = OFF;
+}
+
+
+
+/*******************************************************************************************
+  XBMC Response logic
+*******************************************************************************************/
+/*
+  	Return a string containing the xbmc parameter list for the GetMovies browse query
+*/
+STRING_FUNCTION MovieBrowseParameters() 
+{
+	STRING Params$[1024];
+
+	// These labels from examining CFileItemHandler::FillDetails in FileItemHandler.cpp (xbmc src code)	
+	// \x22 is a double-quote (")
+	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
+	MAKESTRING (Params$, 
+		"{\x22properties\x22:[%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22videotitle\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false%s"
+								,"\x22title\x22"
+								,"\x22thumbnail\x22"
+								,"\x22genre\x22"
+								,"\x22year\x22"
+								,"\x22playcount\x22"
+								,"\x22set\x22"
+								,"\x7D\x7D" // MC3 bug fix
+					);
+
+	RETURN (Params$);
+}
+
+/*
+  	Return a string containing the xbmc parameter list for the GetTvShow browse query
+*/
+STRING_FUNCTION TvShowBrowseParameters(STRING SortMethod) 
+{
+	STRING Params$[1024];
+	MAKESTRING (Params$, 
+		"{\x22properties\x22:[%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false%s"
+								,"\x22title\x22"
+								,"\x22thumbnail\x22"
+								,"\x22genre\x22"
+								,"\x22year\x22"
+								,"\x22playcount\x22"
+								,SortMethod
+								,"\x7D\x7D" // MC3 bug fix
+					);
+
+	RETURN (Params$);
+}
+
+/*
+  	Return a string containing the xbmc parameter list for showing details of a movie
+*/
+STRING_FUNCTION MovieDetailsParameters(INTEGER movieid) 
+{
+	STRING Params$[1024];
+     
+	// These labels from examining CFileItemHandler::FillDetails in FileItemHandler.cpp (xbmc src code)
+	MAKESTRING (Params$, 
+	"{\x22movieid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]%s"
+								,movieid
+								,"\x22title\x22"
+								,"\x22thumbnail\x22"
+								,"\x22director\x22"
+								,"\x22tagline\x22"
+								,"\x22genre\x22"
+								,"\x22runtime\x22"
+								,"\x22year\x22"
+								,"\x22rating\x22"
+								,"\x22playcount\x22"
+								,"\x22studio\x22"
+								,"\x22plot\x22"
+								,"\x22lastplayed\x22"
+								,"\x22mpaa\x22"
+								,"\x22file\x22"
+								,"\x7D" // MC3 bug fix
+					);
+	RETURN (Params$);
+}
+
+
+/*
+  	Return a string containing the xbmc parameter list for showing details of a TV Show
+*/
+STRING_FUNCTION TvShowDetailsParameters(INTEGER tvshowid, INTEGER seasonid, STRING SortMethod) 
+{
+	STRING Params$[1024];
+
+	MAKESTRING (Params$, 
+	"{\x22tvshowid\x22:%d,\x22season\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22%s"
+								, tvshowid, seasonid
+								,"\x22title\x22"
+								,"\x22thumbnail\x22"
+								,"\x22showtitle\x22"
+								,"\x22runtime\x22"
+								,"\x22season\x22"
+								,"\x22episode\x22"
+								,"\x22firstaired\x22"
+								,"\x22playcount\x22"
+								,SortMethod
+								,"\x7D\x7D" // MC3 bug fix
+					);
+	RETURN (Params$);
+}
+
+
+/*
+  	Return a string containing the xbmc parameter list for showing details of a single episode of a TV Show
+*/
+STRING_FUNCTION EpisodeDetailsParameters(INTEGER episodeid) 
+{
+	STRING Params$[1024];
+
+	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
+	MAKESTRING (Params$, 
+	"{\x22episodeid\x22:%d,\x22properties\x22:[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]%s"
+								, episodeid
+								,"\x22title\x22"
+								,"\x22thumbnail\x22"
+								,"\x22director\x22"
+								,"\x22showtitle\x22"
+								,"\x22runtime\x22"
+								,"\x22rating\x22"
+								,"\x22writer\x22"
+								,"\x22plot\x22"
+								,"\x22season\x22"
+								,"\x22episode\x22"
+								,"\x22firstaired\x22"
+								,"\x22playcount\x22"
+								,"\x7D" // MC3 bug fix
+					);
+
+	#IF_DEFINED DEBUG
+		PRINT("EpisodeDetailsParameters: %s" ,LEFT(Params$,200));
+	#ENDIF
+
+	RETURN (Params$);
+}
+
+/*
+  	Return a string containing the xbmc parameter list for Audio Playlists
+*/
+STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, STRING SortMethod) 
+{
+	STRING Params$[1024];
+
+	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
+	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
+	MAKESTRING (Params$, 
+	"{%s\x22properties\x22:[%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false%s"
+				,AdditionalParameters
+				,"\x22artist\x22"
+				,"\x22thumbnail\x22"
+				,"\x22genre\x22"
+				,"\x22year\x22"
+				,SortMethod
+				,"\x7D\x7D" // MC3 bug fix
+				);
+
+
+	RETURN (Params$);
+}
+
+/*
+  	Return a string containing the xbmc parameter list for Artists
+*/
+STRING_FUNCTION ArtistsParameters(STRING SortMethod) 
+{
+	STRING Params$[1024];
+
+	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
+	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
+	MAKESTRING (Params$, 
+	"{\x22properties\x22:[%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false%s"
+				,"\x22thumbnail\x22"
+				,"\x22genre\x22"
+				,SortMethod
+				,"\x7D\x7D" // MC3 bug fix
+				);
+
+	#IF_DEFINED DEBUG
+		PRINT("ArtistsParameters: %s" ,LEFT(Params$,200));
+	#ENDIF
+
+
+	RETURN (Params$);
+}
+
+
+
+/*
+    Take the uri given by XBMC and add http://, ip_address, port etc.
+	When UseJPG = 1, Use the extension '.jpg' instead of '.tbn'. 
+*/
+STRING_FUNCTION ThumbnailUri(STRING uri$, INTEGER UseJPG)
+{
+	STRING tmpCoverPath[512];
+	IF(LOGIN <> "0d" && PASSWORD <> "0d"){
+		tmpCoverPath = "http://" + LOGIN + ":" + PASSWORD + "@" + XBMC_IPAddr$ + ":"+ XBMC_HttpPort$ + "/";
+	}	
+	ELSE{
+		tmpCoverPath = "http://" + XBMC_IPAddr$ + ":"+ XBMC_HttpPort$ + "/";
+	}
+	IF (UseJPG)
+	{
+		/* 	Hack/workaround for Crestron TP's inability to display .tbn files. 
+			Tested with XPanel and 8x. Mobile Pro/ProG/Android R2 work either way.
+		*/
+		tmpCoverPath = tmpCoverPath + "vfs/" + uri$ + "?image.jpg" ;
+    }
+	ELSE
+		tmpCoverPath = tmpCoverPath + "vfs/" + uri$;
+    RETURN (tmpCoverPath);
+}
+
+
+/*
+	Set the output arrays to a default empty state
+*/
+FUNCTION Initialize_OutputArrays()
+{
+	INTEGER i;
+	FOR (I = 1 TO StepAmount)
+	{
+     	Name$[i] = "";
+		Year$[i] = "";
+		Genre$[i] = "";
+		Rating$[i] = "";
+		Runtime$[i] = "";
+		Director$[i] = "";
+		Tagline$[i] = "";
+		Thumb$[i] = "";
+		Writer$[i] = "";
+		EpisodeOrTrackNum$[i] = "";
+		SeasonOrAlbumName$[i] = "";
+		Studio$[i] = "";
+		MPAA$[i] = "";
+		SeriesOrArtistName$[i] = "";
+		Fanart$[i] = "";
+		Watched[i] = OFF;
+	}
+
+	PlotSelected$ = "";
+}
+
+
+/*
+	Process a string received from the XBMC socket buffer.
+	The string is expected to be in JSON-RPC format.
+*/ 
+FUNCTION ProcessResponse(STRING fromBuffer$)
+{
+	WHILE (LEN(fromBuffer$))
+	{
+		IF (LEN(fromBuffer$)>250)
+		{
+			PRINT("%s" , REMOVEBYLENGTH(250, fromBuffer$));
+		}
+		ELSE
+		{
+			// send last chunk
+			PRINT("%s" , REMOVEBYLENGTH(LEN(fromBuffer$), fromBuffer$));
+		}
+	}
+}
+
+/*
+	Send a string to the XBMC Socket
+
+	No authentication
+*/
+Function SendToSocket(STRING Command$)
+{
+    
+	// don't send anything if the socket isn't open
+	IF (IsConnected = OFF)
+		RETURN;
+
+	// don't send anything if a long running query is already in progress
+	IF (Loading = ON)
+		RETURN;
+                   
+	// If the Socket is busy then set a flag to get control of it
+	WHILE (SocketLock)
+	{
+    	Loading = ON;
+		Delay(1);
+	}
+	// Set the lock before doing anything else
+	SocketLock = ON;
+
+	// Send out the command in chunks
+	WHILE (LEN(Command$))
+	{
+		Loading = ON;
+
+		IF (LEN(Command$)>250)
+		{
+			// Send to soucket in chunks
+			SocketSend(XBMC, REMOVEBYLENGTH(250, Command$));
+		}
+		ELSE
+		{
+			// send last chunk
+			SocketSend(XBMC, Command$);
+			Command$ = "";
+		}
+	}
+	                        
+}
+
+/*
+	Send the JSON-RPC command via the TCP socket
+
+	No authentication
+*/
+Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
+{
+	STRING Command$[2000];
+    
+    IF (LEN(Arguments) = 0)
+	{
+		// \x22 is a double quote (")
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
+			,id ,Method);
+	}
+	ELSE
+	{
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
+			,id ,Method, Arguments);
+	}
+
+	#IF_DEFINED DEBUG
+		PRINT("Xbmc-Browse: SendJsonCommand: %s" ,LEFT(Command$,200));
+	#ENDIF
+                   
+	SendToSocket(Command$);                     
+}
+
+PUSH Connect
+{
+	// connect to XBMC
+	ConnectToXbmc();
+
+}
+RELEASE Connect
+{
+ 	// disconnect from XBMC
+	DisconnectFromXbmc();
+}
+            
+#IF_DEFINED DEBUG
+
+FUNCTION InitStoredStrings()
+{
+	INTEGER i;
+	STRING s1[10];
+	STRING s2[10];
+	STRING s3[10];
+	STRING s4[10];
+
+	FOR (i = 0 TO GetNumArrayRows(StoredStrings))
+	{
+       StoredStrings[i] = "";
+	}
+	Store.listIndex = 0;
+	Store.arrayPosition = 0;
+        //12345678901234567890
+	s1 = "This is a test strin";
+	s2 = "g. A second test str";
+	s3 = "ing. A third test st";
+	s4 = "ring. ";
+
+	Store_Store(s1,LEN(s1));
+	Store_Store(s2,LEN(s2));
+	Store_Store(s3,LEN(s3));
+	Store_Store(s4,LEN(s4));
+   
+	FOR (i = 0 TO GetNumArrayRows(StoredStrings))
+	{
+       PRINT("%s",StoredStrings[i]);
+	}
+
+}
+
+FUNCTION TestString(STRING Expected$, STRING Actual$, INTEGER number)
+{
+	IF (actual$ = expected$)
+	{
+		PRINT("%s%d","Success in Test #", number);
+	}
+	ELSE
+	{
+		PRINT("%s%d","ERROR!! in Test #", number);
+		PRINT("Expected: '%s', Actual: '%s'",
+				 expected$,actual$);
+		PRINT("LEN(Expected): %d, LEN(Actual): %d",
+				 LEN(expected$),LEN(actual$));
+	}	
+}
+
+FUNCTION UnitTest(INTEGER number)
+{
+	STRING actual$[STORED_STRING_RET_SIZE];
+	STRING expected$[STORED_STRING_RET_SIZE];
+
+	CSWITCH (number)
+	{
+		CASE (1):
+		{
+			InitStoredStrings();
+			actual$ = StoredStrings[0];
+			expected$ = "This is a ";
+			TestString(expected$, actual$, number);
+
+			actual$ = StoredStrings[1];
+			expected$ = "test strin";
+			TestString(expected$, actual$, number);	
+
+			actual$ = StoredStrings[2];
+			expected$ = "g. A secon";
+			TestString(expected$, actual$, number);
+
+            actual$ = StoredStrings[3];
+			expected$ = "d test str";
+			TestString(expected$, actual$, number);			
+			
+			BREAK;
+		}
+		CASE (2):
+		{
+			InitStoredStrings();
+			actual$ = Store_Retrieve(1,5);
+			expected$ = "This ";
+            TestString(expected$, actual$, number);
+			BREAK;
+		}
+		CASE (3):
+		{
+			InitStoredStrings();
+			actual$ = Store_Retrieve(24,10);
+			expected$ = "A second t";
+			TestString(expected$, actual$, number);	
+			BREAK;
+		}
+		CASE (4):
+		{
+			InitStoredStrings();
+			actual$ = Store_Retrieve(43,11);
+			expected$ = "g. A third ";
+			TestString(expected$, actual$, number);		
+			BREAK;
+		}
+
+		DEFAULT:
+		{
+			PRINT("%s","Unknown Unit Test.");
+		}
+	}
+
+}         
+
+CHANGE UnitTestNumber#
+{
+	UnitTest(UnitTestNumber#);
+}
+
+PUSH RunAllTests
+{
+	UnitTest(1);
+	UnitTest(2);
+	UnitTest(3);
+	UnitTest(4);
+
+}
+#ENDIF
+
+
+///////////// Initialization script
+Function Main()
+{              
+	STRING Xbmc$[BUFFER_SIZE];
+              
+	WaitForInitializationComplete();
+                         
+    // Eternal loop, waiting for Data from Xbmc 
+	WHILE(1)
+	{
+		// Wait for a minimum of 10 bytes
+		// Can't use a delimiter because with JSON there isn't one.
+  		Xbmc$ = GatherByLength(MAX(10,LEN(XBMC.SocketRxBuf)), XBMC.SocketRxBuf);
+		CALL ProcessResponse(Xbmc$);		
+	} 
+
+}
