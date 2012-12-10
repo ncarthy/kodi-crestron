@@ -327,7 +327,8 @@ INTEGER CurrentAlbumNumber;
 INTEGER CurrentArtistNumber;
 INTEGER CurrentMovieNumber;
 INTEGER CurrentTvShowNumber;
-                              
+                           
+STRING Remainder$[512];   
 
 /*******************************************************************************************
   "StoredStrings"
@@ -581,7 +582,7 @@ SIGNED_INTEGER_FUNCTION Jsmn_Parse_Primitive(STRING js, INTEGER num_bytes, INTEG
     for (i = start to num_bytes)
     {
 		c = byte(js, LowWord(parser.pos - parser.currpos)); //extract a char
-		PRINT("PP char: %c, parser.pos %ld, num_bytes %d, parser.currpos %ld",c, parser.pos, num_bytes, parser.currpos);
+		//PRINT("PP char: %c, parser.pos %ld, num_bytes %d, parser.currpos %ld",c, parser.pos, num_bytes, parser.currpos);
         switch (c)
         {
 
@@ -655,7 +656,7 @@ SIGNED_INTEGER_FUNCTION Jsmn_Parse_String(STRING js, INTEGER num_bytes, INTEGER 
     FOR (i = start TO num_bytes)
     {
         c = byte(js, LowWord(parser.pos - parser.currpos)); //extract a char
-        PRINT("PS char: %c, parser.pos %ld, start %ld, parser.currpos %ld",c, parser.pos, start, parser.currpos);
+        //PRINT("PS char: %c, parser.pos %ld, start %ld, parser.currpos %ld",c, parser.pos, start, parser.currpos);
         /* Quote: end of string */
         IF (c = DBLQUOTE)
         {
@@ -732,7 +733,7 @@ SIGNED_INTEGER_FUNCTION Jsmn_Parse(STRING js, INTEGER num_bytes,
     FOR (i = 1 to num_bytes)
     {
 	    c = byte(js, LowWord(parser.pos - parser.currpos)); //extract a char
-		PRINT("char: %c (%d), parser.pos %ld, num_bytes %d, parser.currpos %ld",c,c, parser.pos, num_bytes, parser.currpos);
+		//PRINT("char: %c (%d), parser.pos %ld, num_bytes %d, parser.currpos %ld",c,c, parser.pos, num_bytes, parser.currpos);
 	    IF (c = '{' || c = '[')
 		{
 			token_num = jsmn_alloc_token(num_tokens);
@@ -947,6 +948,9 @@ FUNCTION Init()
 
 	// Reset token index to 1st token
 	tokenIndex = 0;
+                   
+	// Reset the global variable that stores leftover bytes
+	Remainder$ = "";
 }
 	
 
@@ -1743,7 +1747,7 @@ STRING_FUNCTION ProcessResponse(STRING fromBuffer$, INTEGER numberBytes, INTEGER
 	prevPosition = parser.currpos;
 
 	r = Jsmn_Tokenize(fromBuffer$, numberBytes);
-    PRINT("Response %d, parser.currpos %ld",r, parser.currpos);
+    
 	CSWITCH(r)
 	{
     	CASE(JSMN_SUCCESS):
@@ -2728,36 +2732,58 @@ PUSH RunAllTests
 	PRINT("%s","Unit Tests complete.");
 }
 #ENDIF
+                
+THREADSAFE SOCKETRECEIVE XBMC
+{
+ 	STRING Xbmc$[BUFFER_SIZE];
+	
+	INTEGER length;
+                 
+	length = LEN(XBMC.SocketRxBuf);
 
+	Xbmc$ = XBMC.SocketRxBuf;
+	ClearBuffer(XBMC.SocketRxBuf);
+	
+    // Prefix with any bytes leftover from previous pass
+	IF (LEN(Remainder$))
+		MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
+    PRINT("Xbmc$: %s, length:(%d)",Xbmc$,LEN(Xbmc$));
+
+	// Process the characters
+	Remainder$ = ProcessResponse(Xbmc$, length, 0);		
+
+	PRINT("Remainder$: %s, length:(%d)",Remainder$,LEN(Remainder$));
+
+}
 
 ///////////// Initialization script
 Function Main()
 {              
-	STRING Xbmc$[BUFFER_SIZE];
-	STRING Remainder$[512];
-	INTEGER length;
+	//STRING Xbmc$[BUFFER_SIZE];
+	//STRING Remainder$[512];
+	//INTEGER length;
               
 	WaitForInitializationComplete();
 
-	Remainder$ = "";
+	//Remainder$ = "";
                          
     // Eternal loop, waiting for Data from Xbmc 
-	WHILE(1)
-	{
-		length = MAX(10,LEN(XBMC.SocketRxBuf));
+	//WHILE(1)
+	//{
+	//	length = MAX(10,LEN(XBMC.SocketRxBuf));
 		// Wait for a minimum of 10 bytes
 		// Can't use a delimiter because with JSON there isn't one.
-		Xbmc$ = GatherByLength(length, XBMC.SocketRxBuf);
+	//	Xbmc$ = GatherByLength(length, XBMC.SocketRxBuf);
 	
     	// Prefix with any bytes leftover from previous pass
-		IF (LEN(Remainder$))
-			MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
-        PRINT("Xbmc$: %s, length:(%d)",Xbmc$,LEN(Xbmc$));
+	//	IF (LEN(Remainder$))
+	//		MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
+      //  PRINT("Xbmc$: %s, length:(%d)",Xbmc$,LEN(Xbmc$));
 
 		// Process the characters
-		Remainder$ = ProcessResponse(Xbmc$, length, 0);		
+	//	Remainder$ = ProcessResponse(Xbmc$, length, 0);		
 
-		PRINT("Remainder$: %s, length:(%d)",Remainder$,LEN(Remainder$));
-	} 
+	//	PRINT("Remainder$: %s, length:(%d)",Remainder$,LEN(Remainder$));
+	//} 
 
 }
