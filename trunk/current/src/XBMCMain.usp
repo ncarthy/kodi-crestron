@@ -5,7 +5,7 @@
 /*
 Dealer Name:
 System Name: XBMC
-System Number: 1.2
+System Number: 2.0
 Programmer: Neil Carthy (arduino@scpgwiki.com)
 Comments:                                             
     
@@ -23,6 +23,30 @@ Comments:
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+	***** ******* *****
+
+	***** Jsmn License *****
+
+	Copyright (c) 2010 Serge A. Zaitsev
+	
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+	
+	The above copyright notice and this permission notice shall be included in
+	all copies or substantial portions of the Software.
+	
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+	THE SOFTWARE.
 
 	***** ******* *****
 
@@ -50,7 +74,48 @@ Comments:
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 40000		// Socket buffer size
 #DEFINE_CONSTANT STORED_STRING_SIZE 10  // Size of each string in the temporary string store
-#DEFINE_CONSTANT STORED_STRING_RET_SIZE 5000 // The maximum size of strings that can be outputted from the store
+#DEFINE_CONSTANT STORED_STRING_RET_SIZE 40000 // The maximum size of strings that can be outputted from the store
+
+//Useful characters that we'll need in parsing metadata
+#DEFINE_CONSTANT CR 0x0D		 	// Carriage return
+#DEFINE_CONSTANT LF 0x0A		 	// Linefeed
+#DEFINE_CONSTANT TAB 0x09		 	// Tab
+#DEFINE_CONSTANT SPACE 0x20	   		// Space
+#DEFINE_CONSTANT DBLQUOTE 0x22	   	// "
+#DEFINE_CONSTANT BACKSLASH 0x5C	   	// \
+                          
+// Request IDs
+#DEFINE_CONSTANT REQUESTID_GETACTIVEPLAYERS				1
+#DEFINE_CONSTANT REQUESTID_GETPLAYERPROPERTIES			2
+#DEFINE_CONSTANT REQUESTID_AUDIOPLAYLIST_GETITEMS		3
+#DEFINE_CONSTANT REQUESTID_VIDEOPLAYLIST_GETITEMS		4
+#DEFINE_CONSTANT REQUESTID_GETTIME_SECONDS				5
+#DEFINE_CONSTANT REQUESTID_TIME_PERCENTAGE				6
+#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETMOVIES		20 
+#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS	21
+#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETTVSHOWS		22 
+#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETTVSEASONS	23 
+#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETTVEPISODES	24 
+#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETEPISODEDETS	25 
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTS		26 
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		27 
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		28 
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS 29
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				40 
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					41 
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				42 
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			43  
+#DEFINE_CONSTANT REQUESTID_SKIPNEXT						50
+#DEFINE_CONSTANT REQUESTID_SKIPPREV						51
+#DEFINE_CONSTANT REQUESTID_SMALLSKIPFORWARD				52
+#DEFINE_CONSTANT REQUESTID_SMALLSKIPBACKWARD			53
+#DEFINE_CONSTANT REQUESTID_LARGESKIPFORWARD				54
+#DEFINE_CONSTANT REQUESTID_LARGESKIPBACKWARD			55
+#DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_SCAN			56
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_SCAN			57
+#DEFINE_CONSTANT REQUESTID_SEEKTIME						58
+#DEFINE_CONSTANT REQUESTID_VERSION						99
+#DEFINE_CONSTANT REQUESTID_PING							100
 
                                                       
 /* Types of List */ 
@@ -74,6 +139,8 @@ DIGITAL_OUTPUT Loading; // HIGH when a JSON reply is being received;
 
 DIGITAL_OUTPUT _SKIP_, Watched[10];		// HIGH when item has already been watched.
 
+ANALOG_OUTPUT   _SKIP_,VersionID#;
+
 STRING_OUTPUT   _SKIP_,
                 PlotSelected$,					// The plot of the selected movie or TV showList_Summary$
 				_SKIP_,
@@ -94,8 +161,27 @@ STRING_OUTPUT   _SKIP_,
 				Fanart$[10],
 				Filename$[10];
 
+
+
 DIGITAL_INPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_;
 DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
+
+/* Browse functionality */
+DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,				
+				List_UnWatchedOnly,
+				List_TopPage,
+				List_BottomPage,
+				List_PageMinus,
+				List_PagePlus,
+				List_Back,
+				List_Movies,
+				List_Albums,
+				List_TVShows, 
+				List_Artists,
+				List_Songs,
+				List_Exit_Details_Page,
+				_SKIP_;
+
 
 #IF_DEFINED DEBUG
 DIGITAL_INPUT RunAllTests;
@@ -183,8 +269,8 @@ STRUCTURE 	AlbumListItem
 {
 	INTEGER id;
 	STRING  label[MAX_SERIAL_STRING_LENGTH];
-	STRING  genre[50];
-	STRING  artist[50];
+	STRING  genre[100];
+	STRING  artist[100];
 	STRING 	thumbnail[MAX_FILENAME_LENGTH];
 	STRING  year[10];
 	INTEGER Playcount;
@@ -193,7 +279,7 @@ STRUCTURE 	SongListItem
 {
 	INTEGER id;
 	STRING  label[MAX_SERIAL_STRING_LENGTH];
-	STRING  genre[50];
+	STRING  genre[100];
 	STRING  album[50];
 	STRING 	thumbnail[MAX_FILENAME_LENGTH];
 	STRING  duration[10];
@@ -205,12 +291,7 @@ STRUCTURE 	Limits
 	INTEGER end;
 	INTEGER total;
 };
-STRUCTURE 	StoredStringPosition
-{
-	// These are both zero-based even though strings are 1-based
-	INTEGER listIndex; //The number of the current array
-	INTEGER arrayPosition; //The position we have got to in the current array
-};
+
 
 
    
@@ -220,7 +301,33 @@ STRUCTURE 	StoredStringPosition
 SIGNED_INTEGER ConnectionStatus;	// Status of XBMC socket, used to determine if 
 									// the Connect event needs to reconnect or do nothing.
 INTEGER SocketLock;					// Locking flag that is set before any socket activity are submitted
+INTEGER ReceiveLock;				// Locking flag that is set when processing data from Xbmc
+INTEGER VersionID;					// The JSON-RPC protocol version. 4 for Eden, 6 for Frodo
+INTEGER ActivePlayerID;				// 
 
+// Albums/Movies/Artists etc. are loaded all at the start
+DYNAMIC AlbumListItem Albums[100];
+DYNAMIC ListItem Artists[100];
+DYNAMIC SongListItem Songs[50];
+DYNAMIC MovieListItem Movies[100];
+DYNAMIC ListItem TvShows[50];
+DYNAMIC INTEGER TvShowSeasons[10];
+DYNAMIC ListItem TvShowEpisodes[50];
+DYNAMIC ListItem ArtistAlbums[15];
+                       
+NONVOLATILE INTEGER NumberOfAlbums; // The number of albums in Xbmc library. Max 65535. Will retaint value between sessions
+NONVOLATILE INTEGER NumberOfArtists; // The number of artists in Xbmc library. Max 65535. Will retaint value between sessions
+INTEGER NumberOfSongs;
+NONVOLATILE INTEGER NumberOfMovies; // Will retain value between sessions
+NONVOLATILE INTEGER NumberOfTvShows; // Max 65535. Will retain value between sessions (over loss of hardware power)
+INTEGER NumberOfTvShowSeasons;
+INTEGER NumberOfTvShowEpisodes;
+INTEGER NumberOfArtistAlbums;
+INTEGER CurrentAlbumNumber;
+INTEGER CurrentArtistNumber;
+INTEGER CurrentMovieNumber;
+INTEGER CurrentTvShowNumber;
+                              
 
 /*******************************************************************************************
   "StoredStrings"
@@ -230,6 +337,13 @@ INTEGER SocketLock;					// Locking flag that is set before any socket activity a
   The strings are stored in a 2D array to get around the array size limit of 65535 characters
 *******************************************************************************************/
      
+STRUCTURE 	StoredStringPosition
+{
+	// These are both zero-based even though strings are 1-based
+	INTEGER listIndex; //The number of the current array
+	INTEGER arrayPosition; //The position we have got to in the current array
+};
+
 DYNAMIC STRING StoredStrings[1][STORED_STRING_SIZE]; 
 StoredStringPosition Store;
 
@@ -269,7 +383,7 @@ FUNCTION Store_Store(STRING stringToAdd$, INTEGER numberOfBytes)
 	WHILE (length)
 	{
 		lengthToCopy = MIN(length, STORED_STRING_SIZE);
-
+                                       
 		SETSTRING(MID(stringToAdd$,numberOfBytes-length+1,lengthToCopy)
 					,1
 					,StoredStrings[Store.listIndex]); 
@@ -281,16 +395,19 @@ FUNCTION Store_Store(STRING stringToAdd$, INTEGER numberOfBytes)
 }
             
 // start cannot be less than 1
-STRING_FUNCTION Store_Retrieve(INTEGER start, INTEGER length)
+STRING_FUNCTION Store_RetrieveByLength(LONG_INTEGER start, INTEGER length)
 {
 	INTEGER numberBytes;
 	STRING s$[STORED_STRING_RET_SIZE];
 	StoredStringPosition pStart;
-	INTEGER remainder;
+	LONG_INTEGER remainder;
 	INTEGER lengthToCopy;
 
 	if (start = 0)
+	{
 		GenerateUserError("In Store_Retrieve: start cannot be zero");
+     	RETURN ("");
+	}
 
 	start = start-1;
 	numberBytes = length;
@@ -298,13 +415,13 @@ STRING_FUNCTION Store_Retrieve(INTEGER start, INTEGER length)
 	if (start < STORED_STRING_SIZE)
 	{
 	    pStart.listIndex = 0;
-		pStart.arrayPosition = start;
+		pStart.arrayPosition = LowWord(start);
 	}
 	else
 	{
 	   remainder = start MOD STORED_STRING_SIZE;
 	   pStart.listIndex = (start - remainder) / STORED_STRING_SIZE;
-	   pStart.arrayPosition = remainder;
+	   pStart.arrayPosition = LowWord(remainder);
 	}
 		
 	lengthToCopy = MIN(
@@ -328,9 +445,590 @@ STRING_FUNCTION Store_Retrieve(INTEGER start, INTEGER length)
 	return (s$);
 }
 
+// start cannot be less than 1
+STRING_FUNCTION Store_Retrieve(LONG_INTEGER start, LONG_INTEGER end)
+{
+	RETURN (Store_RetrieveByLength(start,LowWord(end-start)));
+}
+
+
+/*******************************************************************************************
+  	"Jsmn" (http://zserge.com/jsmn.html)
+
+  	jsmn (pronounced like 'jasmine') is a minimalistic JSON parser in C.
+
+	It splits JSON string into tokens. Let's consider a JSON string: 
+			"{ "name" : "Jack", "age" : 27 }"
+	
+	jsmn will split it into the following tokens:
+
+    Object: { "name" : "Jack", "age" : 27} (the whole object)
+    Strings: "name", "Jack", "age" (keys and some values)
+    Number: 27
+
+	The key idea is that jsmn tokens do not hold any data, but just point 
+	to the token boundaries in JSON string instead.
+*******************************************************************************************/
+#DEFINE_CONSTANT JSMN_ERROR_NOMEM			-1 //Not enough tokens were provided
+#DEFINE_CONSTANT JSMN_ERROR_INVAL			-2 //Invalid character inside JSON string. Fatal.
+#DEFINE_CONSTANT JSMN_ERROR_PART			-3 //The string is not a full JSON packet, more bytes expected
+#DEFINE_CONSTANT JSMN_SUCCESS				 0 //Everything was fine
+
+#DEFINE_CONSTANT JSMN_PRIMITIVE			0 //Number, Null or True/False
+#DEFINE_CONSTANT JSMN_OBJECT			1 //An object {...}
+#DEFINE_CONSTANT JSMN_ARRAY				2 //An Array [...]
+#DEFINE_CONSTANT JSMN_STRING			3 //A string "..."
+ 
+INTEGER tokenCount;						// Number of filled tokens
+
+/*
+* JSON parser. Contains an array of token blocks available. Also stores 
+* the string being parsed now and current position in that string
+*/
+STRUCTURE 	JsmnParser
+{
+	LONG_INTEGER pos; // offset in the JSON string.
+	INTEGER toknext; //next token to allocate
+	SIGNED_INTEGER toksuper; //superior token node, e.g parent object or array
+	LONG_INTEGER currpos; //Starting position of smaller string in larger string
+};
+/*
+* Jsmn token. Does not hold any data, but just points
+* to the token boundaries in JSON string instead.
+*/
+STRUCTURE 	JsmnToken
+{
+	INTEGER type; // One of JSMN_PRIMITIVE, JSMN_OBJECT, JSMN_ARRAY, JSMN_STRING
+	LONG_INTEGER start; //start position in JSON data string. 1-based
+	LONG_INTEGER end; //end position in JSON data string
+	INTEGER size; //Number of characters in token
+	SIGNED_INTEGER parent; //Token number of parent
+};
+
+DYNAMIC JsmnToken Tokens[10]; // Array of tokens, initially 10-long
+JsmnParser parser;
+        
+/**
+ * Fills token type and boundaries.
+ */
+FUNCTION Jsmn_Fill_Token(JsmnToken token, INTEGER type,
+                            LONG_INTEGER start, LONG_INTEGER end)
+{
+    token.type = type;
+    token.start = start;
+    token.end = end;
+    token.size = 0;}
+
+/**
+ * Resets the module-level parser to an i	nitialized state.
+ */
+FUNCTION Jsmn_Init()
+{
+    parser.pos = 1;
+    parser.toknext = 0;
+    parser.toksuper = -1;
+    parser.currpos = 0;
+	tokenCount = 0;
+}
+           
+/**
+ * Allocates a fresh unused token from the token pool.
+ */
+SIGNED_INTEGER_FUNCTION Jsmn_Alloc_Token(INTEGER num_tokens)
+{
+    if (parser.toknext >= num_tokens)
+    {
+        return (JSMN_ERROR_NOMEM);
+    }
+
+    tokens[parser.toknext].start = 0;
+	tokens[parser.toknext].end = 0;
+    tokens[parser.toknext].size = 0;
+    tokens[parser.toknext].parent = -1;
+
+	tokenCount = parser.toknext;
+
+	parser.toknext = parser.toknext + 1;
+
+    return (parser.toknext-1);
+}
+
+/*
+*	Return an Error, recording current state.
+*/
+INTEGER_FUNCTION Jsmn_Error(SIGNED_INTEGER r)
+{
+    if (r != JSMN_ERROR_NOMEM)
+        parser.currpos = parser.pos;
+    return (r);
+}
+
+/**
+ * Fills next available token with JSON primitive.
+ */
+SIGNED_INTEGER_FUNCTION Jsmn_Parse_Primitive(STRING js, INTEGER num_bytes, INTEGER num_tokens)
+{
+    JsmnToken token;
+    LONG_INTEGER start;
+	INTEGER i;
+	INTEGER c;
+	SIGNED_INTEGER token_num;
+	INTEGER found;
+                 
+	found =0;
+    start = parser.pos - parser.currpos;
+
+    for (i = start to num_bytes)
+    {
+		c = byte(js, LowWord(parser.pos - parser.currpos)); //extract a char
+		PRINT("PP char: %c, parser.pos %ld, num_bytes %d, parser.currpos %ld",c, parser.pos, num_bytes, parser.currpos);
+        switch (c)
+        {
+
+            case (TAB): {found = 1; break;}
+            case (CR): {found = 1; break;}
+            case (LF): {found = 1; break;}
+            case (SPACE): {found = 1; break;}
+            case (','): {found = 1; break;}
+            case (']'): {found = 1; break;}
+            case ('}'): {found = 1; break;}
+            case ('['):
+                return (JSMN_ERROR_INVAL);
+            case ('{'):
+                return (JSMN_ERROR_INVAL);
+            case (DBLQUOTE):
+				return (JSMN_ERROR_INVAL);			
+			case (c < 32 || c >= 127): 
+				return (JSMN_ERROR_INVAL);					
+        }
+
+		parser.pos = parser.pos +1;
+    }
+         
+	IF (found=0)
+	{
+	    /* In strict mode primitive must be followed by a comma/object/array */
+	    parser.pos = start;
+	    return (JSMN_ERROR_PART);
+	}
+
+    token_num = Jsmn_Alloc_Token(num_tokens);
+	
+    if (token_num < 0)
+    {
+        parser.pos = start;
+        return (JSMN_ERROR_NOMEM);
+    }
+
+    Jsmn_Fill_Token(Tokens[token_num], JSMN_PRIMITIVE, start + parser.currpos, parser.pos);
+
+    Tokens[token_num].parent = parser.toksuper;
+
+    parser.pos = parser.pos - 1;
+    return (JSMN_SUCCESS);
+}
+
+/**
+ * Fills next token with JSON string.
+ */
+SIGNED_INTEGER_FUNCTION Jsmn_Parse_String(STRING js, INTEGER num_bytes, INTEGER num_tokens)
+{
+    INTEGER i;
+    LONG_INTEGER start; 
+	INTEGER c;
+	SIGNED_INTEGER token_num;
+    
+	// Return immediately if there are no characters left in the string
+	IF (parser.pos-parser.currpos = num_bytes)
+	{
+	    parser.pos = parser.pos;
+	    return (JSMN_ERROR_PART);
+	}
+	ELSE
+	{
+		//	Skip starting quote
+        parser.pos = parser.pos + 1; 
+		start = parser.pos - parser.currpos;
+	}
+	
+	// Loop through each byte in the string
+    FOR (i = start TO num_bytes)
+    {
+        c = byte(js, LowWord(parser.pos - parser.currpos)); //extract a char
+        PRINT("PS char: %c, parser.pos %ld, start %ld, parser.currpos %ld",c, parser.pos, start, parser.currpos);
+        /* Quote: end of string */
+        IF (c = DBLQUOTE)
+        {
+            token_num = jsmn_alloc_token(num_tokens);
+            if (token_num < 0)
+            {
+                parser.pos = start-1;
+                return (JSMN_ERROR_NOMEM);
+            }
+			
+			Jsmn_Fill_Token(Tokens[token_num], JSMN_STRING, start + parser.currpos, parser.pos);
+
+            Tokens[token_num].parent = parser.toksuper;
+
+            return (JSMN_SUCCESS);
+        }
+        /* Backslash: Quoted symbol expected */
+        ELSE if (c = BACKSLASH)
+        {
+            /* Must check that this is still within the bounds of the string */
+            parser.pos = parser.pos+1;
+    		IF(parser.pos>num_bytes)
+			{
+			    parser.pos = start;
+			    return (JSMN_ERROR_PART);
+			}
+	
+			// Switch on the next byte
+            switch (byte(js, LowWord(parser.pos - parser.currpos)))
+            {
+                /* Allowed escaped symbols */
+                case (DBLQUOTE): break;
+                case ('/'): break;
+                case (BACKSLASH): break;
+                case ('b'): break;
+                case ('f'): break;
+                case ('r'): break;
+                case ('n'): break;
+                case ('t'): break;
+                /* Allows escaped symbol \uXXXX */
+                case ('u'):
+                    /* TODO */
+                    break;
+                /* Unexpected symbol */
+                default:
+				{
+                    parser.pos = start;
+                    return (JSMN_ERROR_INVAL);
+				}
+            }
+
+			// Increment counter to skip next character
+			i = i +1;
+        }
+
+		parser.pos = parser.pos + 1;		
+    }
+    parser.pos = start-1;
+    return (JSMN_ERROR_PART);
+}
+
+/**
+ * Parse JSON string and fill tokens.
+ */
+SIGNED_INTEGER_FUNCTION Jsmn_Parse(STRING js, INTEGER num_bytes,
+        INTEGER num_tokens)
+{
+    SIGNED_INTEGER r; // response
+    INTEGER i; //loop var
+	INTEGER c; // char
+	INTEGER type; // One of JSMN_PRIMITIVE, JSMN_OBJECT, JSMN_ARRAY, JSMN_STRING
+    SIGNED_INTEGER token_num;
+
+    FOR (i = 1 to num_bytes)
+    {
+	    c = byte(js, LowWord(parser.pos - parser.currpos)); //extract a char
+		PRINT("char: %c (%d), parser.pos %ld, num_bytes %d, parser.currpos %ld",c,c, parser.pos, num_bytes, parser.currpos);
+	    IF (c = '{' || c = '[')
+		{
+			token_num = jsmn_alloc_token(num_tokens);
+			if (token_num < 0)
+			    return (JSMN_ERROR_NOMEM);
+			if (parser.toksuper != -1)
+			{
+			    tokens[parser.toksuper].size = tokens[parser.toksuper].size + 1;			
+			    tokens[token_num].parent = parser.toksuper;			
+			}
+			IF (c = '{')
+				tokens[token_num].type = JSMN_OBJECT;
+			ELSE
+				tokens[token_num].type = JSMN_ARRAY;
+			tokens[token_num].start = parser.pos;
+			parser.toksuper = parser.toknext - 1;
+		}
+	    ELSE IF (c = '}' || c = ']')
+	    {
+			IF (c = '}')
+				type = JSMN_OBJECT;
+			ELSE
+				type = JSMN_ARRAY;
+	
+	      	IF (parser.toknext < 1)
+	            return (Jsmn_Error(JSMN_ERROR_INVAL));
+
+	        token_num = parser.toknext - 1;
+	        while (1)
+	        {
+	            if (tokens[token_num].start != 0 && tokens[token_num].end = 0)
+	            {
+	                if (tokens[token_num].type != type)
+	                	return (Jsmn_Error(JSMN_ERROR_INVAL));
+	              
+	              	tokens[token_num].end = parser.pos+1;
+	              	parser.toksuper = tokens[token_num].parent;
+                  	if (tokens[token_num].parent = -1)	                 
+                    	return (JSMN_SUCCESS);	                 
+	              	break;
+	            }
+	            if (tokens[token_num].parent = -1)
+	            {
+	            	break;
+	            }
+	            token_num = tokens[token_num].parent;
+			}	
+		}
+        ELSE IF (c = DBLQUOTE)
+		{
+	        r = Jsmn_Parse_String(js, num_bytes, num_tokens);
+			i = LowWord(parser.pos - parser.currpos);
+	        if (r < 0)
+	            return (Jsmn_Error(r));
+	        
+	        if (parser.toksuper != -1)
+	            tokens[parser.toksuper].size = tokens[parser.toksuper].size + 1;
+		}
+		ELSE IF (c = TAB || c = CR || c = LF || c = ':' || C = ',' || C = SPACE)
+        {
+			//Do Nothing.
+        }
+		ELSE IF (c = '-' || (c >= 46 && c <= 57) || c = 't' || c = 'f' || c = 'n')
+		{
+	        /* In strict mode primitives can only be numbers, booleans or null */
+	        r = jsmn_parse_primitive(js, num_bytes, num_tokens);
+			i = LowWord(parser.pos - parser.currpos);
+	        if (r < 0)
+	        {
+	            return (Jsmn_Error(r));
+	        }
+	        if (parser.toksuper != -1)
+	            tokens[parser.toksuper].size = tokens[parser.toksuper].size+1;
+	    }
+		ELSE
+		{
+            /* Unexpected char in strict mode */
+            return (Jsmn_Error(JSMN_ERROR_INVAL));
+        }
+                                    
+		//PRINT("i: %d, parser.pos %ld, num_bytes: %d", i, parser.pos, num_bytes);
+		parser.pos = parser.pos + 1;
+    }
+
+    for (i = parser.toknext - 1 TO 0 STEP -1)
+    {
+        /* Unmatched opened object or array */
+        if (tokens[i].start != 0 && tokens[i].end = 0)
+        	return (Jsmn_Error(JSMN_ERROR_PART));
+    }
+
+    return (JSMN_SUCCESS);
+}
+                    
+/**
+ * Parse JSON string and fill tokens by repeatedly calling Jsmn_Parse.
+ * Supply new tokens if receive NoMem error
+ * Return the error/success code if not a NoMem error
+ */
+SIGNED_INTEGER_FUNCTION Jsmn_Tokenize(STRING js, INTEGER num_bytes)
+
+{
+    SIGNED_INTEGER r;
+	INTEGER num_tokens;
+
+	num_tokens = GetNumStructureArrayCols(Tokens);
+
+    r = Jsmn_Parse(js, num_bytes, num_tokens);
+
+    while (r = JSMN_ERROR_NOMEM)
+    {
+        num_tokens = GetNumStructureArrayCols(Tokens);
+        ResizeStructureArray(Tokens, num_tokens*2+1);
+
+        r = Jsmn_Parse(js, num_bytes, num_tokens);
+    }
+
+    return (r);
+}
+  
+/*******************************************************************************************
+  "JsonReader"
+  
+  This section of the document combines the string information in 'StoredStrings' with
+  the JSON structure information in the tokens to actually generate meaningful data.
+*******************************************************************************************/
+
+INTEGER tokenIndex; 				// index (number) of current token
+
+INTEGER_FUNCTION Read()
+{
+	if (tokenIndex >= tokenCount)
+		RETURN (0);
+	ELSE
+	{
+		tokenIndex = tokenIndex + 1;
+		RETURN (1);
+	}
+}
+
+STRING_FUNCTION GetString()
+{
+	RETURN (Store_Retrieve(tokens[tokenIndex].start, tokens[tokenIndex].end)); 	
+}
+
+INTEGER_FUNCTION GetInteger()
+{
+	RETURN (AtoI(GetString())); 	
+}
+
+LONG_INTEGER_FUNCTION GetLong()
+{
+	RETURN (AtoL(GetString())); 	
+}
+
+INTEGER_FUNCTION GetBool()
+{
+	STRING value$[5];
+	value$ = LOWER(GetString());
+
+	IF (value$ = "true")
+		RETURN (ON);
+	ELSE
+		RETURN (OFF);
+}
+
+STRING_FUNCTION GetStringArray()
+{
+	STRING value$[100];
+	INTEGER i;
+	INTEGER numberArrayItems;
+	INTEGER position;
+                        
+	position = 1;
+	numberArrayItems = tokens[tokenIndex].size;
+
+	IF (tokens[tokenIndex].type = JSMN_ARRAY && numberArrayItems)
+	{
+		Read();
+
+		value$ = GetString();
+
+		FOR (i = 2 TO numberArrayItems)
+		{
+			Read();
+         	MAKESTRING(value$,"%s, %s", value$, GetString());
+		}
+
+		RETURN (value$);
+	}
+	ELSE
+		RETURN ("[]");		
+}
+            
+/* 
+*  Reset all internal variables to clean state
+*/
+FUNCTION Init()
+{
+	INTEGER i;
+               
+	// Reset StoredStrings
+	FOR (i = 0 TO GetNumArrayRows(StoredStrings))
+	{
+       StoredStrings[i] = "";
+	}
+	Store.listIndex = 0;
+	Store.arrayPosition = 0;
+	
+	// Reset Jsmn Parser
+	Jsmn_Init();
+
+	// Reset token index to 1st token
+	tokenIndex = 0;
+}
+	
+
+
 /*******************************************************************************************
   Socket Functions
 *******************************************************************************************/
+/*
+	Send a string to the XBMC Socket
+
+	No authentication
+*/
+Function SendToSocket(STRING Command$)
+{
+    
+	// don't send anything if the socket isn't open
+	IF (IsConnected = OFF)
+		RETURN;
+
+	// don't send anything if a long running query is already in progress
+	IF (Loading = ON)
+		RETURN;
+                   
+	// If the Socket is busy then set a flag to get control of it
+	WHILE (SocketLock)
+	{
+    	Loading = ON;
+		Delay(1);
+	}
+	// Set the lock before doing anything else
+	SocketLock = ON;
+
+	// Send out the command in chunks
+	WHILE (LEN(Command$))
+	{
+		Loading = ON;
+
+		IF (LEN(Command$)>250)
+		{
+			// Send to soucket in chunks
+			SocketSend(XBMC, REMOVEBYLENGTH(250, Command$));
+		}
+		ELSE
+		{
+			// send last chunk
+			SocketSend(XBMC, Command$);
+			Command$ = "";
+		}
+	}
+	                        
+}
+
+/*
+	Send the JSON-RPC command via the TCP socket
+
+	No authentication
+*/
+Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
+{
+	STRING Command$[2000];
+    
+    IF (LEN(Arguments) = 0)
+	{
+		// \x22 is a double quote (")
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
+			,id ,Method);
+	}
+	ELSE
+	{
+		MAKESTRING (Command$, 
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
+			,id ,Method, Arguments);
+	}
+
+	#IF_DEFINED DEBUG
+		PRINT("Xbmc-Browse: SendJsonCommand: %s" ,LEFT(Command$,200));
+	#ENDIF
+                   
+	SendToSocket(Command$);                     
+}
+
 /*
   	Close the connection and wait for status to show 'disconnected'
 */        
@@ -375,7 +1073,7 @@ FUNCTION ConnectToXbmc()
 			delay( 20 );
 			count = count + 1;
 		}
-    } 
+    }     	
 }
 
 /*
@@ -396,7 +1094,11 @@ SOCKETSTATUS XBMC
 	Status = SocketGetStatus();
     
 	IF (Status = 2)
+	{
 		IsConnected = ON;
+		Init();
+		SendJsonCommand(REQUESTID_VERSION,"JSONRPC.Version","");
+	}
 	ELSE
 		IsConnected = OFF;
 }
@@ -544,19 +1246,18 @@ STRING_FUNCTION EpisodeDetailsParameters(INTEGER episodeid)
 */
 STRING_FUNCTION AudioPlaylistParameters(STRING AdditionalParameters, STRING SortMethod) 
 {
-	STRING Params$[1024];
+	STRING Params$[512];
 
 	// These labels from CFileItemHandler::FillVideoDetails in FileItemHandler.cpp (xbmc src code)
 	// Must use 'ignorearticle'=false otherwise SearchCriteria won't work
 	MAKESTRING (Params$, 
-	"{%s\x22properties\x22:[%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false%s"
+	"{%s\x22properties\x22:[%s,%s,%s,%s],\x22sort\x22:{\x22method\x22:\x22%s\x22,\x22order\x22:\x22ascending\x22,\x22ignorearticle\x22:false}}"
 				,AdditionalParameters
 				,"\x22artist\x22"
 				,"\x22thumbnail\x22"
 				,"\x22genre\x22"
 				,"\x22year\x22"
 				,SortMethod
-				,"\x7D\x7D" // MC3 bug fix
 				);
 
 
@@ -644,102 +1345,478 @@ FUNCTION Initialize_OutputArrays()
 
 	PlotSelected$ = "";
 }
+ 
 
+FUNCTION Process_ActivePlayers()
+{	
+	STRING name$[10];
+                                               
+	// It must be an array... with greater than zero children
+	IF (Tokens[tokenIndex].type = JSMN_ARRAY && Tokens[tokenIndex].size > 0)
+	{
+		//Enter the first object in the array
+		Read();
+
+    	WHILE (Read())
+		{
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "playerid")
+			{		
+				ActivePlayerID = GetInteger();
+				BREAK; // We only process the 1st object in the array, then exit.			
+			}
+            ELSE IF (name$ = "type")
+			{
+				//Do nothing
+			}
+			ELSE
+			{
+				GenerateUserError("Process_ActivePlayers: Unknown property: %s", name$);
+				BREAK;
+			}
+		}
+	}
+	ELSE
+	{
+    	// No active players
+		ActivePlayerID = 0;
+	}
+}
+
+FUNCTION Process_Album()
+{
+	INTEGER ArraySize;
+	STRING name$[15];
+	INTEGER numberOfProperties;
+	INTEGER i;
+                   
+	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
+	{
+		CurrentAlbumNumber = CurrentAlbumNumber+1; 
+		IF (CurrentAlbumNumber > NumberOfAlbums)
+			NumberOfAlbums = CurrentAlbumNumber;
+
+		// Resize structure array
+		ArraySize = GetNumStructureArrayCols(Albums);
+		IF (CurrentAlbumNumber > ArraySize)
+			ResizeStructureArray(Albums, ArraySize*2+1);
+        
+		numberOfProperties = Tokens[tokenIndex].size/2;
+
+    	FOR (i = 1 TO numberOfProperties)
+		{
+			Read();
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "albumid")
+			{		
+				Albums[CurrentAlbumNumber].id = GetInteger();
+			}
+			ELSE IF (name$ = "artist")
+			{
+				IF (VersionID = 4)
+					Albums[CurrentAlbumNumber].artist = GetString();
+				ELSE
+					Albums[CurrentAlbumNumber].artist = GetStringArray();
+				SeriesOrArtistName$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].artist;
+			}
+			ELSE IF (name$ = "fanart")
+			{
+				Fanart$[CurrentAlbumNumber] = GetString();
+			}
+			ELSE IF (name$ = "thumbnail")
+			{
+				Albums[CurrentAlbumNumber].thumbnail = GetString();
+				Thumb$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].thumbnail;
+			}
+			ELSE IF (name$ = "genre")
+			{
+				IF (VersionID = 4)
+					Albums[CurrentAlbumNumber].genre = GetString();
+				ELSE
+					Albums[CurrentAlbumNumber].genre = GetStringArray();
+				Genre$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].genre;
+			}
+			ELSE IF (name$ = "label")
+			{
+				Albums[CurrentAlbumNumber].label = GetString();
+				SeasonOrAlbumName$[CurrentAlbumNumber] = Albums[CurrentAlbumNumber].label;
+			}
+			ELSE IF (name$ = "playcount")
+			{
+				Albums[CurrentAlbumNumber].Playcount = GetInteger();
+			}
+            ELSE IF (name$ = "description")
+			{
+				//Do nothing
+			}
+            ELSE IF (name$ = "title")
+			{
+				//Do nothing
+			}
+			ELSE
+			{
+				GenerateUserError("Process_Album: Unknown property: %s", name$);
+				BREAK;
+			}
+		}
+	}
+
+}
+
+/*
+*	Process the result object containing a list
+*
+*	Result object looks like this: 
+*	   {"movies":[{movie0},{movie1}...{movie9}], "limits":{"end":9,"start":0,"total":200}}
+*   Or
+*	   {"albums":[{album0},{album1}...{album9}], "limits":{"end":9,"start":0,"total":200}}
+*   Etc.
+*/
+FUNCTION Process_List(INTEGER listType)
+{
+	STRING name$[10];
+	INTEGER i;
+	INTEGER numberOfListItems;
+
+
+	//Read the first token
+	Read();
+ 	name$ = GetString();
+
+	IF (name$ = "limits")
+	{
+     	//Process_Limits(listType);
+	}
+	ELSE
+	{
+        //Move to the array
+		Read();
+                                          
+		//iterate through the items
+		numberOfListItems = tokens[tokenIndex].size;        
+		FOR (i = 1 TO numberOfListItems)
+		{
+			Read();
+			CSWITCH (listType)
+			{
+        		CASE (MOVIE_TITLE_LIST):
+				{
+					//Process_Movie();
+				}
+				CASE (TV_SHOW_LIST):
+				{
+				}
+				CASE (TV_SEASON_LIST):
+				{
+				}
+				CASE (TV_EPISODE_LIST):
+				{
+				}
+				CASE (MUSIC_ARTIST_LIST):
+				{
+				}
+				CASE (MUSIC_ALBUM_LIST):
+				{										
+					Process_Album();
+				}
+				CASE (MUSIC_SONG_LIST):
+				{
+				}
+			}
+		}
+	}
+}
+   
+/*
+*	Determine the JSON API version ID from the Xbmc response
+*
+*	Result object looks like this: 
+*	   Frodo: {"version":{"major":6,"minor":0,"patch":0}}
+*	   Eden:  {"version":4}
+*/
+FUNCTION Process_Version()
+{	
+	STRING name$[10];
+
+	//Read the first token (a string that reads 'version'
+	Read();
+
+	// Advance to next token (could be an object or a primitive)
+	Read();
+
+	// Is that token an object? If YES then Frodo, if NO then Eden
+	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
+	{
+		//Frodo
+    	WHILE (Read())
+		{
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "major")
+			{		
+				VersionID = GetInteger();
+				BREAK;			
+			}
+            ELSE IF (name$ = "minor")
+			{
+				//Do nothing
+			}
+			ELSE IF (name$ = "patch")
+			{
+				//Do nothing
+			}
+			ELSE
+			{
+				GenerateUserError("Process_Version: Unknown property: %s", name$);
+				BREAK;
+			}
+		}
+	}
+	ELSE
+	{
+		//Eden
+    	VersionID = GetInteger();
+	}
+	VersionID# = VersionID;
+}
+
+
+/*
+  	Process the result object received from Xbmc	
+*/
+FUNCTION ProcessResult(INTEGER id)      
+{
+	CSWITCH(id)
+	{
+		CASE (REQUESTID_GETACTIVEPLAYERS):
+		{
+			Process_ActivePlayers();
+        	BREAK;
+		}
+		CASE (REQUESTID_VIDEOLIBRARY_GETMOVIES):
+		{
+			Process_List(MOVIE_TITLE_LIST);
+        	BREAK;
+		}
+		CASE (REQUESTID_AUDIOLIBRARY_GETALBUMS):
+		{
+			Process_List(MUSIC_ALBUM_LIST);
+        	BREAK;
+		}
+    	CASE (REQUESTID_VERSION):
+		{
+			Process_Version();
+        	BREAK;
+		}
+		DEFAULT:
+		{
+            GenerateUserError("ProcessResult: Unknown RequestID (%d)",id);
+		}
+	}
+}
+            
+/*
+  	The Xbmc JSON api is reporting an error. Send the information 
+	to the control system's error log.
+*/
+FUNCTION ProcessError(INTEGER id)      
+{
+	GenerateUserError("Error id=(%d) msg='%s'",id,LEFT(GetString(),230));		
+}
+
+/*
+  	We have received a notification from the Xbmc JSON api
+*/
+FUNCTION ProcessNotification(STRING method$)      
+{
+	PRINT("%s",LEFT(GetString(),230));		
+}
+
+
+/*
+	// ResponseType is one of: Result, Error or Notification	
+*/
+FUNCTION ProcessBasedOnResponseType()
+{
+ 	INTEGER id;			// For Result/Error Objects
+	STRING method$[50]; // For Notifications
+	STRING name$[10];   // Name of the 
+    INTEGER i;
+	
+	// Is first token an object?
+	IF (Tokens[0].type = JSMN_OBJECT)
+	{
+    	WHILE (Read())
+		{
+			//PRINT("Token number: %d, Token Val: %s", tokenIndex, GetString());
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "id")
+			{		
+				id = GetInteger();			
+			}
+            ELSE IF (name$ = "jsonrpc")
+			{
+				//Do nothing
+			}
+			ELSE IF (name$ = "method")
+			{
+				method$ = GetString();
+			}
+			ELSE IF (name$ = "result")
+			{
+				ProcessResult(id);
+				BREAK;
+			}
+			ELSE IF (name$ = "error")
+			{
+				ProcessError(id);
+				BREAK;
+			}
+			ELSE IF (name$ = "params")
+			{
+				ProcessNotification(method$);
+				BREAK;
+			}
+			ELSE
+			{
+				GenerateUserError("ProcessBasedOnResponseType: Unknown property: %s", name$);
+				BREAK;
+			}
+		}
+	}
+	ELSE
+	{
+    	GenerateUserError("ProcessBasedOnResponseType: Response was not an object.");
+	}
+}
+
+FUNCTION ResetSocket()
+{
+	Init();
+	ReceiveLock = OFF;
+	Loading = OFF;	
+	SocketLock = OFF;
+}
 
 /*
 	Process a string received from the XBMC socket buffer.
 	The string is expected to be in JSON-RPC format.
+
+	The string returned is 
 */ 
-FUNCTION ProcessResponse(STRING fromBuffer$)
+STRING_FUNCTION ProcessResponse(STRING fromBuffer$, INTEGER numberBytes, INTEGER Recurse)
 {
-	WHILE (LEN(fromBuffer$))
+	SIGNED_INTEGER r;
+	LONG_INTEGER prevPosition;		// The position we have go to in the overall data
+	LONG_INTEGER currPosition;		//
+	STRING Remainder$[STORED_STRING_RET_SIZE]; // TODO: Is this large enough?
+	INTEGER position;				// Used when bytes remain in buffer after 1st pass
+                 
+	//PRINT("ReceiveLock %d, Recurse %d, Loading %d, SocketLock %d",ReceiveLock, Recurse, Loading, SocketLock);
+	//PRINT("fromBuffer$ %s, numberBytes %d", LEFT(fromBuffer$,200), numberBytes);           
+
+	// Set Semaphore
+	IF (ReceiveLock && !Recurse)
 	{
-		IF (LEN(fromBuffer$)>250)
-		{
-			PRINT("%s" , REMOVEBYLENGTH(250, fromBuffer$));
+    	Delay(5);
+	}
+	ReceiveLock = ON;
+
+	// Initialize local variables
+	currPosition = 0;
+	position = 0;
+	prevPosition = parser.currpos;
+
+	r = Jsmn_Tokenize(fromBuffer$, numberBytes);
+    PRINT("Response %d, parser.currpos %ld",r, parser.currpos);
+	CSWITCH(r)
+	{
+    	CASE(JSMN_SUCCESS):
+		{			
+			currPosition = tokens[0].end;			
+			Store_Store(fromBuffer$, LowWord(currPosition - prevPosition)-1);
+			ProcessBasedOnResponseType();
+			BREAK;
 		}
-		ELSE
+		CASE(JSMN_ERROR_PART):
 		{
-			// send last chunk
-			PRINT("%s" , REMOVEBYLENGTH(LEN(fromBuffer$), fromBuffer$));
+         	//Store the processed part of the buffer			
+			parser.currpos = parser.currpos - 1;
+			position = LowWord(parser.currpos-prevPosition);			
+			Store_Store(fromBuffer$, position);  
+						
+			// Are there any unprocessed bytes at the end of this partial string?
+			// If yes then return those.						
+			IF (numberBytes > position)		
+			{
+				ReceiveLock = OFF;				
+				RETURN (MID(fromBuffer$,position+1,numberBytes-position));
+			}
+			ELSE
+			{
+				ReceiveLock = OFF;
+				//Exit to await more data
+				RETURN ("");	
+			}
 		}
+		CASE(JSMN_ERROR_INVAL):
+		{
+         	currPosition = parser.currpos;			
+			if (currPosition = 1)
+			{
+                // Very first character is an error: this is fatal. 
+                // Just reset to initial state and exit
+                ResetSocket();
+                RETURN ("");
+			}
+		}
+	}
+               
+	//Are there any bytes left in buffer?
+	IF (numberBytes > currPosition - prevPosition)
+	{
+		position = LowWord(currPosition - prevPosition);
+		numberBytes = numberBytes - position + 1;
+
+		//Error check
+		IF (numberBytes > STORED_STRING_RET_SIZE)
+		{
+			GenerateUserError("ProcessResponse: Too many bytes (%d)", numberBytes);
+			//Reset initial values & exit
+			ResetSocket();
+			RETURN ("");
+        }
+
+    	Remainder$ = MID(fromBuffer$, position, numberBytes);
+              
+		//Reset initial values and recurse
+		Init();		
+		ProcessResponse(Remainder$,numberBytes, 1);
+	}
+    ELSE
+	{
+		//Reset initial values & exit
+		ResetSocket();
+		RETURN ("");
 	}
 }
 
-/*
-	Send a string to the XBMC Socket
 
-	No authentication
-*/
-Function SendToSocket(STRING Command$)
-{
-    
-	// don't send anything if the socket isn't open
-	IF (IsConnected = OFF)
-		RETURN;
-
-	// don't send anything if a long running query is already in progress
-	IF (Loading = ON)
-		RETURN;
-                   
-	// If the Socket is busy then set a flag to get control of it
-	WHILE (SocketLock)
-	{
-    	Loading = ON;
-		Delay(1);
-	}
-	// Set the lock before doing anything else
-	SocketLock = ON;
-
-	// Send out the command in chunks
-	WHILE (LEN(Command$))
-	{
-		Loading = ON;
-
-		IF (LEN(Command$)>250)
-		{
-			// Send to soucket in chunks
-			SocketSend(XBMC, REMOVEBYLENGTH(250, Command$));
-		}
-		ELSE
-		{
-			// send last chunk
-			SocketSend(XBMC, Command$);
-			Command$ = "";
-		}
-	}
-	                        
-}
-
-/*
-	Send the JSON-RPC command via the TCP socket
-
-	No authentication
-*/
-Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
-{
-	STRING Command$[2000];
-    
-    IF (LEN(Arguments) = 0)
-	{
-		// \x22 is a double quote (")
-		MAKESTRING (Command$, 
-			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22}"
-			,id ,Method);
-	}
-	ELSE
-	{
-		MAKESTRING (Command$, 
-			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
-			,id ,Method, Arguments);
-	}
-
-	#IF_DEFINED DEBUG
-		PRINT("Xbmc-Browse: SendJsonCommand: %s" ,LEFT(Command$,200));
-	#ENDIF
-                   
-	SendToSocket(Command$);                     
-}
 
 PUSH Connect
 {
@@ -752,9 +1829,23 @@ RELEASE Connect
  	// disconnect from XBMC
 	DisconnectFromXbmc();
 }
+
+PUSH List_Albums
+{
+	STRING Params$[512];
+
+	Params$ = AudioPlaylistParameters("\"limits\":{\"start\":0,\"end\":9},", "label");
+
+	CALL SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETALBUMS
+				, "AudioLibrary.GetAlbums", Params$);
+
+}
+PUSH List_Movies
+{
+}
             
 #IF_DEFINED DEBUG
-
+ 
 FUNCTION InitStoredStrings()
 {
 	INTEGER i;
@@ -779,23 +1870,37 @@ FUNCTION InitStoredStrings()
 	Store_Store(s2,LEN(s2));
 	Store_Store(s3,LEN(s3));
 	Store_Store(s4,LEN(s4));
-   
-	FOR (i = 0 TO GetNumArrayRows(StoredStrings))
-	{
-       PRINT("%s",StoredStrings[i]);
-	}
 
 }
 
-FUNCTION TestString(STRING Expected$, STRING Actual$, INTEGER number)
+FUNCTION InitAndStoreOneString(STRING s$)
 {
-	IF (actual$ = expected$)
+	INTEGER i;
+	STRING s1[10];
+	STRING s2[10];
+	STRING s3[10];
+	STRING s4[10];
+               
+	// Reset StoredStrings
+	FOR (i = 0 TO GetNumArrayRows(StoredStrings))
 	{
-		PRINT("%s%d","Success in Test #", number);
+       StoredStrings[i] = "";
 	}
-	ELSE
+	Store.listIndex = 0;
+	Store.arrayPosition = 0;
+	
+	// Reset Jsmn Parser
+	Jsmn_Init();	
+
+	Store_Store(s$,LEN(s$));
+
+}
+
+FUNCTION TestString(STRING expected$, STRING actual$, INTEGER test_number)
+{
+	IF (actual$ != expected$)
 	{
-		PRINT("%s%d","ERROR!! in Test #", number);
+		PRINT("ERROR!! testing string in test #%d", test_number);
 		PRINT("Expected: '%s', Actual: '%s'",
 				 expected$,actual$);
 		PRINT("LEN(Expected): %d, LEN(Actual): %d",
@@ -803,10 +1908,69 @@ FUNCTION TestString(STRING Expected$, STRING Actual$, INTEGER number)
 	}	
 }
 
+FUNCTION TestInteger(SIGNED_INTEGER expected, 
+						SIGNED_INTEGER actual, INTEGER test_number)
+{
+	IF (actual != expected)
+	{
+		PRINT("ERROR!! testing integer in test #%d", test_number);
+		PRINT("Expected: (%d), Actual: (%d)",
+				 expected,actual);
+	}	
+}
+
+FUNCTION TestLongInteger(SIGNED_LONG_INTEGER expected, 
+					SIGNED_LONG_INTEGER actual, INTEGER test_number)
+{
+	IF (actual != expected)
+	{
+		PRINT("ERROR!! testing integer in test #%d", test_number);
+		PRINT("Expected: (%ld), Actual: (%ld)",
+				 expected, actual);
+	}	
+}
+
+
+FUNCTION TestToken(INTEGER token_number, INTEGER start, 
+					INTEGER end, INTEGER type, 
+					SIGNED_INTEGER parent, INTEGER size, INTEGER test_number)
+{
+	IF (tokens[token_number].start != start ||
+			tokens[token_number].end != end ||
+			tokens[token_number].type != type || 
+			tokens[token_number].parent != parent ||
+			tokens[token_number].size != size)
+	{
+		PRINT("ERROR!! in Test #%d, Token #%d", test_number, token_number);
+		IF (tokens[token_number].start != start)
+			PRINT("Start Expected: (%ld), Actual: (%ld)",
+				 start, tokens[token_number].start);
+		IF (tokens[token_number].end != end)
+			PRINT("End Expected: (%ld), Actual: (%ld)",
+				 end, tokens[token_number].end);
+		IF (tokens[token_number].type != type)
+			PRINT("Type Expected: (%d), Actual: (%d)",
+				 type, tokens[token_number].type);
+		IF (tokens[token_number].parent != parent)
+			PRINT("Parent Expected: (%d), Actual: (%d)",
+				 parent, tokens[token_number].parent);
+		IF (tokens[token_number].size != size)
+			PRINT("Size Expected: (%d), Actual: (%d)",
+				 size, tokens[token_number].size);
+	}	
+}
+
+
+
 FUNCTION UnitTest(INTEGER number)
 {
+	STRING s$[STORED_STRING_RET_SIZE];
 	STRING actual$[STORED_STRING_RET_SIZE];
 	STRING expected$[STORED_STRING_RET_SIZE];
+	INTEGER actual;
+	INTEGER expected;
+	SIGNED_INTEGER token_num;
+	INTEGER i;
 
 	CSWITCH (number)
 	{
@@ -834,28 +1998,712 @@ FUNCTION UnitTest(INTEGER number)
 		CASE (2):
 		{
 			InitStoredStrings();
-			actual$ = Store_Retrieve(1,5);
-			expected$ = "This ";
-            TestString(expected$, actual$, number);
+			actual$ = Store_RetrieveByLength(24,10);
+			expected$ = "A second t";
+			TestString(expected$, actual$, number);	
 			BREAK;
 		}
 		CASE (3):
 		{
-			InitStoredStrings();
-			actual$ = Store_Retrieve(24,10);
-			expected$ = "A second t";
+			Init();
+			Store_Store("abcdef",6);
+			Store_Store("ghijklm",7);
+			actual$ = Store_RetrieveByLength(1,12);
+			expected$ = "abcdefghijkl";
 			TestString(expected$, actual$, number);	
 			BREAK;
 		}
 		CASE (4):
 		{
 			InitStoredStrings();
-			actual$ = Store_Retrieve(43,11);
+			actual$ = Store_RetrieveByLength(43,11);
 			expected$ = "g. A third ";
 			TestString(expected$, actual$, number);		
 			BREAK;
 		}
+    	CASE (5):
+		{
+					 //1-23-45678
+			actual$ = "{\"a\": 2}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
 
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,9,JSMN_OBJECT, -1, 2, number);		
+			TestToken(1,3,4,JSMN_STRING, 0, 0, number);
+			TestToken(2,7,8,JSMN_PRIMITIVE, 0, 0, number);
+                           
+			// Test the returned bytes
+			actual$ = Store_Retrieve(tokens[0].start, tokens[0].end);
+			expected$ = "{\"a\": 2}";
+			TestString(expected$, actual$, number);
+			actual$ = Store_Retrieve(tokens[1].start, tokens[1].end);
+			expected$ = "a";
+			TestString(expected$, actual$, number);
+			actual = AtoI(Store_Retrieve(tokens[2].start, tokens[2].end));
+			expected = 2;
+			TestInteger(expected, actual, number);
+			BREAK;
+		}
+    	CASE (6):
+		{
+					 //1-23-45678-90-12345
+			actual$ = "[\"a\":{},\"b\":{}]";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+					 //1-23-45678-90-12345
+			actual$ = "{\n \"Day\": 26,\n \"Month\": 9,\n \"Year\": 12\n }";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+        	         //1-23-456789-01-234567
+			actual$ = "{\"a\":100,\"b\":y200}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_ERROR_INVAL;
+				
+			TestInteger(expected, actual, number);
+
+            BREAK;
+		}
+    	CASE (7): //objects and arrays
+		{
+			actual$ = "[10}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_ERROR_INVAL;
+				
+			TestInteger(expected, actual, number);
+
+			actual$ = "[10]";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+
+			actual$ = "{\"a\": 1]";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_ERROR_INVAL;
+				
+			TestInteger(expected, actual, number);
+			BREAK;
+		}
+        CASE (8): //partial arrays
+		{
+					 //1234567890123
+			actual$ = "  [ 1, true, ";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_ERROR_PART;
+				
+			TestInteger(expected, actual, number);
+
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,3,0,JSMN_ARRAY, -1, 2, number);		
+			TestToken(1,5,6,JSMN_PRIMITIVE, 0, 0, number);
+			TestToken(2,8,12,JSMN_PRIMITIVE, 0, 0, number);
+       
+
+					 //1234567890123456789-012345-678
+			actual$ = "  [ 1, true, [123, \"hello\"]]";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,3,29,JSMN_ARRAY, -1, 3, number);		
+			TestToken(1,5,6,JSMN_PRIMITIVE, 0, 0, number);
+			TestToken(2,8,12,JSMN_PRIMITIVE, 0, 0, number);
+			TestToken(3,14,28,JSMN_ARRAY, 0, 2, number);
+			TestToken(4,15,18,JSMN_PRIMITIVE, 3, 0, number);
+			TestToken(5,21,26,JSMN_STRING, 3, 0, number);
+            BREAK;
+		}
+		CASE (9): // empty objects, arrays
+		{
+					 //1234567890123
+			actual$ = "{}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,3,JSMN_OBJECT, -1, 0, number);
+
+					 //1234567890123
+			actual$ = "[]";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,3,JSMN_ARRAY, -1, 0, number);
+
+            	     //1-2345-67890123
+			actual$ = "{\"abc\":[]}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,11,JSMN_OBJECT, -1, 2, number);
+			TestToken(1,3,6,JSMN_STRING, 0, 0, number);
+			TestToken(2,8,10,JSMN_ARRAY, 0, 0, number);
+
+            	     //1234567890123
+			actual$ = "[{},{}]";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,8,JSMN_ARRAY, -1, 2, number);
+			TestToken(1,2,4,JSMN_OBJECT, 0, 0, number);
+			TestToken(2,5,7,JSMN_OBJECT, 0, 0, number);
+
+
+            BREAK;
+		}
+		CASE (10): //one complete object, one partial object
+		{
+           	         //1-23-456789-01-2345678-90-1234
+			actual$ = "{\"a\":100,\"b\":200}{\"c\":2,";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_SUCCESS; // partial object is ignored
+				
+			TestInteger(expected, actual, number);
+            TestLongInteger(0, parser.currpos, number);
+            TestToken(0,1,18,JSMN_OBJECT, -1, 4, number);
+			BREAK;
+		}
+		CASE (11): //invalid character in primitive
+		{
+         	         //1-23-4567890...............
+			actual$ = "{\"a\":100{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":{\"version\":6}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_ERROR_INVAL;
+				
+			TestInteger(expected, actual, number);
+            TestLongInteger(9, parser.pos, number);
+
+			BREAK;
+		}
+		CASE (12): //invalid character at end of string
+		{
+         	         //1-23-45-67890123-45
+			actual$ = "{\"a\":\"hello {\"a\":\"hello\",\"b\":200}world\",\"b\":200}{\"a\":\"hello\",\"b\":200}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Parse(actual$,LEN(actual$),10);
+			expected = JSMN_ERROR_INVAL;
+				
+			TestInteger(expected, actual, number);
+            TestLongInteger(15, parser.pos, number);
+
+			BREAK;
+		}
+		CASE (13): //Tokenize tests begin here
+		{
+           	         //1-23-456789-01-234567
+			actual$ = "{\"a\":100,\"b\":200}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Tokenize(actual$,LEN(actual$));
+			expected = JSMN_SUCCESS;
+				
+			TestInteger(expected, actual, number);
+
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,18,JSMN_OBJECT, -1, 4, number);
+			TestToken(1,3,4,JSMN_STRING, 0, 0, number);
+			TestToken(2,6,9,JSMN_PRIMITIVE, 0, 0, number);
+			TestToken(3,11,12,JSMN_STRING, 0, 0, number);
+			TestToken(4,14,17,JSMN_PRIMITIVE, 0, 0, number);
+            BREAK;
+        }
+		CASE (14): 
+		{
+                     //1-23-4567890123-45-67890123
+			actual$ = "{\"a\" : 100[], \"b\" : 200}";
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Tokenize(actual$,LEN(actual$));
+			expected = JSMN_ERROR_INVAL;
+				
+			TestInteger(expected, actual, number);
+			TestLongInteger(11, parser.pos, number);
+
+			BREAK;
+		}
+		CASE (15):
+		{
+			MAKESTRING(actual$, "{\"a\":1%s",
+				"{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":{\"version\":6}"); 
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Tokenize(actual$,LEN(actual$));
+			expected = JSMN_ERROR_INVAL;
+				
+			TestInteger(expected, actual, number);
+			TestLongInteger(7, parser.pos, number);
+
+			BREAK;
+		}
+		CASE (16): // Test partial message
+		{
+			actual$="";
+								    //1-23-4567-89-012
+			MAKESTRING(actual$, "%s","{\"i\":1,\"r\":{"); 
+			Init();
+			actual = Jsmn_Tokenize(actual$,LEN(actual$));
+			expected = JSMN_ERROR_PART;
+				
+			TestInteger(expected, actual, number);
+                                                       
+			TestLongInteger(13, parser.pos, number);
+			TestLongInteger(13, parser.currpos, number);
+			TestLongInteger(12, LEN(actual$), number);            
+                        
+			parser.currpos = parser.currpos - 1;
+			Store_Store(actual$, LEN(actual$));  
+            
+								    //34567890-12345
+			MAKESTRING(actual$,"%s","\"version\":6}}");
+            actual = Jsmn_Tokenize(actual$,LEN(actual$));
+			expected = JSMN_SUCCESS;
+			TestInteger(expected, actual, number);
+            
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,26,JSMN_OBJECT, -1, 4, number);
+			TestToken(1,3,4,JSMN_STRING, 0, 0, number);
+			TestToken(2,6,7,JSMN_PRIMITIVE, 0, 0, number);
+			TestToken(3,9,10,JSMN_STRING, 0, 0, number);
+			TestToken(4,12,25,JSMN_OBJECT, 0, 2, number);
+			TestToken(5,14,21,JSMN_STRING, 4, 0, number);
+			TestToken(6,23,24,JSMN_PRIMITIVE, 4, 0, number);
+
+			Store_Store(actual$, LEN(actual$));
+
+			// Test the returned bytes
+			actual$ = Store_Retrieve(tokens[6].start, tokens[6].end);
+			expected$ = "6";
+			TestString(expected$, actual$, number);
+
+
+			BREAK;
+		}
+		CASE (17): // Begin testing Reader functions (GetInteger, GetString etc.)
+		{
+			Jsmn_Init();
+			actual$ = "{\"id\":123,\"jsonrpc\":\"2.0\",\"result\":{\"version\":5}}";
+			InitAndStoreOneString(actual$);
+            actual = Jsmn_Tokenize(actual$,LEN(actual$));
+			expected = JSMN_SUCCESS;
+			TestInteger(expected, actual, number);
+              
+			Read();
+			actual = tokenIndex;
+			expected = 1;
+			TestInteger(expected, actual, number);
+
+			actual$ = GetString();
+			expected$="id";
+			TestString(expected$, actual$, number);
+
+			Read();
+			actual = GetInteger();
+			expected = 123;
+			TestInteger(expected, actual, number);
+
+			Read();
+			actual = tokenIndex;
+			expected = 3;
+			TestInteger(expected, actual, number);
+
+			actual$ = GetString();
+			expected$="jsonrpc";
+			TestString(expected$, actual$, number);
+              
+			Read();
+			actual$ = GetString();
+			expected$="2.0";
+			TestString(expected$, actual$, number);
+
+			Read();
+			actual$ = GetString();
+			expected$="result";
+			TestString(expected$, actual$, number);
+
+			BREAK;			
+		}
+		CASE (18): //Process Response tests begin here
+		{
+			Init();
+			//In Eden 'JSONRPC.Version' is a simple integer
+			MAKESTRING(actual$,"%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:599}}");
+			
+            ProcessResponse(actual$,LEN(actual$),0);
+			expected = 599;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+
+			Init();
+			//In Frodo 'JSONRPC.Version' is an object
+			MAKESTRING(actual$,"{%s%d%s%s%s}"
+							,"\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:"
+							,"{\x22major\x22:601,\x22minor\x22:0,\x22patch\x22:0}}");
+			
+            ProcessResponse(actual$,LEN(actual$),0);
+			expected = 601;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+
+            VersionID = 0;
+			BREAK;			
+		}
+		CASE (19): // Partial Test
+		{
+			VersionID = 0;
+			Init();
+
+			MAKESTRING(actual$,"%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{");
+            expected$="";
+			actual$=ProcessResponse(actual$,LEN(actual$),0);
+			TestString(expected$, actual$, number);
+
+			actual$="\x22version\x22:15}}";
+            actual$=ProcessResponse(actual$,LEN(actual$),0);
+			TestString(expected$, actual$, number);
+
+			// Test that the content was processed
+			expected = 15;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+
+            //Test tokens
+			//Params: tokennum, start, end, type, parent, size, test_number
+			TestToken(0,1,50,JSMN_OBJECT, -1, 6, number);
+			TestToken(1,3,5,JSMN_STRING, 0, 0, number);
+			TestToken(2,7,9,JSMN_PRIMITIVE, 0, 0, number);
+			TestToken(3,11,18,JSMN_STRING, 0, 0, number);
+			TestToken(4,21,24,JSMN_STRING, 0, 0, number);
+			TestToken(5,27,33,JSMN_STRING, 0, 0, number);
+			TestToken(6,35,49,JSMN_OBJECT, 0, 2, number);
+			TestToken(7,37,44,JSMN_STRING, 6, 0, number);
+			TestToken(8,46,48,JSMN_PRIMITIVE, 6, 0, number);
+
+			BREAK;			
+		}
+		CASE (20): // ActivePlayers-1
+		{
+			Init();
+			MAKESTRING(actual$,"%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_GETACTIVEPLAYERS
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":[{\x22playerid\x22:123,\x22type\x22:\x22video\x22}]}");
+			InitAndStoreOneString(actual$);
+			actual = Jsmn_Tokenize(actual$,LEN(actual$));
+			expected = JSMN_SUCCESS;
+            TestInteger(expected,actual,number);
+			BREAK;
+ 		}
+		CASE (21): // ActivePlayers-2
+		{
+			Init();
+        	MAKESTRING(actual$,"%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_GETACTIVEPLAYERS
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":[{\x22playerid\x22:123,\x22type\x22:\x22video\x22}]}");
+            ProcessResponse(actual$,LEN(actual$),0);
+			expected = 123;
+			actual = ActivePlayerID;
+			TestInteger(expected,actual,number);
+            ActivePlayerID = 0;
+			BREAK;				
+		}
+
+		CASE (22): // Two Messages in same buffer
+		{
+			Init();
+			MAKESTRING(actual$,"%s%d%s%s%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:15}}"
+							,"{\x22id\x22:"
+							,REQUESTID_GETACTIVEPLAYERS
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":[{\x22playerid\x22:12,\x22type\x22:\x22video\x22}]}");
+            ProcessResponse(actual$,LEN(actual$),0);
+
+			expected = 15;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+
+			expected = 12;
+			actual = ActivePlayerID;
+			TestInteger(expected,actual,number);
+
+            ActivePlayerID = 0;
+            VersionID = 0;
+			BREAK;			
+		}
+		CASE (23): // Two Messages in same buffer, one partial
+		{
+			Init();
+			MAKESTRING(actual$,"%s%d%s%s%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:15}}"
+							,"{\x22id\x22:"
+							,REQUESTID_GETACTIVEPLAYERS
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":[{\x22playerid\x22:99,\x22type\x22:\x22video\x22");
+            ProcessResponse(actual$,LEN(actual$),0);
+
+			expected = 15;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+			
+			expected = 0;
+			actual = ActivePlayerID;
+			TestInteger(expected,actual,number);
+
+
+			MAKESTRING(actual$,"%s","}]}");
+			ProcessResponse(actual$,LEN(actual$),0);                                              
+
+			expected = 99;
+			actual = ActivePlayerID;
+			TestInteger(expected,actual,number);
+
+            ActivePlayerID = 0;
+            VersionID = 0;
+			BREAK;			
+		}
+		CASE (24): // Invalid Character In Primitive
+		{
+			Init();
+			MAKESTRING(actual$,"%s%s%d%s%s"
+							,"{\x22id\x22:9"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:234}"
+							);
+            ProcessResponse(actual$,LEN(actual$),0);
+			expected = 0;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+
+                                        
+			MAKESTRING(actual$,"%s","}");
+			ProcessResponse(actual$,LEN(actual$),0); 
+			expected = 234;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+			            
+            VersionID = 0;
+			BREAK;			
+		}
+		CASE (25): // Valid but partial message where break occurs in a string
+		{
+			Init();
+			MAKESTRING(actual$,"%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22versi"
+							);
+            actual$ = ProcessResponse(actual$,LEN(actual$),0);
+			expected$ = "\x22versi";
+            TestString(expected$, actual$, number);
+
+			expected = 0;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+                                        
+			MAKESTRING(actual$,"%s%s",expected$,"on\x22:666}}");
+			ProcessResponse(actual$,LEN(actual$),0); 
+			expected = 666;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+			            
+            VersionID = 0;
+			BREAK;			
+		}
+		CASE (26): // Invalid Character In String
+		{
+			Init();
+			MAKESTRING(actual$,"%s%s%d%s%s"
+							,"{\x22id"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:230}"
+							);
+            ProcessResponse(actual$,LEN(actual$),0);
+			expected = 0;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+
+                                        
+			MAKESTRING(actual$,"%s","}");
+			ProcessResponse(actual$,LEN(actual$),0); 
+			expected = 0;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+
+			MAKESTRING(actual$,"%s%d%s%s"
+							,"{\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:230}}"
+							);
+			ProcessResponse(actual$,LEN(actual$),0); 
+			expected = 230;
+			actual = VersionID;
+			TestInteger(expected,actual,number);
+            
+            VersionID = 0;
+			BREAK;			
+		}
+		CASE (27): // GetAlbums Response (Test a long string)
+		{
+			Init();
+			CurrentAlbumNumber = 0;
+			NumberOfAlbums = 0;
+			VersionID = 6;
+
+			MAKESTRING(actual$,"%s%d%s%s%s%s%s%s%s%s%s%s"
+				,"{\x22id\x22:",REQUESTID_AUDIOLIBRARY_GETALBUMS
+         		,",\"jsonrpc\":\"2.0\",\"result\":{"
+				,"\"albums\":[{\"albumid\":1,\"artist\":[\"4 Non Blondes\"],"
+                ,"\"description\":\"Bigger, Better, Faster, More! is the only studio alb"
+                ,"um released by alternative rock band 4 Non Blondes, released in 1992."
+                ,"\",\"fanart\":\"image://W%3a%5cNeilsMusic%5c4%20Non%20Blondes%5cfanart."
+                ,"jpg/\",\"genre\":[\"Rock\"],\"label\":\"Bigger, Better, Faster, More!\","
+                ,"\"playcount\":0,\"thumbnail\":\"image://W%3a%5cNeilsMusic%5c4%20Non%20Bl"
+                ,"ondes%5cBigger%2c%20Better%2c%20Faster%2c%20More!%5cfolder.jpg/\",\"titl"
+                ,"e\":\"Bigger, Better, Faster, More!\"}],\"limits\":{\"end\":1,\"start\":"
+                ,"0,\"total\":1}}}");            
+			ProcessResponse(actual$,LEN(actual$),0);
+
+			CurrentAlbumNumber = 0;
+			NumberOfAlbums = 0;
+			VersionID = 0;
+			BREAK;			
+		}
+		CASE (28): // For a given string try every possible partial rendering of it
+		{
+			Init();
+			MAKESTRING(s$,"{%s%d%s%s%s}"
+							,"\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:"
+							,"{\x22major\x22:6,\x22minor\x22:0,\x22patch\x22:0}}");			
+			ProcessResponse(s$,LEN(s$),0);
+			expected = 6;
+			actual = VersionID;
+			TestInteger(expected,actual,number*1000);
+
+
+			FOR (i = 1 TO (LEN(s$)-1) )
+			{
+				VersionID = 0;
+				Init();
+
+				actual$=LEFT(s$,i);
+            	actual$=ProcessResponse(actual$,LEN(actual$),0);
+	
+				IF (i=2)
+				{
+					TestString("\"", actual$, number*1000+i); 	
+				}
+				ELSE IF (i=3)
+				{
+					TestString("\"i", actual$, number*1000+i); 
+                }
+				
+                MAKESTRING(actual$,"%s%s",actual$,MID(s$,i+1,LEN(s$)-i));   
+				ProcessResponse(actual$,LEN(actual$),0);
+
+				// Test that the content was processed
+				expected = 6;
+				actual = VersionID;
+				TestInteger(expected,actual,number*1000+i);
+			}
+			BREAK;
+		}
+		CASE (29): // Isolate one case from UnitTest 28
+		{
+			Init();
+			MAKESTRING(s$,"{%s%d%s%s%s}"
+							,"\x22id\x22:"
+							,REQUESTID_VERSION
+							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
+							,":{\x22version\x22:"
+							,"{\x22major\x22:6,\x22minor\x22:0,\x22patch\x22:0}}");			
+			ProcessResponse(s$,LEN(s$),0);
+			expected = 6;
+			actual = VersionID;
+			TestInteger(expected,actual,number*1000);
+
+
+			FOR (i = 10 to 10 )
+			{
+				VersionID = 0;
+				Init();
+
+				actual$=LEFT(s$,i);
+            	actual$=ProcessResponse(actual$,LEN(actual$),0);
+				
+                MAKESTRING(actual$,"%s%s",actual$,MID(s$,i+1,LEN(s$)-i));   
+				ProcessResponse(actual$,LEN(actual$),0);
+
+				// Test that the content was processed
+				expected = 6;
+				actual = VersionID;
+				TestInteger(expected,actual,number*1000+i);
+			}
+			BREAK;
+		}
 		DEFAULT:
 		{
 			PRINT("%s","Unknown Unit Test.");
@@ -871,11 +2719,13 @@ CHANGE UnitTestNumber#
 
 PUSH RunAllTests
 {
-	UnitTest(1);
-	UnitTest(2);
-	UnitTest(3);
-	UnitTest(4);
+	INTEGER i;
 
+	FOR (i = 1 TO 29)
+	{
+		UnitTest(i);
+	}
+	PRINT("%s","Unit Tests complete.");
 }
 #ENDIF
 
@@ -884,16 +2734,30 @@ PUSH RunAllTests
 Function Main()
 {              
 	STRING Xbmc$[BUFFER_SIZE];
+	STRING Remainder$[512];
+	INTEGER length;
               
 	WaitForInitializationComplete();
+
+	Remainder$ = "";
                          
     // Eternal loop, waiting for Data from Xbmc 
 	WHILE(1)
 	{
+		length = MAX(10,LEN(XBMC.SocketRxBuf));
 		// Wait for a minimum of 10 bytes
 		// Can't use a delimiter because with JSON there isn't one.
-  		Xbmc$ = GatherByLength(MAX(10,LEN(XBMC.SocketRxBuf)), XBMC.SocketRxBuf);
-		CALL ProcessResponse(Xbmc$);		
+		Xbmc$ = GatherByLength(length, XBMC.SocketRxBuf);
+	
+    	// Prefix with any bytes leftover from previous pass
+		IF (LEN(Remainder$))
+			MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
+        PRINT("Xbmc$: %s, length:(%d)",Xbmc$,LEN(Xbmc$));
+
+		// Process the characters
+		Remainder$ = ProcessResponse(Xbmc$, length, 0);		
+
+		PRINT("Remainder$: %s, length:(%d)",Remainder$,LEN(Remainder$));
 	} 
 
 }
