@@ -51,14 +51,10 @@
   InputList2SigType3=Serial
   InputList2Cue4=[~UNUSED~]
   InputList2SigType4=Serial
-  InputList2Cue5=XBMC_IPAddr$
+  InputList2Cue5=LogMessage$
   InputList2SigType5=Serial
-  InputList2Cue6=[~UNUSED~]
+  InputList2Cue6=Notification$
   InputList2SigType6=Serial
-  InputList2Cue7=LogMessage$
-  InputList2SigType7=Serial
-  InputList2Cue8=Notification$
-  InputList2SigType8=Serial
   OutputList2Cue1=RepeatStatus$
   OutputList2SigType1=Serial
   OutputList2Cue2=ShuffleStatus$
@@ -66,16 +62,18 @@
   ParamCue1=[Reference Name]
   ParamCue2=EventServer_Port/#
   ParamSigType2=Constant
+  ParamCue3=XBMC_IPAddr$
+  ParamSigType3=String
   MinVariableInputs=12
   MaxVariableInputs=12
-  MinVariableInputsList2=8
-  MaxVariableInputsList2=8
+  MinVariableInputsList2=6
+  MaxVariableInputsList2=6
   MinVariableOutputs=0
   MaxVariableOutputs=0
   MinVariableOutputsList2=2
   MaxVariableOutputsList2=2
-  MinVariableParams=1
-  MaxVariableParams=1
+  MinVariableParams=2
+  MaxVariableParams=2
   Expand=expand_separately
   Expand2=expand_separately
   OffsetOutputs=2
@@ -92,7 +90,8 @@
   NumFixedParams=1
   Pp1=1
   Pp2=2
-  MPp=2
+  Pp3=3
+  MPp=3
   NVStorage=10
   ParamSigType1=String
   SmplCInputCue1=o#
@@ -102,7 +101,6 @@
   SPlus2CompiledName=S2_XBMC_ES
   SymJam=NonExclusive
   FileName=XBMC-ES.ush
-  Usl1=Common_Functions.usl
 [END]
 [BEGIN]
   ObjTp=Dp
@@ -122,5 +120,15 @@
   NF=1
   NoS=True
   DNF=1
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=3
+  Tp=1
+  SD=The IP Address of the XBMC HTTP server.
+  HD=True
+  DV=
+  NoS=False
   VVS=0
 [END]

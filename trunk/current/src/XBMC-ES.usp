@@ -233,10 +233,7 @@ ANALOG_INPUT Command;
 ANALOG_INPUT WindowName#; // Activate this window (Delta Window ID) See http://wiki.xbmc.org/index.php?title=Window_IDs                            
 STRING_INPUT WindowName$[100];
 
-STRING_INPUT _SKIP_, XBMC_IPAddr$[16], //the ip of the XBMC server.
-			 _SKIP_;
-
-BUFFER_INPUT LogMessage$[500];
+BUFFER_INPUT _SKIP_,LogMessage$[500];
 BUFFER_INPUT Notification$[500];
 
 STRING_OUTPUT RepeatStatus$,			// 'Repeat', 'RepeatOne' or 'RepeatAll' or ''
@@ -244,6 +241,11 @@ STRING_OUTPUT RepeatStatus$,			// 'Repeat', 'RepeatOne' or 'RepeatAll' or ''
 
 ///////////////////////////// Parameters 
 INTEGER_PARAMETER EventServer_Port#;		 //the port that the XBMC sends broadcast packets from
+STRING_PARAMETER XBMC_IPAddr$[16];   //the ip of the XBMC server.
+#BEGIN_PARAMETER_PROPERTIES XBMC_IPAddr$ 
+    propDefaultValue = "";  
+    propShortDescription = "The IP Address of the XBMC HTTP server.";
+#END_PARAMETER_PROPERTIES
 #BEGIN_PARAMETER_PROPERTIES EventServer_Port#
    propValidUnits = unitDecimal;
    propDefaultValue = 9777d;   
@@ -311,8 +313,8 @@ FUNCTION Send(INTEGER PacketType)
 		IF (Connect = 0)
 			PRINT ("Not connected to Xbmc at %s. Socket Error number is %d", XBMC_IPAddr$, Return_Value);
 		ELSE
-		{
-			PRINT ("Connect: %d", Connect);
+		{			
+			PRINT ("Error in XBMC-ES. Connect: %d", Connect);
 			PRINT ("IP Address of Xbmc is %s. Socket Error number is %d", XBMC_IPAddr$, Return_Value);
 		}
 	}
