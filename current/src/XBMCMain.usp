@@ -86,7 +86,8 @@ Comments:
 // Request IDs
 #DEFINE_CONSTANT REQUESTID_GETACTIVEPLAYERS				1
 #DEFINE_CONSTANT REQUESTID_PLAYER_GETITEM				2
-#DEFINE_CONSTANT REQUESTID_PLAYER_GETPROPERTIES			3
+#DEFINE_CONSTANT REQUESTID_PLAYER_GETITEMEXTENDED		3
+#DEFINE_CONSTANT REQUESTID_PLAYER_GETPROPERTIES			4
 #DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETMOVIES		20 
 #DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS	21
 #DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETTVSHOWS		22 
@@ -97,10 +98,12 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETALBUMS		27 
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		28 
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS 29
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEAR				40 
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					41 
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				42 
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			43  
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARAUDIO			40 
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARVIDEO			41 
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					42 
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_OPEN				43
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAY				44 
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_PLAYALLLIST			45  
 #DEFINE_CONSTANT REQUESTID_SKIPNEXT						50
 #DEFINE_CONSTANT REQUESTID_SKIPPREV						51
 #DEFINE_CONSTANT REQUESTID_SMALLSKIPFORWARD				52
@@ -133,6 +136,12 @@ Comments:
 #DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums                                                        
 
 #DEFINE_CONSTANT SPECIAL_SEASON						 65535
+
+/* Types of XBMC Playlist/Player type */
+#DEFINE_CONSTANT XBMC_ACTIVEPLAYER_NONE 255
+#DEFINE_CONSTANT XBMC_ACTIVEPLAYER_AUDIO 0
+#DEFINE_CONSTANT XBMC_ACTIVEPLAYER_VIDEO 1
+#DEFINE_CONSTANT XBMC_ACTIVEPLAYER_SLIDESHOW 2
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -600,7 +609,7 @@ SIGNED_INTEGER_FUNCTION Jsmn_Parse_Primitive(STRING js, INTEGER num_bytes, INTEG
 		//PRINT("PP char: %c, parser.pos %ld, num_bytes %d, parser.currpos %ld",c, parser.pos, num_bytes, parser.currpos);
         switch (c)
         {
-
+            // Unlike in a CSWITCH, BREAK in a SWITCH exits both the SWITCH and the FOR loop
             case (TAB): {found = 1; break;}
             case (CR): {found = 1; break;}
             case (LF): {found = 1; break;}
@@ -693,42 +702,44 @@ SIGNED_INTEGER_FUNCTION Jsmn_Parse_String(STRING js, INTEGER num_bytes, INTEGER 
         {
             /* Must check that this is still within the bounds of the string */
             parser.pos = parser.pos+1;
-    		IF(parser.pos>num_bytes)
+    		IF(LowWord(parser.pos - parser.currpos)>num_bytes)
 			{
-			    parser.pos = start;
+			    parser.pos = start + parser.currpos;
 			    return (JSMN_ERROR_PART);
 			}
 	
 			// Switch on the next byte
-            switch (byte(js, LowWord(parser.pos - parser.currpos)))
+			c = byte(js, LowWord(parser.pos - parser.currpos));
+            cswitch (c)
             {
                 /* Allowed escaped symbols */
-                case (DBLQUOTE): break;
-                case ('/'): break;
-                case (BACKSLASH): break;
-                case ('b'): break;
-                case ('f'): break;
-                case ('r'): break;
-                case ('n'): break;
-                case ('t'): break;
+                case (DBLQUOTE): { break; }
+                case ('/'): { break; }
+                case (BACKSLASH): { break; }
+                case ('b'): { break; }
+                case ('f'): { break; }
+                case ('r'): { break; }
+                case ('n'): { break; }
+                case ('t'): { break; }
                 /* Allows escaped symbol \uXXXX */
                 case ('u'):
                     /* TODO */
-                    break;
+                    { break; }
                 /* Unexpected symbol */
                 default:
-				{
-                    parser.pos = start;
+				{	
+                    parser.pos = start + parser.currpos;
                     return (JSMN_ERROR_INVAL);
 				}
             }
 
 			// Increment counter to skip next character
-			i = i +1;
+			i = i + 1;
         }
 
 		parser.pos = parser.pos + 1;		
     }
+
     parser.pos = start-1;
     return (JSMN_ERROR_PART);
 }
@@ -1078,25 +1089,16 @@ FUNCTION SendStringSeekCommand(INTEGER RequestID, STRING Command$)
 }
 
 /*
-	Request more information about a movie
+	Request more information about a movie...filling in details that
+	are not available either through "VideoLibrary.GetMovies".
 */
-FUNCTION Movie_GetDetails(INTEGER movieid, INTEGER all)
+FUNCTION Movie_GetDetails(INTEGER movieid)
 {
 	STRING Params$[150];
 
-	IF (All)
-	{
-		MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s]}"
-			, movieid, "\"streamdetails\"");
-	}
-	ELSE
-	{
-		MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
-			, movieid, "\"director\"","\"tagline\"","\"runtime\""
-			,"\"rating\"","\"studio\"","\"plot\"","\"lastplayed\""
-			,"\"mpaa\"","\"file\""
-		);
-	}
+	MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s,%s,%s]}"
+			, movieid, "\"director\"", "\"runtime\"", "\"plot\""
+			,"\"file\"");
 
 	CALL SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS
 						, "VideoLibrary.GetMovieDetails", Params$);
@@ -1178,6 +1180,8 @@ SOCKETSTATUS XBMC
 /*
     Send the plot string (usu very long) to a STRING_OUTPUT
 	Done this way to overcome length restriction on indirect text joins
+
+	Doesn't work on iPad
 */
 FUNCTION SendPlotAsIndirectText(STRING longstring$)
 {
@@ -1269,6 +1273,18 @@ FUNCTION Player_GetItem()
 
 	IF (IsPlaying)
 		SendJsonCommand(REQUESTID_PLAYER_GETITEM,"Player.GetItem",Params$);
+}
+FUNCTION Player_GetItemExtended(INTEGER movieid)
+{
+	STRING Params$[150];
+
+	MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s]}"
+		, movieid, "\"streamdetails\"");
+
+
+	CALL SendJsonCommand (REQUESTID_PLAYER_GETITEMEXTENDED
+				, "VideoLibrary.GetMovieDetails", Params$);
+
 } 
 FUNCTION Player_GetProperties()
 {
@@ -1692,6 +1708,7 @@ FUNCTION Process_GetItem(INTEGER requestId)
 
 	// Move to 'items' string        
 	Read();
+
 	// Move to 'items' object
 	Read();
 
@@ -1713,31 +1730,19 @@ FUNCTION Process_GetItem(INTEGER requestId)
 			}
             ELSE IF (name$ = "artist")
 			{
-				IF (VersionID = 4)
-					CurrentArtist$ = GetString();
-				ELSE
-					CurrentArtist$ = GetStringArray();
+				CurrentArtist$ = GetStringArray();
 			}
             ELSE IF (name$ = "writer")
 			{
-				IF (VersionID = 4)
-					CurrentWriter$ = GetString();
-				ELSE
-					CurrentWriter$ = GetStringArray();
+				CurrentWriter$ = GetStringArray();
 			}
             ELSE IF (name$ = "studio")
 			{
-				IF (VersionID = 4)
-					CurrentStudio$ = GetString();
-				ELSE
-					CurrentStudio$ = GetStringArray();
+				CurrentStudio$ = GetStringArray();
 			}
             ELSE IF (name$ = "director")
 			{
-				IF (VersionID = 4)
-					CurrentDirector$ = GetString();
-				ELSE
-					CurrentDirector$ = GetStringArray();
+				CurrentDirector$ = GetStringArray();
 			}
 			ELSE IF (name$ = "art")
 			{
@@ -1811,11 +1816,7 @@ FUNCTION Process_GetItem(INTEGER requestId)
 				id = GetInteger();
 				PlayingItemId = id;
 			}
-			ELSE IF (name$ = "plot" || name$ = "plotoutline")
-			{
-				 SendPlotAsIndirectText(GetString());
-			}
-			ELSE IF (name$ = "type" || name$ = "fanart" || name$ = "mpaa"
+			ELSE IF (name$ = "type" || name$ = "fanart"
 						|| name$ = "movieid" || name$ = "position")
 			{
 				 //Do Nothing
@@ -1834,12 +1835,9 @@ FUNCTION Process_GetItem(INTEGER requestId)
 	{
     	WAIT(100)
 		{
-			Movie_GetDetails(PlayingItemId,0); 
+			Player_GetItemExtended(PlayingItemId);
 		}
 	}
-	/*ELSE IF (id && PlayingItemType$ = "song" && requestId = REQUESTID_PLAYER_GETITEM)
-	{
-	}*/
 
 }
 
@@ -1946,8 +1944,10 @@ FUNCTION Process_PlayerProperties()
 		GenerateUserError("Process_PlayerProperties: Not an Object.");	
 }
 
-
-FUNCTION Process_Movie()
+/*
+  	         
+*/
+FUNCTION Process_Movie(INTEGER inList)
 {
 	INTEGER ArraySize;
 	STRING name$[15];
@@ -1956,7 +1956,10 @@ FUNCTION Process_Movie()
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		ListIndex = ListIndex+1; 
+		IF (inList) 
+			ListIndex = ListIndex+1; 
+		ELSE
+            ListIndex = SelectedItem;
         
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
@@ -1969,8 +1972,8 @@ FUNCTION Process_Movie()
 			Read();			
 
 			IF (name$ = "movieid")
-			{		
-				ListIDs[ListIndex] = GetInteger();
+			{
+				ListIDs[ListIndex] = GetInteger();					
 			}
 			ELSE IF (name$ = "thumbnail")
 			{
@@ -1978,10 +1981,7 @@ FUNCTION Process_Movie()
 			}
 			ELSE IF (name$ = "genre")
 			{
-				IF (VersionID = 4)
-					Genre$[ListIndex] = GetString();
-				ELSE
-					Genre$[ListIndex] = GetStringArray();
+				Genre$[ListIndex] = GetStringArray();
 			}
 			ELSE IF (name$ = "label")
 			{
@@ -2006,9 +2006,37 @@ FUNCTION Process_Movie()
 			{
 				//Do nothing
 			}
-            ELSE IF (name$ = "director")
+			ELSE IF (name$ = "rating")
 			{
-				Director$[ListIndex] = GetStringArray();
+                Rating$[ListIndex] = Round(GetString(),3); 
+			}
+			ELSE IF (name$ = "file")
+			{
+                Filename$[ListIndex] = GetString(); 
+			}
+			ELSE IF (name$ = "mpaa")
+			{
+                MPAA$[ListIndex] = GetString(); 
+			}
+			ELSE IF (name$ = "director")
+			{
+                 Director$[ListIndex] = GetStringArray();
+			}
+			ELSE IF (name$ = "writer")
+			{
+                 Writer$[ListIndex] = GetStringArray();
+			}
+			ELSE IF (name$ = "studio")
+			{
+            	Studio$[ListIndex] = GetStringArray();
+			}
+            ELSE IF (name$ = "duration" || name$ = "runtime")
+			{
+				Runtime$[ListIndex] = ConvertToTime(GetInteger());
+			}
+			ELSE IF (name$ = "plot" || name$ = "plotoutline")
+			{
+				 SendPlotAsIndirectText(GetString());
 			}
 			ELSE
 			{
@@ -2501,7 +2529,7 @@ FUNCTION Process_List(INTEGER listType)
 				{
 	        		CASE (MOVIE_TITLE_LIST):
 					{	
-						Process_Movie();
+						Process_Movie(1);
 						BREAK;
 					}
 					CASE (TV_SHOW_LIST):
@@ -2624,6 +2652,11 @@ FUNCTION ProcessResult(INTEGER requestId)
 			Process_GetItem(requestId);
         	BREAK;
 		}
+		CASE (REQUESTID_PLAYER_GETITEMEXTENDED):
+		{
+			Process_GetItem(requestId);
+        	BREAK;
+		}
 		CASE (REQUESTID_PLAYER_GETPROPERTIES):
 		{
 			Process_PlayerProperties();
@@ -2636,7 +2669,9 @@ FUNCTION ProcessResult(INTEGER requestId)
 		}
 		CASE (REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS):
 		{
-			Process_GetItem(requestId);
+			Read(); 
+			Read();
+			Process_Movie(0);
         	BREAK;
 		}
 		CASE (REQUESTID_VIDEOLIBRARY_GETTVSHOWS):
@@ -2653,6 +2688,22 @@ FUNCTION ProcessResult(INTEGER requestId)
 		{
 			Process_List(MUSIC_ALBUM_LIST);
         	BREAK;
+		}
+		CASE (REQUESTID_PLAYLIST_ADD):
+		{
+         	BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_PLAYLIST_CLEARAUDIO):
+		{
+            BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_PLAYLIST_CLEARVIDEO):
+		{
+            BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_PLAYLIST_PLAY):
+		{
+            BREAK; // Do Nothing
 		}
     	CASE (REQUESTID_VERSION):
 		{
@@ -2949,9 +3000,11 @@ FUNCTION List_Retrieve()
 	{
 		CASE(MOVIE_TITLE_LIST):
 		{
-            MAKESTRING (Params$, "{%s%s\"properties\":[%s,%s,%s,%s,%s,%s]%s}"
-				,Filter$, Limits$, "\"title\"", "\"thumbnail\"", "\"tagline\""
-				,"\"genre\"", "\"year\"", "\"playcount\"", Sort$);
+            MAKESTRING (Params$, "{%s%s\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s}"
+				,Filter$, Limits$, "\"thumbnail\"", "\"tagline\""
+				,"\"genre\"", "\"year\"", "\"playcount\"", "\"rating\""
+				,"\"studio\"","\"writer\"","\"mpaa\""
+				,Sort$);
 			Method$ = "VideoLibrary.GetMovies"; 
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIES, Method$, Params$);
 			BREAK;
@@ -2988,6 +3041,79 @@ FUNCTION List_Retrieve()
          	GenerateUserError("List_Retrieve: Unknown list: %d", CurrentList);
 		}
 	}
+}
+
+/*
+ 	Play the selected item
+*/   
+FUNCTION Play()
+{
+	STRING BatchCommand$[500];
+	INTEGER PlayerID;
+	STRING ItemType$[20];
+    STRING Id$[5];
+	STRING Params$[25];
+	STRING Item$[7];
+	STRING Playlist$[13];
+	STRING Position$[12];
+	STRING MethodClear$[25];
+	STRING MethodAdd$[25];
+	STRING MethodOpen$[25];
+
+	SWITCH (CurrentList)
+	{
+		CASE (MOVIE_TITLE_LIST) :
+		{
+			MovieDetails = OFF;
+            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+			ItemType$ = "movieid";
+		}
+		CASE (TV_EPISODE_LIST)  : 
+		{
+            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+			ItemType$ = "episodeid";
+		}
+		CASE (MUSIC_SONG_LIST)  : 
+		{          			
+            PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+			ItemType$ = "songid";
+            
+			GenerateUserError("CHANGE PlayItem %s","is not implemented yet.");
+			RETURN;
+            /*IF (AlbumID || ArtistID)
+            {
+				CreatePlaylistOnXbmc();
+	                 
+				WaitforSocketToClear();
+
+			    // Wait 3 seconds before requesting metadata
+				WAIT(300)
+				{
+					PULSE(10, CheckCurrentlyPlaying);
+				}
+				RETURN; // Exit function
+			}	*/		
+		}
+	}
+    
+    Id$ = "\"id\":";
+	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
+	Item$ = "\"item\":";
+	Playlist$ = "\"playlistid\":";
+	Position$ = "\"position\":0";
+	MethodClear$ = "\"method\":\"Playlist.Clear\"";
+	MethodAdd$ = "\"method\":\"Playlist.Add\"";
+	MethodOpen$ = "\"method\":\"Playlist.Open\"";
+	
+	MAKESTRING(BatchCommand$,"[{%s%d,%s,%s{%s%d}},{%s%d,%s,%s{%s%d}},{%s%d,%s,%s{%s%d,%s{\"%s\":%d}}},{%s%d,%s,%s{%s{%s%d,%s}}}]"
+					,Id$,REQUESTID_PLAYLIST_CLEARAUDIO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
+					,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO
+                    ,Id$,REQUESTID_PLAYLIST_ADD,MethodAdd$,Params$,Playlist$,PlayerID,Item$,ItemType$,ListIDs[SelectedItem]
+					,Id$,REQUESTID_PLAYLIST_OPEN,MethodOpen$,Params$,Item$,Playlist$,PlayerID,Position$
+					);
+    PRINT("%s",LEFT(BatchCommand$,200));
+    PRINT("%s",RIGHT(BatchCommand$,200));
+	SendToSocket(BatchCommand$);
 }
 
 /*******************************************************************************************
@@ -3053,6 +3179,8 @@ PUSH List_Albums
 	ListEnd=StepAmount;				// limits.end
 	PageNumber=0;					// The current page we are on
 	SortMethod$="label";
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;
 	List_Retrieve();
 
 }
@@ -3064,6 +3192,8 @@ PUSH List_Artists
 	ListEnd=StepAmount;				
 	PageNumber=0;					
 	SortMethod$="label";
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;
 	List_Retrieve();
 }
 
@@ -3075,6 +3205,8 @@ PUSH List_Movies
 	ListEnd=StepAmount;				// limits.end
 	PageNumber=0;					// The current page we are on
 	SortMethod$="title";
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;
 	List_Retrieve();
 }
 PUSH List_TvShows
@@ -3085,12 +3217,16 @@ PUSH List_TvShows
 	ListEnd=StepAmount;				
 	PageNumber=0;					
 	SortMethod$="title";
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;
 	List_Retrieve();
 }
 PUSH List_UnWatchedOnly
 {
 	UnWatched = 1;
 	ListIndex=0;
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;
 	List_Retrieve();	
 }
 RELEASE List_UnWatchedOnly
@@ -3101,7 +3237,8 @@ RELEASE List_UnWatchedOnly
 }
 PUSH List_Exit_Details_Page
 {
-	
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;	
 }
 
 PUSH PlayNext
@@ -3203,9 +3340,7 @@ CHANGE SearchCriteria$
 */
 CHANGE PlayItem
 {
-	GenerateUserError("CHANGE PlayItem %s","is not implemented yet.");
-
-	//Play();
+	Play();
 
 	MovieDetails = OFF;
     TvShowDetails = OFF;
@@ -3216,18 +3351,16 @@ CHANGE PlayItem
 */
 CHANGE SelectedItem
 {
-	GenerateUserError("CHANGE SelectedItem %s","is not implemented yet.");
-	/*
+	
 	CSWITCH (CurrentList)
 	{
 		CASE (MOVIE_TITLE_LIST) : 
 		{
-			Movie_GetDetails(ListIDs[SelectedItem],1);
-
 			MovieDetails = ON;
+			Movie_GetDetails(ListIDs[SelectedItem]);        				
 			Break;
 		}
-		CASE (TV_SHOW_LIST) 	: 
+		/*CASE (TV_SHOW_LIST) 	: 
 		{
 			SelectedSeriesName$ =    TvShows[List_Position[SelectedItem]].label;  
             SelectedGenre$      =    TvShows[List_Position[SelectedItem]].genre;
@@ -3319,7 +3452,7 @@ CHANGE SelectedItem
 			GetPlayAllPlaylist();
 		
 			Break;
-		}
+		}*/
 		CASE (MUSIC_SONG_LIST)  : 
 		{ 
 			Play();
@@ -3329,7 +3462,7 @@ CHANGE SelectedItem
 		{
 			// do Nothing			
 		}
-	}*/
+	}
 }
 
 
@@ -4286,6 +4419,28 @@ FUNCTION UnitTest(INTEGER number)
 
 			BREAK;
 		}
+		CASE (31):
+		{
+            Init();
+			ListIndex = 1;
+			MAKESTRING(s$,"%s%d%s%s%s%s%s"
+                ,"{\"id\":", REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS
+				,",\"result\":{\"moviedetails\":{\"label\""
+				,":\"2012\",\"movieid\":541,\"plot\":\"Dr. Adrian Helmsley, part of a "
+				,"Meanwhile, writer Jackson Curtis stumbles on"
+				," the same information. While the world's leaders race to build \\\"arks\\\""
+				," to escape the impending cataclysm.\"}}}"
+				);
+
+			length = LEN(s$);
+			WHILE (length)
+			{
+				PRINT ("lewngth: %d", length);
+            	ProcessResponse(s$,length);
+			}
+
+			BREAK;
+		}
 		DEFAULT:
 		{
 			PRINT("%s","Unknown Unit Test.");
@@ -4307,7 +4462,7 @@ PUSH RunAllTests
 
 	INTEGER i;
 #IF_DEFINED DEBUG
-	FOR (i = 1 TO 30)
+	FOR (i = 1 TO 31)
 	{
 		UnitTest(i);
 	}
