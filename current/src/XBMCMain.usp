@@ -81,7 +81,7 @@ Comments:
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 10000		// Socket buffer size
-#DEFINE_CONSTANT STORED_STRING_SIZE 10  // Size of each string in the temporary string store
+#DEFINE_CONSTANT STORED_STRING_SIZE 1000  // Size of each string in the temporary string store
 #DEFINE_CONSTANT STORED_STRING_RET_SIZE 10000 // The maximum size of strings that can be outputted from the store
 
 //Useful characters that we'll need in parsing metadata
@@ -365,7 +365,7 @@ INTEGER ArtistID;					// ID of artist, used to generate artist-albums list
   
   A temporary storage of json strings received from Xbmc. These stored strings,
   together with the array of tokens are then used to decode the JSON into useful data.
-  The strings are stored in a 2D array to get around the array size limit of 65535 characters
+  The strings are stored in a 2D array to get around the string size limit of 65535 characters
 *******************************************************************************************/
      
 STRUCTURE 	StoredStringPosition
@@ -389,7 +389,7 @@ FUNCTION Store_RecalculatePosition(INTEGER value)
 		Store.arrayPosition = 0;
 
 		IF (Store.listIndex > GetNumArrayRows(StoredStrings)) 
-			ResizeArray(StoredStrings,Store.listIndex,STORED_STRING_SIZE);
+			ResizeArray(StoredStrings,Store.listIndex+1,STORED_STRING_SIZE);
 	}
 }
 
@@ -4451,23 +4451,21 @@ FUNCTION UnitTest(INTEGER number)
 	CSWITCH (number)
 	{
 		CASE (1):
-		{
+		{		//1234567890123456789012345678901234567890
+			s$ = "This is a test string. A second test string. A third test string. ";
 			InitStoredStrings();
-			actual$ = StoredStrings[0];
-			expected$ = "This is a ";
-			TestString(expected$, actual$, number);
+             
+			// Not testing 'actual' in this unit test, only actual$
+			// just using it as a integer variable		
+			actual = LEN(s$) MOD STORED_STRING_SIZE;
+			actual = 1+(LEN(s$)-actual)/STORED_STRING_SIZE;
 
-			actual$ = StoredStrings[1];
-			expected$ = "test strin";
-			TestString(expected$, actual$, number);	
-
-			actual$ = StoredStrings[2];
-			expected$ = "g. A secon";
-			TestString(expected$, actual$, number);
-
-            actual$ = StoredStrings[3];
-			expected$ = "d test str";
-			TestString(expected$, actual$, number);			
+			FOR (i = 1 TO actual)
+			{
+				actual$ = StoredStrings[i-1];
+				expected$ = MID(s$,1+(i-1)*STORED_STRING_SIZE,STORED_STRING_SIZE);
+				TestString(expected$, actual$, number);
+			}		
 			
 			BREAK;
 		}
@@ -5260,7 +5258,6 @@ FUNCTION UnitTest(INTEGER number)
 			length = LEN(s$);
 			WHILE (length)
 			{
-				PRINT ("lewngth: %d", length);
             	ProcessResponse(s$,length);
 			}
 
@@ -5302,5 +5299,9 @@ Function Main()
 {              
    
 	WaitForInitializationComplete();
-
+                        
+	// Init StoredStrings                  
+	Store.listIndex = 0;
+	Store.arrayPosition = 0;
+	SetArray(StoredStrings,"");
 }
