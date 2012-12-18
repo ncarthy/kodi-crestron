@@ -4328,10 +4328,10 @@ THREADSAFE SOCKETRECEIVE XBMC
 FUNCTION InitStoredStrings()
 {
 	INTEGER i;
-	STRING s1[10];
-	STRING s2[10];
-	STRING s3[10];
-	STRING s4[10];
+	STRING s1[20];
+	STRING s2[20];
+	STRING s3[20];
+	STRING s4[20];
 
 	FOR (i = 0 TO GetNumArrayRows(StoredStrings))
 	{
@@ -4355,10 +4355,6 @@ FUNCTION InitStoredStrings()
 FUNCTION InitAndStoreOneString(STRING s$)
 {
 	INTEGER i;
-	STRING s1[10];
-	STRING s2[10];
-	STRING s3[10];
-	STRING s4[10];
                
 	// Reset StoredStrings
 	FOR (i = 0 TO GetNumArrayRows(StoredStrings))
