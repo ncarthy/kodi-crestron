@@ -1,0 +1,76 @@
+/*******************************************************************************************
+  SIMPL+ Module Information
+  (Fill in comments below)
+*******************************************************************************************/
+/*
+Module Name: CalcPercentage
+Module Version: 1.0
+Programmer: Neil Carthy (arduino@scpgwiki.com)
+Comments:                                             
+	***** License *****
+
+	This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+	***** ******* *****
+*/
+
+/*******************************************************************************************
+  Compiler Directives
+  (Uncomment and declare compiler directives as needed)
+*******************************************************************************************/
+#SYMBOL_NAME "CalcPercentage"
+#CATEGORY "1" // Analog Operations
+#HINT "Calculate a Percentage From Two Analog Inputs"  
+
+
+/////////////////////Compiler Directives
+#PRINT_TO_TRACE
+#ENABLE_DYNAMIC
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+/*******************************************************************************************
+  DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
+  (Uncomment and declare inputs and outputs as needed)
+*******************************************************************************************/
+ANALOG_INPUT _SKIP_,_SKIP_,Denominator;
+ANALOG_INPUT Numerator;
+
+ANALOG_OUTPUT Percentage;
+
+CHANGE Denominator
+{
+	IF (Numerator)
+		Percentage = MULDIV(Denominator,100,Numerator);
+} 
+
+
+/*******************************************************************************************
+  Main()
+  Uncomment and place one-time startup code here
+  (This code will get called when the system starts up)
+*******************************************************************************************/
+
+Function Main()
+{
+    WaitForInitializationComplete();
+    // If you are reading any Input or Output variables, uncomment
+    //   the WaitForInitializationComplete statement above and read
+    //   them afterwards.  Input/Output variables will not have
+    //   their correct values set until after the logic processor
+    //   runs and propagates the values to them.
+}
+
+
