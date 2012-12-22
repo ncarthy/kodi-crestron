@@ -635,7 +635,6 @@
   SPlus2CompiledName=S2_XBMCMain
   SymJam=NonExclusive
   FileName=XBMCMain.ush
-  Usl1=Common_Functions.usl
 [END]
 [BEGIN]
   ObjTp=Dp

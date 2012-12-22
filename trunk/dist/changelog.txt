@@ -1,5 +1,13 @@
 xbmc-crestron history
 
+1.0-beta 22 Dec 2012
+* Works with Frodo release of Xbmc (v12)
+* Does not work with Eden release (v11)
+* Complete re-write of JSON parsing from Xbmc
+* Implemented filter to show unwatched movies/episodes
+* Fixed SMS keys by extending timeout to 0.5sec
+* Progress bar and current time in track now driven by notifications, reducing network overhead
+
 0.7.1 07-Nov-2012
 * Small changes to make XBMC V2.umc to SB module
 
