@@ -77,7 +77,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 10000		// Socket buffer size
@@ -171,10 +171,10 @@ DIGITAL_OUTPUT  IsConnected,
 
 ANALOG_OUTPUT   _SKIP_,VersionID#,		// The version id of the JSON api. 4 = Eden, 6 = Frodo
 			    CurrentlyPlayingType,	// 1 = movie, 2 = audio, 3 = tv, 4= picture, 5 = other video
-				ScrollBarPercentage#,// Percentage (0-99) user has moved through the media list (feedback for scroll bar)
 				CurrentList,				// The ID of the current list
 				Position_Seconds, 			// Position in track in seconds
 				Duration_Seconds, 			// Total length of track in seconds
+				ScrollBarPercentage#,// Percentage (0-99) user has moved through the media list (feedback for scroll bar)
 				NumberAudioStreams,		 	// Number of audio streams in movie/episode
 				NumberSubtitleStreams,		// Number of subtitle streams in movie/episode
 				RepeatStatus;				// 0 = 'off', 1 = 'all', 2 = 'one'
@@ -199,9 +199,7 @@ STRING_OUTPUT   _SKIP_,
 				CurrentTrackNumber$,		// The track number				
 				CurrentArtist$,			   	// The artist of the current track
 				CurrentAlbum$,			    // The album of the current track
-				CurrentAlbumDescription$,   // Allmusic description
-				CurrentArtistDescription$,  // Allmusic description
-				CurrentAudioBitRate$,_SKIP_,// audio bitrate
+				CurrentAudioBitRate$,		// audio bitrate
 				CurrentAudioCodec$,			// audio codec
 				CurrentAudioChannels$,		// Number of Channels
 				CurrentAudioLanguage$,		// Current Language
@@ -232,16 +230,15 @@ STRING_OUTPUT	Title$[10],
 				SeriesOrArtistName$[10],
 				Fanart$[10],
 				Filename$[10],
-				Banner$[10];
-
-
-
+				Banner$[10],
+				PlotDescription$[10];
 
 DIGITAL_INPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_;
 DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
 
 /* Browse functionality */
-DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,				
+DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+				List_RecentItems,			// When HIGH only show recently added Movies/TvShows
 				List_UnWatchedOnly,			// When HIGH only show unwatched Movies/TvShows
 				List_TopPage,				// Go to 1st page
 				List_BottomPage,			// Go to last page
@@ -252,7 +249,6 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
 				List_Albums,				// Show music albums list
 				List_TVShows, 				// Show TV shows list
 				List_Artists,				// Show music artists list
-				List_Songs,
 				List_Exit_Details_Page,
 				_SKIP_,
 				PlayNext, 
@@ -280,9 +276,6 @@ ANALOG_INPUT 	_SKIP_,PlayItem,			// Begin playing this listitem
 STRING_PARAMETER XBMC_IPAddr$[16];   //the ip of the XBMC server.
 STRING_PARAMETER XBMC_HttpPort$[5];	 //the port that the XBMC server lives on
 INTEGER_PARAMETER StepAmount;		 // Only return this many results from database at a time
-INTEGER_PARAMETER UseJpgExtension;	 // Use '.jpg' as thumbnail extension instead of '.tbn'
-STRING_PARAMETER LOGIN[30];			 // Username for http server (used to downlaod thumbnails) 
-STRING_PARAMETER PASSWORD[30];		 // Password for http server (used to downlaod thumbnails)
 STRING_PARAMETER XBMC_TcpPort$[5];	 //the port that the XBMC server lives on
 
 
@@ -303,20 +296,6 @@ STRING_PARAMETER XBMC_TcpPort$[5];	 //the port that the XBMC server lives on
     propDefaultUnit = unitDecimal;
     propDefaultValue = 10d;
     propShortDescription = "Only return this many results from database at a time.";
-#END_PARAMETER_PROPERTIES
-#BEGIN_PARAMETER_PROPERTIES UseJpgExtension
-	propValidUnits = unitDecimal;
-    propDefaultUnit = unitDecimal;
-    propDefaultValue = 0d;
-    propShortDescription = "Use jpg as thumbnail extension instead of tbn";
-#END_PARAMETER_PROPERTIES
-#BEGIN_PARAMETER_PROPERTIES LOGIN
-   propDefaultValue = "xbmc";   
-   propShortDescription = "Login for HTTP Basic Authentication. Set 0d if no login. Max 30 chars.";
-#END_PARAMETER_PROPERTIES
-#BEGIN_PARAMETER_PROPERTIES PASSWORD
-   propDefaultValue = "xbmc";   
-   propShortDescription = "Password for HTTP Basic Authentication. Set 0d if no password. Max 30 chars.";
 #END_PARAMETER_PROPERTIES
 #BEGIN_PARAMETER_PROPERTIES XBMC_TcpPort$
    propDefaultValue = "";   
@@ -352,6 +331,7 @@ INTEGER ListEnd;					// limits.end
 INTEGER ListStart_Prev;				// limits.start for the previous list view
 INTEGER ListTotal;					// Total number of items in list (limits.total)
 INTEGER UnWatched;					// HIGH = show unwatched movies/tv shows only
+INTEGER Recent;						// HIGH = show recently added movies/tv shows only
 STRING StartsWith$[20];				// Filter list items to those that start with this string
 STRING StartsWith_Prev$[20];        // Previous list filter, stored to enable 'Back' functionality
 STRING SortMethod$[20];				// The property (title, label, trackno etc) to sort the list
@@ -1119,9 +1099,9 @@ FUNCTION Movie_GetDetails(INTEGER movieid)
 {
 	STRING Params$[150];
 
-	MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s,%s,%s]}"
+	MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s,%s,%s,%s]}"
 			, movieid, "\"director\"", "\"runtime\"", "\"plot\""
-			,"\"file\"");
+			,"\"file\"", "\"writer\"");
 
 	CALL SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS
 						, "VideoLibrary.GetMovieDetails", Params$);
@@ -1239,37 +1219,6 @@ STRING_FUNCTION EscapeUri(STRING uri$)
 	
 	RETURN(LEFT(escaped$,pos-1));
 }
-
-
-/*
-     Convert a number of seconds into a readable time string
-*/
-/*STRING_FUNCTION ConvertToTime(INTEGER NumberOfSeconds)
-{
-	INTEGER hours;
-	INTEGER minutes;
-	INTEGER seconds;
-	INTEGER tmp;
-	STRING  OUT$[10];
-    
-	seconds = NumberOfSeconds MOD 3600;
-	hours = (NumberOfSeconds - seconds) / 3600;
-
-	tmp = seconds;    
-
-	seconds = tmp MOD 60;
-
-	minutes = (tmp - seconds) / 60;
-
-	IF ( hours > 0)
-        MAKESTRING(OUT$, "%02d:%02d:%02d", hours, minutes, seconds);
-	ELSE IF (minutes > 0)
-        MAKESTRING(OUT$, "%02d:%02d", minutes, seconds);
-	ELSE
-		MAKESTRING(OUT$, "00:%02d", seconds);
-
-	RETURN (OUT$);
-}*/
            
 /*
 	Given a string representation of a floating point number, 
@@ -1487,6 +1436,9 @@ FUNCTION SendPlotAsIndirectText(STRING longstring$)
 STRING_FUNCTION EscapeThumbnailUri(STRING uri$)
 {
 	STRING return$[512];
+	
+	IF (!LEN(uri$))
+    	RETURN ("");
 
 	MAKESTRING(return$,"http://%s:%s/image/%s"
 					,XBMC_IPAddr$, XBMC_HttpPort$, EscapeUri(uri$));
@@ -1495,7 +1447,7 @@ STRING_FUNCTION EscapeThumbnailUri(STRING uri$)
 	IF (RIGHT(return$,1) = "/")                                                                 
 		return$ = LEFT(return$,LEN(return$)-1);
 
-	IF (UseJpgExtension && RIGHT(return$,4) = ".tbn")
+	IF (RIGHT(return$,4) = ".tbn")
 	{
 		return$ = return$ + "?image.jpg";
 	}		
@@ -1755,7 +1707,7 @@ FUNCTION Process_AudioStream(INTEGER Skip)
 			ELSE IF (name$ = "bitrate")
 			{
 				bitrate = AtoL(GetString())/1000;
-            	MAKESTRING(CurrentAudioBitrate$,"%ldkps",bitrate);
+            	MAKESTRING(CurrentAudioBitrate$,"%ldkbs",bitrate);
 			}
             ELSE IF (name$ = "index" || name$ = "language" || name$ = "name")
 			{
@@ -1800,7 +1752,7 @@ FUNCTION Process_VideoStream(INTEGER Skip)
 	
 			IF (name$ = "aspect")
 			{		
-	           	CurrentVideoAspect$ = Round(GetString(),4);
+	           	CurrentVideoAspect$ = Round(GetString(),3);
 			}
 			ELSE IF (name$ = "codec")
 			{
@@ -2076,7 +2028,7 @@ FUNCTION Process_GetItem(INTEGER requestId)
 			}
             ELSE IF (name$ = "rating")
 			{
-				CurrentRating$ = Round(GetString(),3);
+				CurrentRating$ = Round(GetString(),2);
 			}
 			ELSE IF (name$ = "year")
 			{
@@ -2307,7 +2259,7 @@ FUNCTION Process_Movie(INTEGER inList)
 			}
 			ELSE IF (name$ = "rating")
 			{
-                Rating$[ListIndex] = Round(GetString(),3); 
+                Rating$[ListIndex] = Round(GetString(),2); 
 			}
 			ELSE IF (name$ = "file")
 			{
@@ -2689,7 +2641,7 @@ FUNCTION Process_TvShow(INTEGER requestId,INTEGER inList)
 				IF (requestId = REQUESTID_VIDEOLIBRARY_GETTVSEASONS)
 					ListIDs[ListIndex] = GetInteger();
 				ELSE
-					SeasonOrAlbumName$[ListIndex] = GetString();
+					SeasonOrAlbumName$[ListIndex] = "Season " + GetString();
 			}
 			ELSE IF (name$ = "episodeid")
 			{
@@ -2710,7 +2662,7 @@ FUNCTION Process_TvShow(INTEGER requestId,INTEGER inList)
 			}
 			ELSE IF (name$ = "rating")
 			{
-                Rating$[ListIndex] = Round(GetString(),3); 
+                Rating$[ListIndex] = Round(GetString(),2); 
 			}
 			ELSE IF (name$ = "studio")
 			{
@@ -2818,6 +2770,7 @@ FUNCTION Process_Artist()
 FUNCTION Process_Album(INTEGER requestId)
 {
 	STRING name$[15];
+	STRING utf8_encoded$[100];
 	INTEGER numberOfProperties;
 	INTEGER i;
                    
@@ -2854,7 +2807,8 @@ FUNCTION Process_Album(INTEGER requestId)
 			}
 			ELSE IF (name$ = "artist")
 			{
-				SeriesOrArtistName$[ListIndex] = GetStringArray();
+				utf8_encoded$ = LEFT(GetStringArray(), 100);
+				SeriesOrArtistName$[ListIndex] = ReplaceUtf8(utf8_encoded$);
 			}
 			ELSE IF (name$ = "thumbnail")
 			{
@@ -2866,7 +2820,8 @@ FUNCTION Process_Album(INTEGER requestId)
 			}
 			ELSE IF (name$ = "label")
 			{
-				SeasonOrAlbumName$[ListIndex] = GetString();
+				utf8_encoded$ = LEFT(GetString(), 100);
+				SeasonOrAlbumName$[ListIndex] = ReplaceUtf8(utf8_encoded$);
 			}
 			ELSE IF (name$ = "year")
 			{
@@ -3712,9 +3667,9 @@ STRING_FUNCTION ProcessResponse(STRING fromBuffer$, BYREF INTEGER numberBytes)
 	}
 }
 
-STRING_FUNCTION List_FieldName()
+STRING_FUNCTION List_FieldName(INTEGER listID)
 {
-    CSWITCH(CurrentList)
+    CSWITCH(listID)
 	{
 		CASE(MOVIE_TITLE_LIST):
 		{
@@ -3748,13 +3703,13 @@ STRING_FUNCTION List_FieldName()
 		}
 		DEFAULT:
 		{
-         	GenerateUserError("List_FieldName: Unknown list: %d", CurrentList);
+         	GenerateUserError("List_FieldName: Unknown listID: %d", listID);
 		}
 
 	}
 }
       
-STRING_FUNCTION List_Filter()
+STRING_FUNCTION List_Filter(INTEGER listID)
 {
 	STRING FilterFinal$[500];
 	STRING Filter$[3][255];
@@ -3762,27 +3717,29 @@ STRING_FUNCTION List_Filter()
 	
 
     // Do not apply unwatched filter to Artist list
-	IF (Unwatched && CurrentList != MUSIC_ARTIST_LIST && ArtistID = 0)
+	IF (Unwatched && listID != MUSIC_ARTIST_LIST && ArtistID = 0)
 	{
     	numberFilters = 1;	
 		Filter$[0]="{\"field\":\"playcount\",\"operator\":\"is\",\"value\":\"0\"}";
 	}
 	ELSE
 		numberFilters = 0;
-
-	IF (LEN(StartsWith$))
+    
+	// Do not apply startswith filter to Song list
+	IF (LEN(StartsWith$) && listID != MUSIC_SONG_LIST)
 	{
         MAKESTRING(Filter$[numberFilters]
 			,"{\"field\":\"%s\",\"operator\":\"startswith\",\"value\":\"%s\"}"
-			,List_FieldName(),StartsWith$);
+			,List_FieldName(listID),StartsWith$);
     	numberFilters = numberFilters + 1;
 	}
 
 	IF (AlbumID)
 	{
-        MAKESTRING(Filter$[numberFilters]
-			,"{\"%s\":%d}"
-			,"albumid",AlbumID);
+		
+	    MAKESTRING(Filter$[numberFilters]
+				,"{\"%s\":%d}"
+				,"albumid",AlbumID);		
     	numberFilters = numberFilters + 1;    	
 	}
 	ELSE IF (ArtistID)
@@ -3817,23 +3774,16 @@ STRING_FUNCTION List_Filter()
 
 }
 
-FUNCTION List_Retrieve()
+FUNCTION List_Retrieve(INTEGER listID)
 {
 	STRING Filter$[255];
 	STRING Limits$[100];
 	STRING Sort$[100];
 	STRING Params$[512];
 	STRING Method$[50];
-    
-	// Supply default value
-	IF (!CurrentList)
-	{
-		CurrentList = MOVIE_TITLE_LIST;
-        SortMethod$="title";
-	}
                      
 	// Set filter, limits and sorting objects
-	Filter$ = List_Filter();
+	Filter$ = List_Filter(listID);
 	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d}"
 				,ListStart,ListEnd);
 	IF (SortMethod$="")
@@ -3843,7 +3793,7 @@ FUNCTION List_Retrieve()
 				,SortMethod$);
     
 	// Use a switch to execute the JSON command
-	CSWITCH (CurrentList)
+	CSWITCH (listID)
 	{
 		CASE(MOVIE_TITLE_LIST):
 		{
@@ -3858,8 +3808,8 @@ FUNCTION List_Retrieve()
 		}
 		CASE(TV_SHOW_LIST):
 		{
-            MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s]%s}"
-				,Filter$, Limits$, "\"title\"", "\"art\""
+            MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s]%s}"
+				,Filter$, Limits$, "\"title\"", "\"art\"", "\"studio\""
 				,"\"genre\"", "\"year\"", "\"playcount\"", Sort$);
 			Method$ = "VideoLibrary.GetTvShows"; 
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETTVSHOWS, Method$, Params$);
@@ -3876,9 +3826,9 @@ FUNCTION List_Retrieve()
 		CASE(TV_EPISODE_LIST):
 		{
 				MAKESTRING (Params$, 
-					"{\"tvshowid\":%d,\"season\":%d,%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s]%s}"
+					"{\"tvshowid\":%d,\"season\":%d,%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s}"
 					, TvShowID, TvShowSeasonID, Limits$, "\"thumbnail\"","\"rating\""
-					,"\"showtitle\"","\"runtime\"","\"episode\""
+					,"\"showtitle\"","\"runtime\"","\"episode\"","\"director\""
 					,"\"firstaired\"","\"playcount\"","\"season\"", Sort$);
 			Method$ = "VideoLibrary.GetEpisodes"; 
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETTVEPISODES, Method$, Params$);
@@ -4050,7 +4000,7 @@ PUSH List_TopPage
 	ListIndex=0;					// The index of the current object within the list
 	ListStart=0;                  	// limits.start      
 	ListEnd=StepAmount;				// limits.end
-    List_Retrieve();
+    List_Retrieve(CurrentList);
 }
 
 // Move to the last page in the list
@@ -4059,7 +4009,7 @@ PUSH List_BottomPage
 	ListIndex=0;					
 	ListEnd=ListTotal;
 	ListStart=ListEnd-StepAmount;
-	List_Retrieve();
+	List_Retrieve(CurrentList);
 }
 
 // Move to the previous page in the list
@@ -4068,7 +4018,7 @@ PUSH List_PageMinus
 	ListIndex=0;				
 	ListStart=MAX(0,ListStart-StepAmount);
 	ListEnd=ListStart+StepAmount;			
-    List_Retrieve();
+    List_Retrieve(CurrentList);
 }
 // Move to the next page in the list
 PUSH List_PagePlus
@@ -4076,7 +4026,7 @@ PUSH List_PagePlus
 	ListIndex=0;					
 	ListEnd=MIN(ListTotal,ListEnd+StepAmount);	
 	ListStart=ListEnd-StepAmount;
-	List_Retrieve();
+	List_Retrieve(CurrentList);
 }
 // Return to the previous list  
 PUSH List_Back
@@ -4105,7 +4055,6 @@ PUSH List_Back
 			ListStart=0;
 			ListEnd=StepAmount;
 			CurrentList = TV_SEASON_LIST;
-			TERMINATEEVENT;	// don't need to reload current list values;
 		}
 		CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
 		{ 
@@ -4155,7 +4104,7 @@ PUSH List_Back
 		}
 	}
 	
-	List_Retrieve();
+	List_Retrieve(CurrentList);
 }
 
 PUSH List_Albums
@@ -4167,8 +4116,7 @@ PUSH List_Albums
 	FOR (i = 1 TO StepAmount)
 	{
 		Watched[i] = OFF;
-	}
-	CurrentList = MUSIC_ALBUM_LIST;	
+	}	
 	ListIndex=0;					// The index of the current object within the list
 	ListStart=0;                  	// limits.start      
 	ListEnd=StepAmount;				// limits.end
@@ -4176,33 +4124,36 @@ PUSH List_Albums
 	SortMethod$="label";
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
-	List_Retrieve();
-
+	List_Retrieve(MUSIC_ALBUM_LIST);
+	CurrentList = MUSIC_ALBUM_LIST;
 }
 PUSH List_Artists
 {
+	INTEGER i;
     ArtistID = 0;
 	AlbumID = 0;
 	ArtistID_Prev = 0;
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
-
+	FOR (i = 1 TO StepAmount)
+	{
+		Watched[i] = OFF;
+	}
 	ListIndex=0;					
 	ListStart=0;                  	
 	ListEnd=StepAmount;				
 
 	StartsWith$= "";
 	SortMethod$="label";
-	CurrentList = MUSIC_ARTIST_LIST;	
 
-	List_Retrieve();
+	List_Retrieve(MUSIC_ARTIST_LIST);
+	CurrentList = MUSIC_ARTIST_LIST;	
 }
 
 PUSH List_Movies
 {
     ArtistID = 0;
 	AlbumID = 0;
-	CurrentList = MOVIE_TITLE_LIST;	
 	ListIndex=0;					// The index of the current object within the list
 	ListStart=0;                  	// limits.start      
 	ListEnd=StepAmount;				// limits.end
@@ -4210,13 +4161,13 @@ PUSH List_Movies
 	SortMethod$="title";
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
-	List_Retrieve();
+	List_Retrieve(MOVIE_TITLE_LIST);
+	CurrentList = MOVIE_TITLE_LIST;	
 }
 PUSH List_TvShows
 {
     ArtistID = 0;
-	AlbumID = 0;
-	CurrentList = TV_SHOW_LIST;	
+	AlbumID = 0;	
 	ListIndex=0;					
 	ListStart=0;                  	
 	ListEnd=StepAmount;				
@@ -4224,7 +4175,8 @@ PUSH List_TvShows
 	SortMethod$="title";
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
-	List_Retrieve();
+	List_Retrieve(TV_SHOW_LIST);
+	CurrentList = TV_SHOW_LIST;
 }
 PUSH List_UnWatchedOnly
 {
@@ -4232,13 +4184,13 @@ PUSH List_UnWatchedOnly
 	ListIndex=0;
     TvShowDetails = OFF;	
    	MovieDetails = OFF;
-	List_Retrieve();	
+	List_Retrieve(CurrentList);	
 }
 RELEASE List_UnWatchedOnly
 {
 	UnWatched = 0;
 	ListIndex=0;
-	List_Retrieve();	
+	List_Retrieve(CurrentList);	
 }
 PUSH List_Exit_Details_Page
 {
@@ -4347,7 +4299,7 @@ CHANGE SearchCriteria$
 		ListIndex=0;
 		ListStart=0;                  	     
 		ListEnd=StepAmount;
-		List_Retrieve();
+		List_Retrieve(CurrentList);
 	}
 }
 
@@ -4377,7 +4329,7 @@ CHANGE SelectedItem
 		}
 		CASE (TV_SHOW_LIST) 	: 
 		{
-	        CurrentList = TV_SEASON_LIST;
+	        
 			ListStart_Prev = ListStart;
 			ListIndex=0;					
 			ListStart=0;                  	
@@ -4385,14 +4337,14 @@ CHANGE SelectedItem
 			StartsWith$= "";
 			SortMethod$ = "season";
 			TvShowID = ListIDs[SelectedItem];
-			List_Retrieve();
+			List_Retrieve(TV_SEASON_LIST);
+			CurrentList = TV_SEASON_LIST;
 			Break;
 		}
 		CASE (TV_SEASON_LIST) 	: 
 		{
 			IF (ListIDs[SelectedItem])
-			{
-		        CurrentList = TV_EPISODE_LIST;
+			{		        
 				IF (ListIDs[SelectedItem] = SPECIAL_SEASON)
 					TvShowSeasonID = 0;
 				else				
@@ -4403,7 +4355,8 @@ CHANGE SelectedItem
 				ListEnd=StepAmount;				
 				StartsWith$= "";
 				SortMethod$ = "episode";
-				List_Retrieve();
+				List_Retrieve(TV_EPISODE_LIST);
+				CurrentList = TV_EPISODE_LIST;
 			}
 			Break;
 		}
@@ -4411,16 +4364,14 @@ CHANGE SelectedItem
 		{ 
 			IF (ListIDs[SelectedItem])
 			{
+				Episode_GetDetails(ListIDs[SelectedItem]);	
 	    		MovieDetails = OFF;
     	    	TvShowDetails = ON;
-				Episode_GetDetails(ListIDs[SelectedItem]);	
 			}
 			Break;
 		}
 		CASE (MUSIC_ALBUM_LIST) : 
 		{ 
-	        CurrentList = MUSIC_SONG_LIST;
-
 			AlbumID = ListIDs[SelectedItem];
 			ArtistID = 0;
             
@@ -4433,13 +4384,12 @@ CHANGE SelectedItem
 			ListEnd=StepAmount;							
 			StartsWith$= "";
 			SortMethod$ = "track";
-			List_Retrieve();
+			List_Retrieve(MUSIC_SONG_LIST);
+			CurrentList = MUSIC_SONG_LIST;
 			Break;
 		}
 		CASE (MUSIC_ARTIST_LIST) : 
 		{ 
-	        CurrentList = MUSIC_ARTIST_CHOOSE_LIST;
-
 			ArtistID = ListIDs[SelectedItem];
 			AlbumID = 0;
              
@@ -4452,13 +4402,13 @@ CHANGE SelectedItem
 			ListEnd=StepAmount;				
 			StartsWith$= "";
 			SortMethod$ = "label";
-			List_Retrieve();
+			List_Retrieve(MUSIC_ARTIST_CHOOSE_LIST);
+			CurrentList = MUSIC_ARTIST_CHOOSE_LIST;
 			Break;
 
 		}
 		CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
-		{ 
-	        CurrentList = MUSIC_SONG_LIST;
+		{ 	        
 			// If albumID = 0 then 'All songs' has been selected
 			// So keep the reference to artistID. 
 			AlbumID = ListIDs[SelectedItem];
@@ -4476,7 +4426,8 @@ CHANGE SelectedItem
 			ListStart=0;      
 			ListEnd=StepAmount;				
 			StartsWith$= "";			
-			List_Retrieve();
+			List_Retrieve(MUSIC_SONG_LIST);
+			CurrentList = MUSIC_SONG_LIST;
 			Break;
 		}
 		CASE (MUSIC_SONG_LIST)  : 
