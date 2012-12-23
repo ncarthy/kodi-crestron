@@ -90,7 +90,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 10000		// Socket buffer size
@@ -251,7 +251,7 @@ DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
 
 /* Browse functionality */
 DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
-				List_RecentItems,			// When HIGH only show recently added Movies/TvShows
+				List_RecentItems,			// When HIGH only show recently added Movies/Albums
 				List_UnWatchedOnly,			// When HIGH only show unwatched Movies/TvShows
 				List_TopPage,				// Go to 1st page
 				List_BottomPage,			// Go to last page
@@ -344,7 +344,7 @@ INTEGER ListEnd;					// limits.end
 INTEGER ListStart_Prev;				// limits.start for the previous list view
 INTEGER ListTotal;					// Total number of items in list (limits.total)
 INTEGER UnWatched;					// HIGH = show unwatched movies/tv shows only
-INTEGER Recent;						// HIGH = show recently added movies/tv shows only
+INTEGER RecentlyAdded;				// HIGH = show recently added movies/tv shows only
 STRING StartsWith$[20];				// Filter list items to those that start with this string
 STRING StartsWith_Prev$[20];        // Previous list filter, stored to enable 'Back' functionality
 STRING SortMethod$[20];				// The property (title, label, trackno etc) to sort the list
@@ -3795,12 +3795,19 @@ FUNCTION List_Retrieve(INTEGER listID)
 	STRING Params$[512];
 	STRING Method$[50];
                      
+	// Don't allow zro listID
+	IF (!listID)
+		RETURN;
+
 	// Set filter, limits and sorting objects
-	Filter$ = List_Filter(listID);
+	IF (RecentlyAdded)
+		Filter$ = "";
+	ELSE
+		Filter$ = List_Filter(listID);
 	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d }"
 				,ListStart,ListEnd);
-	IF (SortMethod$="")
-		Sort$ = "";
+	IF (SortMethod$="" || (RecentlyAdded && (listID = MOVIE_TITLE_LIST || listID = MUSIC_ALBUM_LIST)) )
+		Sort$ = ""; // Recently added only works for Movies and Albums
 	ELSE
 		MAKESTRING(Sort$,",\"sort\":{\"method\":\"%s\",\"order\":\"ascending\",\"ignorearticle\":true}"
 				,SortMethod$);
@@ -3815,7 +3822,10 @@ FUNCTION List_Retrieve(INTEGER listID)
 				,"\"genre\"", "\"year\"", "\"playcount\"", "\"rating\""
 				,"\"studio\"","\"writer\"","\"mpaa\""
 				,Sort$);
-			Method$ = "VideoLibrary.GetMovies"; 
+			IF (RecentlyAdded)
+				Method$ = "VideoLibrary.GetRecentlyAddedMovies"; 
+			ELSE
+				Method$ = "VideoLibrary.GetMovies"; 
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIES, Method$, Params$);
 			BREAK;
 		}
@@ -3852,7 +3862,10 @@ FUNCTION List_Retrieve(INTEGER listID)
            	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"artist\"", "\"thumbnail\""
 				,"\"genre\"", "\"year\"", Sort$);
-			Method$ = "AudioLibrary.GetAlbums"; 
+			IF (RecentlyAdded)
+				Method$ = "AudioLibrary.GetRecentlyAddedAlbums"; 
+			ELSE
+				Method$ = "AudioLibrary.GetAlbums"; 
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETALBUMS, Method$, Params$);
 			BREAK;
 		}
@@ -4202,6 +4215,20 @@ PUSH List_UnWatchedOnly
 RELEASE List_UnWatchedOnly
 {
 	UnWatched = 0;
+	ListIndex=0;
+	List_Retrieve(CurrentList);	
+}
+PUSH List_RecentItems
+{
+	RecentlyAdded = 1;
+	ListIndex=0;
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;
+	List_Retrieve(CurrentList);	
+}
+RELEASE List_RecentItems
+{
+	RecentlyAdded = 0;
 	ListIndex=0;
 	List_Retrieve(CurrentList);	
 }
