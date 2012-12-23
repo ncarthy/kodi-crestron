@@ -61,6 +61,19 @@ Comments:
 
 	***** ******* *****
 
+	A note on the replacement of '%d}' and '%s}' with '%d }' and '%s }' 
+    (NOTE THE SPACE) in MAKESTRING function calls.
+	There is a bug in the Series 3 firmware that is having issue with the curly brackets 
+	in MAKESTRING. It has been confirmed with TB Support.  It can be worked around 
+	by replacing instances of a format specifier and a '}' with 
+	format specifier a space and then a '}. 
+     
+    This has been confirmed on the following
+    CP3, firmware version 1.005.0015 
+    MC3, firmware version unknown
+
+    Reported by Josh Haskell.
+                                   
 */
 
 #SYMBOL_NAME "XBMCMain"
@@ -1051,7 +1064,7 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 	ELSE
 	{
 		MAKESTRING (Command$, 
-			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s}"
+			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s }"
 			,id ,Method, Arguments);
 	}
 
@@ -3738,14 +3751,14 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	{
 		
 	    MAKESTRING(Filter$[numberFilters]
-				,"{\"%s\":%d}"
+				,"{\"%s\":%d }"
 				,"albumid",AlbumID);		
     	numberFilters = numberFilters + 1;    	
 	}
 	ELSE IF (ArtistID)
 	{
         MAKESTRING(Filter$[numberFilters]
-			,"{\"%s\":%d}"
+			,"{\"%s\":%d }"
 			,"artistid",ArtistID);
     	numberFilters = numberFilters + 1;    	
 	}
@@ -3784,7 +3797,7 @@ FUNCTION List_Retrieve(INTEGER listID)
                      
 	// Set filter, limits and sorting objects
 	Filter$ = List_Filter(listID);
-	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d}"
+	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d }"
 				,ListStart,ListEnd);
 	IF (SortMethod$="")
 		Sort$ = "";
@@ -3797,7 +3810,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 	{
 		CASE(MOVIE_TITLE_LIST):
 		{
-            MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s}"
+            MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"thumbnail\"", "\"tagline\""
 				,"\"genre\"", "\"year\"", "\"playcount\"", "\"rating\""
 				,"\"studio\"","\"writer\"","\"mpaa\""
@@ -3808,7 +3821,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		}
 		CASE(TV_SHOW_LIST):
 		{
-            MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s]%s}"
+            MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"title\"", "\"art\"", "\"studio\""
 				,"\"genre\"", "\"year\"", "\"playcount\"", Sort$);
 			Method$ = "VideoLibrary.GetTvShows"; 
@@ -3817,7 +3830,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		}
 		CASE(TV_SEASON_LIST):
 		{
-            MAKESTRING (Params$, "{\"tvshowid\":%d,%s,\"properties\":[\"season\"]%s}"
+            MAKESTRING (Params$, "{\"tvshowid\":%d,%s,\"properties\":[\"season\"]%s }"
 					, TvShowID, Limits$, Sort$);
 			Method$ = "VideoLibrary.GetSeasons"; 
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETTVSEASONS, Method$, Params$);
@@ -3826,7 +3839,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		CASE(TV_EPISODE_LIST):
 		{
 				MAKESTRING (Params$, 
-					"{\"tvshowid\":%d,\"season\":%d,%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s}"
+					"{\"tvshowid\":%d,\"season\":%d,%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s }"
 					, TvShowID, TvShowSeasonID, Limits$, "\"thumbnail\"","\"rating\""
 					,"\"showtitle\"","\"runtime\"","\"episode\"","\"director\""
 					,"\"firstaired\"","\"playcount\"","\"season\"", Sort$);
@@ -3836,7 +3849,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		}
 		CASE(MUSIC_ALBUM_LIST):
 		{
-           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s}"
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"artist\"", "\"thumbnail\""
 				,"\"genre\"", "\"year\"", Sort$);
 			Method$ = "AudioLibrary.GetAlbums"; 
@@ -3845,7 +3858,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		}
 		CASE(MUSIC_ARTIST_LIST):
 		{
-           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s]%s}"
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"thumbnail\""
 				,"\"genre\"","\"style\"", Sort$);
 			Method$ = "AudioLibrary.GetArtists"; 
@@ -3854,7 +3867,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		}
 		CASE (MUSIC_SONG_LIST):
 		{
-           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s]%s}"
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"track\"", "\"playcount\""
 				,"\"artist\"","\"album\"","\"duration\"", Sort$);
 			Method$ = "AudioLibrary.GetSongs"; 
@@ -3864,7 +3877,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		}
 		CASE(MUSIC_ARTIST_CHOOSE_LIST):
 		{
-           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s}"
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"artist\"", "\"thumbnail\""
 				,"\"genre\"", "\"year\"", Sort$);
 			Method$ = "AudioLibrary.GetAlbums"; 
@@ -3959,7 +3972,7 @@ FUNCTION Play()
 	MethodAdd$ = "\"method\":\"Playlist.Add\"";
 	MethodOpen$ = "\"method\":\"Player.Open\"";
 	
-	MAKESTRING(BatchCommand$,"[{%s%d,%s,%s{%s%d}},{%s%d,%s,%s{%s%d}},{%s%d,%s,%s{%s%d,%s{\"%s\":%d}}},{%s%d,%s,%s{%s{%s%d,%s%d}}}]"
+	MAKESTRING(BatchCommand$,"[{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d,%s{\"%s\":%d }}},{%s%d,%s,%s{%s{%s%d,%s%d }}}]"
 					,Id$,REQUESTID_PLAYLIST_CLEARAUDIO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
 					,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO
                     ,Id$,REQUESTID_PLAYLIST_ADD,MethodAdd$,Params$,Playlist$,PlayerID,Item$,ItemType$,itemid
@@ -4275,7 +4288,7 @@ CHANGE Seek_Time
     
 	IF (IsPlaying)
 	{
-		MAKESTRING(Params$, "{\"playerid\":%d, \"value\":{\"hours\":%d,\"minutes\":%d,\"seconds\":%d,\"milliseconds\":%d}}"
+		MAKESTRING(Params$, "{\"playerid\":%d, \"value\":{\"hours\":%d,\"minutes\":%d,\"seconds\":%d,\"milliseconds\":%d }}"
 					, ActivePlayerID
 					, Hours
 					, Minutes
@@ -5000,7 +5013,7 @@ FUNCTION UnitTest(INTEGER number)
 
 			Init();
 			//In Frodo 'JSONRPC.Version' is an object
-			MAKESTRING(actual$,"{%s%d%s%s%s}"
+			MAKESTRING(actual$,"{%s%d%s%s%s }"
 							,"\x22id\x22:"
 							,REQUESTID_VERSION
 							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
@@ -5283,7 +5296,7 @@ FUNCTION UnitTest(INTEGER number)
 		CASE (28): // For a given string try every possible partial rendering of it
 		{
 			Init();
-			MAKESTRING(s$,"{%s%d%s%s%s}"
+			MAKESTRING(s$,"{%s%d%s%s%s }"
 							,"\x22id\x22:"
 							,REQUESTID_VERSION
 							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
@@ -5328,7 +5341,7 @@ FUNCTION UnitTest(INTEGER number)
 		CASE (29): // Isolate one case from UnitTest 28
 		{
 			Init();
-			MAKESTRING(s$,"{%s%d%s%s%s}"
+			MAKESTRING(s$,"{%s%d%s%s%s }"
 							,"\x22id\x22:"
 							,REQUESTID_VERSION
 							,",\x22jsonrpc\x22:\x222.0\x22,\x22result\x22"
