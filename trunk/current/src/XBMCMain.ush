@@ -39,7 +39,7 @@
   InputSigType9=Digital
   InputCue10=[~UNUSED~]
   InputSigType10=Digital
-  InputCue11=[~UNUSED~]
+  InputCue11=Poll
   InputSigType11=Digital
   InputCue12=[~UNUSED~]
   InputSigType12=Digital
@@ -193,9 +193,9 @@
   OutputList2SigType23=Serial
   OutputList2Cue24=CurrentRating$
   OutputList2SigType24=Serial
-  OutputList2Cue25=CurrentYear$
+  OutputList2Cue25=CurrentMPAA$
   OutputList2SigType25=Serial
-  OutputList2Cue26=[~UNUSED~]
+  OutputList2Cue26=CurrentYear$
   OutputList2SigType26=Serial
   OutputList2Cue27=CurrentShowTitle$
   OutputList2SigType27=Serial

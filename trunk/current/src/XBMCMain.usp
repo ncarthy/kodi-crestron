@@ -90,7 +90,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 10000		// Socket buffer size
@@ -204,7 +204,8 @@ STRING_OUTPUT   _SKIP_,
                 CurrentWriter$,				// Movie writer
 				CurrentTagLine$,			// Movie tag line
 				CurrentRating$,				// imdb rating
-				CurrentYear$,_SKIP_,		// The year the song/movie was released				
+				CurrentMPAA$,				// MPAA rating
+				CurrentYear$,				// The year the song/movie was released				
 				CurrentShowTitle$,			// TV Show title
 				CurrentSeason$,				// TV Show season
 				CurrentEpisode$,			// TV Show episode
@@ -250,7 +251,9 @@ DIGITAL_INPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_;
 DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
 
 /* Browse functionality */
-DIGITAL_INPUT   _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+DIGITAL_INPUT   _SKIP_,_SKIP_,
+				Poll,						// Poll Xbmc for metadata about currently playing track
+				_SKIP_,_SKIP_,_SKIP_,
 				List_RecentItems,			// When HIGH only show recently added Movies/Albums
 				List_UnWatchedOnly,			// When HIGH only show unwatched Movies/TvShows
 				List_TopPage,				// Go to 1st page
@@ -1112,14 +1115,13 @@ FUNCTION Movie_GetDetails(INTEGER movieid)
 {
 	STRING Params$[150];
 
-	MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s,%s,%s,%s]}"
+	MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s,%s,%s,%s,%s]}"
 			, movieid, "\"director\"", "\"runtime\"", "\"plot\""
-			,"\"file\"", "\"writer\"");
+			,"\"file\"", "\"writer\"", "\"mpaa\"");
 
 	CALL SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS
 						, "VideoLibrary.GetMovieDetails", Params$);
 }
-
 
 /*
   	Close the connection and wait for status to show 'disconnected'
@@ -1194,6 +1196,9 @@ SOCKETSTATUS XBMC
 *******************************************************************************************/
 /*
     Take the uri given by XBMC and escape it
+
+	Maximum string length is 1024 characters. This is longer than the max
+    string that can be sent on a Serial.
 */
 STRING_FUNCTION EscapeUri(STRING uri$)
 {
@@ -1212,7 +1217,7 @@ STRING_FUNCTION EscapeUri(STRING uri$)
 	FOR (i = 1 TO LEN(uri$))
 	{
 		c = byte(uri$, i); //extract a char
-        //PRINT("c: %c %d, i %d, pos %d", c,c,i,pos);
+        
 		IF ((c >= 45 && c <= 58) || (c >=65 && c <=90) || (c >=97 && C <= 122)
 				|| (c = 95) || (c = 126))
 		{
@@ -1246,7 +1251,6 @@ STRING_FUNCTION Round(STRING Number, INTEGER N)
 	LONG_INTEGER BeforeDecimal, AfterDecimal;
 	INTEGER I;		
     
-	//PRINT("Number: %s, N: %d", Number, N);
 	DecimalPointIndex = FIND(".", Number);
 	Length = LEN(Number);
 
@@ -1279,7 +1283,6 @@ STRING_FUNCTION Round(STRING Number, INTEGER N)
 				ELSE
                     MAKESTRING(Result$, "%ld.%ld",BeforeDecimal,AfterDecimal);
 
-				//PRINT("Result: %s", Result$);
 				RETURN (Result$);
 			}
 			ELSE
@@ -1352,8 +1355,6 @@ INTEGER_FUNCTION ConvertUtf8ToAscii(INTEGER highByte, INTEGER lowByte)
 		PowerOfTwo = PowerOfTwo / 2; 			
 	}
 
-	//PRINT ("Hex: \\x%s, Dec: %d, chr:%s", ItoHex(Dec), Dec, chr(Dec));
-
 	RETURN (Dec);
 }
   
@@ -1410,8 +1411,6 @@ STRING_FUNCTION ReplaceUtf8(STRING input)
 /*
     Send the plot string (usu very long) to a STRING_OUTPUT
 	Done this way to overcome length restriction on indirect text joins
-
-	Doesn't work on iPad
 */
 FUNCTION SendPlotAsIndirectText(STRING longstring$)
 {
@@ -1498,7 +1497,8 @@ FUNCTION InitOutputArrays(INTEGER start)
 	}
 		
 }
-
+         
+// Get information about the item that is currently playing
 FUNCTION Player_GetItem()
 {
 	STRING Params$[500];
@@ -1514,6 +1514,8 @@ FUNCTION Player_GetItem()
 	IF (IsPlaying)
 		SendJsonCommand(REQUESTID_PLAYER_GETITEM,"Player.GetItem",Params$);
 }
+
+// Get MORE information about the item that is currently playing
 FUNCTION Player_GetItemExtended(INTEGER id)
 {
 	STRING Params$[150];
@@ -1523,8 +1525,8 @@ FUNCTION Player_GetItemExtended(INTEGER id)
               
 	IF (PlayingItemType$ = "movie")
 	{
-		MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s]}"
-			, id, "\"streamdetails\"", "\"plot\"");
+		MAKESTRING(Params$, "{\"movieid\":%d,\"properties\":[%s,%s,%s]}"
+			, id, "\"streamdetails\"", "\"plot\"","\"mpaa\"");
         method$ = "VideoLibrary.GetMovieDetails";
 		requestId = REQUESTID_PLAYER_GETITEMEXTENDED;
 	}
@@ -1556,12 +1558,14 @@ FUNCTION Player_GetItemExtended(INTEGER id)
 	
 
 } 
+
+// Get information about the Player
 FUNCTION Player_GetProperties()
 {
 	STRING Params$[500];
 
-    MAKESTRING(Params$,"{\"playerid\":%d,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
-				,ActivePlayerID, "\"percentage\"", "\"position\"", "\"repeat\""
+    MAKESTRING(Params$,"{\"playerid\":%d,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s]}"
+				,ActivePlayerID, "\"percentage\"", "\"position\"", "\"repeat\"", "\"speed\""
 				, "\"currentsubtitle\"", "\"type\"", "\"time\"", "\"totaltime\""
 				, "\"shuffled\"", "\"currentaudiostream\"", "\"subtitleenabled\""
 				);
@@ -1569,6 +1573,25 @@ FUNCTION Player_GetProperties()
 	IF (IsPlaying)
 		SendJsonCommand(REQUESTID_PLAYER_GETPROPERTIES,"Player.GetProperties",Params$);
 } 
+ 
+FUNCTION PollForMetadata()
+{
+	SendJsonCommand(REQUESTID_GETACTIVEPLAYERS,"Player.GetActivePlayers","");
+
+	// Wait one second, then retrieve metadata about
+	// the currently playing item
+	WAIT (100)
+	{
+		// First data about the activeplayer
+		Player_GetProperties();			
+	}
+	WAIT (200)
+	{
+		// then the item itself			
+		Player_GetItem();
+	}
+	
+}
 
 /*
 *	Currently only called by GetTvShows() so requestId is 
@@ -1942,6 +1965,7 @@ FUNCTION Process_ActivePlayers()
 			IF (name$ = "playerid")
 			{		
 				ActivePlayerID = GetInteger();
+				IsPlaying = 1;
 				BREAK; // We only process the 1st object in the array, then exit.			
 			}
             ELSE IF (name$ = "type")
@@ -1960,6 +1984,33 @@ FUNCTION Process_ActivePlayers()
     	// No active players
 		ActivePlayerID = 0;
 	}
+}
+
+FUNCTION Process_PlayingType()
+{
+    PlayingItemType$ = GetString();
+	
+	if (PlayingItemType$ = "episode")
+	{
+		CurrentlyPlayingType = TYPE_SERIES;
+	}    
+       else if (PlayingItemType$ = "movie")
+	{
+		CurrentlyPlayingType = TYPE_MOVIE;
+	}
+       else if (PlayingItemType$ = "unknown")
+	{
+		CurrentlyPlayingType = TYPE_OTHERVIDEO;
+	}			
+       else if (PlayingItemType$ = "musicvideo")
+	{
+		CurrentlyPlayingType = TYPE_OTHERVIDEO;
+	}
+       else if (PlayingItemType$ = "song")
+	{
+		CurrentlyPlayingType = TYPE_AUDIO;
+	}
+
 }
 
 FUNCTION Process_GetItem(INTEGER requestId)
@@ -2019,6 +2070,10 @@ FUNCTION Process_GetItem(INTEGER requestId)
 			ELSE IF (name$ = "file")
 			{
 				CurrentFilename$ = GetString();
+			}
+			ELSE IF (name$ = "mpaa")
+			{
+                CurrentMpaa$ = GetString(); 
 			}
 			ELSE IF (name$ = "tagline")
 			{
@@ -2084,7 +2139,11 @@ FUNCTION Process_GetItem(INTEGER requestId)
 			{
 				 SendPlotAsIndirectText(GetString());
 			}
-			ELSE IF (name$ = "type" || name$ = "fanart"
+			ELSE IF (name$ = "type")
+			{
+            	Process_PlayingType();
+			}
+			ELSE IF (name$ = "fanart"
 						|| name$ = "movieid" || name$ = "episodeid" 
 						|| name$ = "position")
 			{
@@ -2114,7 +2173,7 @@ FUNCTION Process_GetItem(INTEGER requestId)
 FUNCTION Process_PlayerProperties()
 {
 	INTEGER ArraySize;
-	STRING name$[15];
+	STRING name$[25];
 	INTEGER numberOfProperties;
 	INTEGER i;
 	INTEGER id;           
@@ -2182,6 +2241,37 @@ FUNCTION Process_PlayerProperties()
 					ShuffleStatus = OFF;
 				}
 			}
+			ELSE IF (name$ = "speed" )
+			{
+				PlaySpeed = GetSignedInteger();
+				StopFb = OFF;
+				PlayFb = ON;
+				IF (PlaySpeed<0)
+				{
+					PauseFb = OFF;
+					FastForwardFB = OFF;
+					RewindFB = ON;
+				}
+				ELSE IF (PlaySpeed>1)
+				{
+					PauseFb = OFF;
+                    RewindFB = OFF;
+					FastForwardFB = ON;
+				}
+				ELSE IF (PlaySpeed=0)
+				{
+    				PauseFb = ON;
+					RewindFB = OFF;
+					FastForwardFB = OFF;
+				}
+				ELSE
+				{
+    				PauseFb = OFF;
+					RewindFB = OFF;
+					FastForwardFB = OFF;
+				}
+						
+			}
 			ELSE IF (name$ = "subtitleenabled" )
 			{
 				//Do Nothing				
@@ -2209,7 +2299,7 @@ FUNCTION Process_PlayerProperties()
 }
 
 /*
-  	         
+	Process the data for a single movie in a Browse list  	         
 */
 FUNCTION Process_Movie(INTEGER inList)
 {
@@ -2313,7 +2403,10 @@ FUNCTION Process_Movie(INTEGER inList)
 
 
 }
-
+  
+/*
+  	Information about the Player, usually provided by a notification.
+*/
 FUNCTION Process_Player()
 {
 
@@ -2403,29 +2496,7 @@ FUNCTION Process_OnPlayItem()
 			}
 			ELSE IF (name$ = "type")
 			{		
-            	PlayingItemType$ = GetString();
-				
-				if (PlayingItemType$ = "episode")
-				{
-					CurrentlyPlayingType = TYPE_SERIES;
-				}    
-		        else if (PlayingItemType$ = "movie")
-				{
-					CurrentlyPlayingType = TYPE_MOVIE;
-				}
-		        else if (PlayingItemType$ = "unknown")
-				{
-					CurrentlyPlayingType = TYPE_OTHERVIDEO;
-				}			
-		        else if (PlayingItemType$ = "musicvideo")
-				{
-					CurrentlyPlayingType = TYPE_OTHERVIDEO;
-				}
-		        else if (PlayingItemType$ = "song")
-				{
-					CurrentlyPlayingType = TYPE_AUDIO;
-				}
-
+            	Process_PlayingType();
 			}
 			ELSE
 			{
@@ -4237,7 +4308,10 @@ PUSH List_Exit_Details_Page
     TvShowDetails = OFF;	
    	MovieDetails = OFF;	
 }
-
+PUSH Poll
+{
+	PollForMetadata();
+}
 PUSH PlayNext
 {
 	STRING Params$[100];
