@@ -1448,6 +1448,7 @@ FUNCTION SendPlotAsIndirectText(STRING longstring$)
 STRING_FUNCTION EscapeThumbnailUri(STRING uri$)
 {
 	STRING return$[512];
+	STRING ext$[4];	// file extension
 	
 	IF (!LEN(uri$))
     	RETURN ("");
@@ -1458,8 +1459,9 @@ STRING_FUNCTION EscapeThumbnailUri(STRING uri$)
 	// Remove trailing '/'
 	IF (RIGHT(return$,1) = "/")                                                                 
 		return$ = LEFT(return$,LEN(return$)-1);
-
-	IF (RIGHT(return$,4) = ".tbn")
+      
+	ext$ = LOWER(RIGHT(return$,4));
+	IF (ext$ = ".tbn" || (ext$ != ".jpg" && ext$ != ".bmp" && ext$ != ".png"))
 	{
 		return$ = return$ + "?image.jpg";
 	}		
