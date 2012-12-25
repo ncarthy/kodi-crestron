@@ -315,7 +315,7 @@ FUNCTION Send(INTEGER PacketType)
 		ELSE
 		{			
 			PRINT ("Error in XBMC-ES. Connect: %d", Connect);
-			PRINT ("IP Address of Xbmc is %s. Socket Error number is %d", XBMC_IPAddr$, Return_Value);
+			GenerateUserError("Xbmc Eventserver error. IP Address: %s, ErrorNum: %d.", XBMC_IPAddr$, Return_Value);
 		}
 	}
 
