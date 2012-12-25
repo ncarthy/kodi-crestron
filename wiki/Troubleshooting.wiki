@@ -35,3 +35,9 @@ If you have problems compiling any of the modules for the MC3 like "Getting Comp
 
   * Use "Recompile All" in the Build Menu, not F12. 
   * On Windows 7 I always run SIMPL+ as an administrator. (Right-click the icon and select "Run as administrator".
+
+
+=== This version only works with the Frodo release ===
+If you need a version that works with Eden then use version 0.7.1 in the Downloads tab.
+
+You can also use the eden branch in the source code. Use svn to check it out.
