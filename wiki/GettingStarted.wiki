@@ -1,14 +1,15 @@
 #summary Full instructions to get this project working on your system.
 
 = Preliminaries =
-  * Download and install the Eden (v11.0) version of Xbmc. You can obtain it from http://www.xbmc.org/download/ 
+  * Download and install the Frodo (v12.0) version of Xbmc. You can obtain it from http://www.xbmc.org/download/ 
   * LoadMediaOntoXbmc
   * Switch on Xbmc HTTP server and event server:
-    * From the Xbmc main menu navigate to System > Network
-    * Select "Allow control of XBMC via HTTP". The port number must match the Http Port number in the Parameter section of XBMC V2 in your SIMPL program, otherwise you won't see Thumbnail images.
+    * From the Xbmc main menu navigate to System > Services > Webserver
+    * Select "Allow control of XBMC via HTTP". The port number must match the Http Port number in the Parameter section of the XBMC module in your SIMPL program, otherwise you won't see Thumbnail images.
+    * Go down to Remote Control
     * Select both "Allow programs on this system to control XBMC" and "Allow programs on other systems to control XBMC"
   * If you suspect that a firewall is preventing you from communicating to Xbmc then open ports 8080, 9090 and 9777 on the Xbmc machine. Maybe first try disabling the firewall to see if that helps.
-  * The VT Pro-e project requires at least version 4.2 of [http://www.crestron.com VisionTools]
+  * The VT Pro-e project requires at least version 5.0 of [http://www.crestron.com VisionTools]
 
 
 = Compiling =
@@ -16,15 +17,12 @@ What follows are instructions for getting the demo XPanel project working.
   * Download and extract the source code zip file from the Downloads tab
   * Open the xbmc-test.smw project file in SIMPL windows
     *  This project is set up for an AV2 processor. Change if required.
-  * Locate the XBMC V2 module in the project. In the detail view, at the bottom of this module you will see 9 parameters:
+  * Locate the XBMC module in the project. In the detail view, at the bottom of this module you will see 5 parameters:
     * `Item_Count`: is the number of items in a browse list that will be shown at one time. Minimum 1, maximum 10. Leave it at 6 for the XPanel project to function correctly.
     * `Name`: The name of the controller, as seen by Xbmc. Can be any string.
     * `Address`: The IP address of the Xbmc
     * `httpport`: The port that Xbmc's HTTP server is listening on (usually 8080 but might be 80... check what port was set in "Preliminaries" above )    
-    * `tcpport`: The port that Xbmc's TCP server is listening on (usually 9090). This server does not have any authentication capability at present.
-    * `Polltime`: The interval between polling Xbmc for currently-playing metadata. During playback the module also polls Xbmc every 2 seconds to get percentage completed.
-    * `UseJpgExtension`: Usually this is set to 1. Xbmc thumbnails are files with the extension '.tbn'. Set this to 1 if you want the thumbnails to have extension '.jpg' instead. There is more information in the README in the download.
-    * `Username` & `Password`:  set these parameters if you are using http authentication on your Xbmc server. At present these are not used as there is no authentication on the tcp port 9090 that this module uses.
+    * `tcpport`: The port that Xbmc's TCP server is listening on (usually 9090). This server does not have any authentication capability at present. If port 9090 conflicts with another device on you network it can be changed via XBMC's advancedsettings.xml file. See the XBMC wiki for mor information.
   * Compile the project. If you get errors please email me.
   * Upload to your Crestron processor
   * Open and compile the VT Pro-e XPanel project. 
@@ -34,6 +32,6 @@ What follows are instructions for getting the demo XPanel project working.
 
 = Troubleshooting=
   * Ensure you have [LoadMediaOntoXbmc correctly loaded your media libraries] onto the Xbmc application
-  * Use the Eden (v11.0) release of xbmc and the latest version of this project
-  * For debug output uncomment the debug constant at the top of the SIMPL+ files. This greatly increases debug output to the Toolbox debugger
+  * Use the Frodo (v12.0) release of xbmc and the latest version of this project
+  * For debug output uncomment the debug constant at the top of the SIMPL+ files. This show what JSON commands are being sent to XBMC.
   * More tips at [Troubleshooting]
