@@ -1,4 +1,4 @@
-This vesion only works with the Frodo release of Xbmc
+This version only works with the Frodo release of Xbmc
 
 
 If you experience video problems after upgrading to Frodo from Eden then
@@ -12,7 +12,7 @@ AudioEngine info here: http://wiki.xbmc.org/index.php?title=AudioEngine
 
 
 Frodo uses larger thumbnail images than Eden and XPanel and most TouchPanels
-will struggle to sho the images because they have to be rescaled. Images
+will struggle to show the images because they have to be rescaled. Images
 are fine on iPad.
 
 
