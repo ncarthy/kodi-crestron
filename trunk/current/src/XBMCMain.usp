@@ -15,10 +15,11 @@ Comments:
 	5) "StoredStrings" - A temporary storage of json strings received from Xbmc.
 	6) "Jsmn" - Pronounced 'jasmine'. Low level JSON parsing. Populates Tokens array.
 	7) "JsonReader" - Combines StoredStrings and Tokens to generate meaningful data.
-	8) Socket Functions - Socket IO, except the SocketReceive event.
-	9) XBMC Response logic - functions that handle Xbmc queries and responses and UI stuff
-	10) Eventhandlers - PUSH, RELEASE, CHANGE event handlers including SocketReceive    
-    11) Function Main()
+	8) ListContext - Functions to manage Browse lists with 'Back' functionality
+	9) Socket Functions - Socket IO, except the SocketReceive event.
+	10) XBMC Response logic - functions that handle Xbmc queries and responses and UI stuff
+	11) Eventhandlers - PUSH, RELEASE, CHANGE event handlers including SocketReceive    
+    12) Function Main()
 
 	***** License *****
 
@@ -90,7 +91,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 10000		// Socket buffer size
@@ -121,6 +122,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGS		28 
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGDETAILS  29
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS 30
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETGENRES 		31
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARAUDIO			40 
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARVIDEO			41 
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					42 
@@ -153,8 +155,13 @@ Comments:
 #DEFINE_CONSTANT TV_EPISODE_LIST                     4
 #DEFINE_CONSTANT MUSIC_ARTIST_LIST                   5
 #DEFINE_CONSTANT MUSIC_ALBUM_LIST                    6
-#DEFINE_CONSTANT MUSIC_SONG_LIST                     7  
-#DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums                                                        
+#DEFINE_CONSTANT MUSIC_SONG_LIST                     7 
+#DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums  
+#DEFINE_CONSTANT MUSIC_GENRE_LIST                    9  
+#DEFINE_CONSTANT HOME_LIST		                     10
+#DEFINE_CONSTANT MUSIC_LIST		                     11
+#DEFINE_CONSTANT PICTURE_LIST	                     12
+#DEFINE_CONSTANT ADDON_LIST		                     13                                                        
 
 #DEFINE_CONSTANT SPECIAL_SEASON						 65535
 
@@ -253,7 +260,7 @@ DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
 /* Browse functionality */
 DIGITAL_INPUT   _SKIP_,_SKIP_,
 				Poll,						// Poll Xbmc for metadata about currently playing track
-				_SKIP_,_SKIP_,_SKIP_,
+				_SKIP_,_SKIP_,
 				List_RecentItems,			// When HIGH only show recently added Movies/Albums
 				List_UnWatchedOnly,			// When HIGH only show unwatched Movies/TvShows
 				List_TopPage,				// Go to 1st page
@@ -261,10 +268,13 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 				List_PageMinus,				// Go back one page
 				List_PagePlus,				// Go forward one page
 				List_Back,					// Return to previous list
+				List_Home,					// Go to the Home list
 				List_Movies,				// Show movies list
 				List_Albums,				// Show music albums list
 				List_TVShows, 				// Show TV shows list
 				List_Artists,				// Show music artists list
+				List_Pictures,				// Show Pictures list
+				List_Addons,				// Show Addons list
 				List_Exit_Details_Page,
 				_SKIP_,
 				PlayNext, 
@@ -330,6 +340,7 @@ SIGNED_INTEGER ConnectionStatus;	// Status of XBMC socket, used to determine if
 									// the Connect event needs to reconnect or do nothing.
 INTEGER SocketLock;					// Locking flag that is set before any socket activity are submitted
 INTEGER ReceiveLock;				// Locking flag that is set when processing data from Xbmc
+STRING Remainder$[4000];   			// Store unprocessed bytes from 1st pass of ProcessResponse()
 INTEGER VersionID;					// The JSON-RPC protocol version. 4 for Eden, 6 for Frodo
 INTEGER ActivePlayerID;				// The ID of the current active player. Zero for none.
 SIGNED_INTEGER PlaySpeed;			// Speed of current audio/video playback (1x, 2x, 4x etc.) Negative for rewind.
@@ -338,26 +349,16 @@ STRING PlayingItemType$[10];		// e.g. 'song', 'movie' etc.
 INTEGER PlayingItemId;				// id of current item
 INTEGER NextItemId;					// id of next item
 INTEGER PlaylistPosition;			// position in active playlist
-INTEGER Playlist[25];				// An array of the item IDs in the active playlist
+DYNAMIC INTEGER Playlist[25];		// An array of the item IDs in the active playlist
 
 INTEGER ListIDs[10];				// A store of the IDs of objects in current list
 INTEGER ListIndex;					// The index of the current object within the list
-INTEGER ListStart;                  // limits.start      
-INTEGER ListEnd;					// limits.end
-INTEGER ListStart_Prev;				// limits.start for the previous list view
 INTEGER ListTotal;					// Total number of items in list (limits.total)
-INTEGER UnWatched;					// HIGH = show unwatched movies/tv shows only
-INTEGER RecentlyAdded;				// HIGH = show recently added movies/tv shows only
-STRING StartsWith$[20];				// Filter list items to those that start with this string
-STRING StartsWith_Prev$[20];        // Previous list filter, stored to enable 'Back' functionality
-STRING SortMethod$[20];				// The property (title, label, trackno etc) to sort the list
-STRING Remainder$[4000];   			// Store unprocessed bytes from 1st pass of ProcessResponse()
 
-INTEGER TvShowID;					// ID of curent Tv Show in List view
-INTEGER TvShowSeasonID;				// ID of current Tv Show Season in List view
-INTEGER AlbumID;					// ID of album, used to generate songs list
-INTEGER ArtistID;					// ID of artist, used to generate artist-albums list
-INTEGER ArtistID_Prev;				// The artist ID of the previous list view, stored to allow List_Back	
+
+STRING HomeListItems$[4][8];		// Labels for the Home List	
+STRING MusicListItems$[3][7];		// Labels for the Music List	
+
 
 /*******************************************************************************************
   "StoredStrings"
@@ -998,7 +999,74 @@ FUNCTION Init()
 	Remainder$ = "";
 }
 	
+/*******************************************************************************************
+  ListContext
 
+  
+*******************************************************************************************/
+STRUCTURE ListContext 			// Information used to Retrieve a Browse List
+{
+	INTEGER listID; 			// ID of the list e.g. MOVIE_TITLE_LIST, TV_SHOW_LIST
+	INTEGER start;				// Limits.start for database search
+	INTEGER end;				// Limits.end for database search
+	INTEGER unWatched;			// HIGH = show unwatched movies/tv shows only
+	INTEGER recentlyAdded;		// HIGH = show recently added movies/tv shows only
+	STRING startsWith[10];		// Filter list items to those that start with this string
+	STRING sortMethod[10];		// The property (title, label, trackno etc) to sort the list
+	INTEGER artistID;			// ID of artist, used to generate artist-albums list
+	INTEGER albumID;			// ID of album, used to generate songs list
+	INTEGER genreID;
+	INTEGER tvShowID;			// ID of curent Tv Show in List view
+	INTEGER tvSeasonID;			// ID of current Tv Show Season in List view
+};
+ListContext Stack[5];	// Store of previous list contexts to allow 'Back' button
+ListContext CurrentListCxt;		// The current list
+INTEGER StackPosition;			// Position on stack
+
+FUNCTION ListContext_Push()
+{
+	StackPosition = StackPosition + 1;
+	IF (StackPosition>5) StackPosition = 5;
+	PRINT("ListContext_Push: StackPosition %d", StackPosition);
+	Stack[StackPosition].listID = CurrentListCxt.listID;
+	Stack[StackPosition].start = CurrentListCxt.start;
+	Stack[StackPosition].end = CurrentListCxt.end;
+	Stack[StackPosition].unWatched = CurrentListCxt.unWatched;
+	Stack[StackPosition].recentlyAdded = CurrentListCxt.recentlyAdded;
+	Stack[StackPosition].startsWith = CurrentListCxt.startsWith;
+	Stack[StackPosition].sortMethod = CurrentListCxt.sortMethod;
+	Stack[StackPosition].artistID = CurrentListCxt.artistID;
+	Stack[StackPosition].albumID = CurrentListCxt.albumID;
+	Stack[StackPosition].genreID = CurrentListCxt.genreID;
+	Stack[StackPosition].tvShowID = CurrentListCxt.tvShowID;
+	Stack[StackPosition].tvSeasonID = CurrentListCxt.tvSeasonID;
+}
+
+FUNCTION ListContext_Pop()
+{
+	PRINT("ListContext_Pop: StackPosition %d", StackPosition);
+	CurrentListCxt.listID = Stack[StackPosition].listID;
+	CurrentListCxt.start = Stack[StackPosition].start;
+	CurrentListCxt.end = Stack[StackPosition].end;
+	CurrentListCxt.unWatched = Stack[StackPosition].unWatched;
+	CurrentListCxt.recentlyAdded = Stack[StackPosition].recentlyAdded;
+	CurrentListCxt.startsWith = Stack[StackPosition].startsWith;
+	CurrentListCxt.sortMethod = Stack[StackPosition].sortMethod;
+	CurrentListCxt.artistID = Stack[StackPosition].artistID;
+	CurrentListCxt.albumID = Stack[StackPosition].albumID;
+	CurrentListCxt.genreID = Stack[StackPosition].genreID;
+	CurrentListCxt.tvShowID = Stack[StackPosition].tvShowID;
+	CurrentListCxt.tvSeasonID = Stack[StackPosition].tvSeasonID;
+	IF (StackPosition)
+		StackPosition = StackPosition - 1;
+	PRINT("ListContext_Pop: New StackPosition %d", StackPosition);
+
+}
+
+FUNCTION ListContext_Clear()
+{
+	StackPosition = 0;
+}
 
 /*******************************************************************************************
   Socket Functions
@@ -1181,6 +1249,24 @@ SOCKETSTATUS XBMC
 		IsConnected = ON;
 		Init();
 		SendJsonCommand(REQUESTID_VERSION,"JSONRPC.Version","");
+       	FOR (ListIndex = 1 TO GetNumArrayRows(HomeListItems$)+1)
+		{
+			Title$[ListIndex] = HomeListItems$[ListIndex-1];
+			CSWITCH (ListIndex)
+			{
+				CASE (1):
+				{ListIDs[ListIndex] = MOVIE_TITLE_LIST; BREAK;}
+				CASE (2):
+				{ListIDs[ListIndex] = TV_SHOW_LIST; BREAK;}
+				CASE (3):
+				{ListIDs[ListIndex] = MUSIC_LIST; BREAK;}
+				CASE (4):
+				{ListIDs[ListIndex] = PICTURE_LIST; BREAK;}
+				CASE (5):
+				{ListIDs[ListIndex] = ADDON_LIST; BREAK;}
+			}
+		}
+
 	}
 	ELSE
 	{
@@ -2551,6 +2637,10 @@ FUNCTION Process_OnAdd()
 	
 						if (id && pos>=0)
 						{
+							// Playlist is dynamic
+							IF (pos >= GetNumArrayCols(Playlist))
+								ResizeArray(Playlist,pos*2+1);
+
 							Playlist[pos] = id;
                          	RETURN;
 						}
@@ -2563,6 +2653,10 @@ FUNCTION Process_OnAdd()
 
 				if (id && pos>=0)
 				{
+					// Playlist is dynamic
+					IF (pos >= GetNumArrayCols(Playlist))
+						ResizeArray(Playlist,pos*2+1);
+
 					Playlist[pos] = id;
 					RETURN;
 				}
@@ -2787,7 +2881,7 @@ FUNCTION Process_TvShow(INTEGER requestId,INTEGER inList)
 		GenerateUserError("Process_TvShow: Not an Object.");
 
 }
-
+  
 FUNCTION Process_Artist()
 {
 	INTEGER ArraySize;
@@ -2848,6 +2942,48 @@ FUNCTION Process_Artist()
 			ELSE
 			{
 				GenerateUserError("Process_Artist: Unknown property: %s", name$);
+			}
+		}
+	}
+}
+
+
+FUNCTION Process_Genre()
+{
+	INTEGER ArraySize;
+	STRING name$[15];
+	INTEGER numberOfProperties;
+	INTEGER i;
+                   
+	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
+	{
+		ListIndex = ListIndex+1; 
+        
+		numberOfProperties = Tokens[tokenIndex].size/2;
+
+    	FOR (i = 1 TO numberOfProperties)
+		{
+			Read();
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "genreid")
+			{		
+				ListIDs[ListIndex] = GetInteger();
+			}
+			ELSE IF (name$ = "thumbnail")
+			{
+				Thumb$[ListIndex] = EscapeThumbnailUri(GetString());
+			}
+			ELSE IF (name$ = "label")
+			{
+				Genre$[ListIndex] = GetString();
+			}
+			ELSE
+			{
+				GenerateUserError("Process_Genre: Unknown property: %s", name$);
 			}
 		}
 	}
@@ -3046,11 +3182,11 @@ FUNCTION Process_Limits()
 		Read();
 		IF (name$ = "start")
 		{
-			ListStart = GetInteger();
+			CurrentListCxt.start = GetInteger();
 		}
 		ELSE IF (name$ = "end")
 		{
-			ListEnd = GetInteger();
+			CurrentListCxt.end = GetInteger();
 		}
         ELSE IF (name$ = "total")
 		{
@@ -3060,11 +3196,12 @@ FUNCTION Process_Limits()
 	}	
     
 	// Send to signals
-	MAKESTRING(List_Summary$, "%d to %d of %d", ListStart+1, ListEnd, ListTotal);
-	IF (ListEnd = ListTotal)
+	MAKESTRING(List_Summary$, "%d to %d of %d", 
+				CurrentListCxt.start+1, CurrentListCxt.end, ListTotal);
+	IF (CurrentListCxt.end = ListTotal)
 		ScrollBarPercentage# = 100;
 	ELSE
-	    ScrollBarPercentage# = MULDIV(100, ListStart, ListTotal);
+	    ScrollBarPercentage# = MULDIV(100, CurrentListCxt.start, ListTotal);
 }
 
 /*
@@ -3141,6 +3278,11 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 					CASE (MUSIC_SONG_LIST):
 					{
 						Process_Song(requestId);
+						BREAK;
+					}
+					CASE (MUSIC_GENRE_LIST):
+					{
+						Process_Genre();
 						BREAK;
 					}
 				}
@@ -3296,6 +3438,11 @@ FUNCTION ProcessResult(INTEGER requestId)
 		CASE (REQUESTID_AUDIOLIBRARY_GETSONGS):
 		{
 			Process_List(MUSIC_SONG_LIST,requestId);
+        	BREAK;
+		}
+		CASE (REQUESTID_AUDIOLIBRARY_GETGENRES):
+		{
+			Process_List(MUSIC_GENRE_LIST,requestId);
         	BREAK;
 		}
 		CASE (REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS):
@@ -3550,18 +3697,22 @@ FUNCTION ProcessNotification(STRING method$)
 	{
 		SETARRAY(Playlist,0);	// reset playlist array		
 
+	}
+	ELSE IF (method$ = "Playlist.OnAdd")
+	{
+		// Cancel any requests that are in the wait queue
+		CANCELALLWAIT();
+
+		Process_PlayerNotification(1);		
+
 		// Following a batch command like this sometimes the messages from xbmc get 'stuck'
 		// in the buffer. Give it a nudge by sending the cheapest communication: a ping
 		// This WAIT will be cancelled if a OnPlay event is received before the trigger
-		WAIT (500, SendPing)
+		WAIT (300, SendPing)
 		{
 	    	SendJsonCommand(REQUESTID_PING,"JSONRPC.Ping","");
 		}
 
-	}
-	ELSE IF (method$ = "Playlist.OnAdd")
-	{
-		Process_PlayerNotification(1);		
 	}
 	ELSE
 	{
@@ -3801,9 +3952,13 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	STRING Filter$[3][255];
 	INTEGER numberFilters;
 	
+	IF (listID = HOME_LIST || listID = MUSIC_LIST 
+			|| listID = PICTURE_LIST || listID = MUSIC_LIST)
+		RETURN ("");
 
     // Do not apply unwatched filter to Artist list
-	IF (Unwatched && listID != MUSIC_ARTIST_LIST && ArtistID = 0)
+	IF (CurrentListCxt.unWatched && listID != MUSIC_ARTIST_LIST 
+										&& CurrentListCxt.artistID = 0)
 	{
     	numberFilters = 1;	
 		Filter$[0]="{\"field\":\"playcount\",\"operator\":\"is\",\"value\":\"0\"}";
@@ -3812,27 +3967,27 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 		numberFilters = 0;
     
 	// Do not apply startswith filter to Song list
-	IF (LEN(StartsWith$) && listID != MUSIC_SONG_LIST)
+	IF (LEN(CurrentListCxt.startsWith) && listID != MUSIC_SONG_LIST)
 	{
         MAKESTRING(Filter$[numberFilters]
 			,"{\"field\":\"%s\",\"operator\":\"startswith\",\"value\":\"%s\"}"
-			,List_FieldName(listID),StartsWith$);
+			,List_FieldName(listID),CurrentListCxt.startsWith);
     	numberFilters = numberFilters + 1;
 	}
 
-	IF (AlbumID)
+	IF (CurrentListCxt.albumID)
 	{
 		
 	    MAKESTRING(Filter$[numberFilters]
 				,"{\"%s\":%d }"
-				,"albumid",AlbumID);		
+				,"albumid",CurrentListCxt.albumID);		
     	numberFilters = numberFilters + 1;    	
 	}
-	ELSE IF (ArtistID)
+	ELSE IF (CurrentListCxt.artistID)
 	{
         MAKESTRING(Filter$[numberFilters]
 			,"{\"%s\":%d }"
-			,"artistid",ArtistID);
+			,"artistid",CurrentListCxt.artistID);
     	numberFilters = numberFilters + 1;    	
 	}
 
@@ -3860,33 +4015,36 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 
 }
 
-FUNCTION List_Retrieve(INTEGER listID)
+FUNCTION List_Retrieve()
 {
 	STRING Filter$[255];
 	STRING Limits$[100];
 	STRING Sort$[100];
 	STRING Params$[512];
 	STRING Method$[50];
-                     
-	// Don't allow zro listID
-	IF (!listID)
-		RETURN;
+           
+	// Output the current list ID
+	CurrentList = CurrentListCxt.listID;
+
+	// Reset index of item in List
+	ListIndex = 0;
 
 	// Set filter, limits and sorting objects
-	IF (RecentlyAdded)
+	IF (CurrentListCxt.recentlyAdded)
 		Filter$ = "";
 	ELSE
-		Filter$ = List_Filter(listID);
+		Filter$ = List_Filter(CurrentListCxt.listID);
 	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d }"
-				,ListStart,ListEnd);
-	IF (SortMethod$="" || (RecentlyAdded && (listID = MOVIE_TITLE_LIST || listID = MUSIC_ALBUM_LIST)) )
+				,CurrentListCxt.start,CurrentListCxt.end);
+	IF (CurrentListCxt.sortMethod="" || (CurrentListCxt.recentlyAdded 
+					&& (CurrentListCxt.listID = MOVIE_TITLE_LIST || CurrentListCxt.listID = MUSIC_ALBUM_LIST)) )
 		Sort$ = ""; // Recently added only works for Movies and Albums
 	ELSE
 		MAKESTRING(Sort$,",\"sort\":{\"method\":\"%s\",\"order\":\"ascending\",\"ignorearticle\":true}"
-				,SortMethod$);
+				,CurrentListCxt.sortMethod);
     
 	// Use a switch to execute the JSON command
-	CSWITCH (listID)
+	CSWITCH (CurrentListCxt.listID)
 	{
 		CASE(MOVIE_TITLE_LIST):
 		{
@@ -3895,7 +4053,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 				,"\"genre\"", "\"year\"", "\"playcount\"", "\"rating\""
 				,"\"studio\"","\"writer\"","\"mpaa\""
 				,Sort$);
-			IF (RecentlyAdded)
+			IF (CurrentListCxt.recentlyAdded)
 				Method$ = "VideoLibrary.GetRecentlyAddedMovies"; 
 			ELSE
 				Method$ = "VideoLibrary.GetMovies"; 
@@ -3914,7 +4072,7 @@ FUNCTION List_Retrieve(INTEGER listID)
 		CASE(TV_SEASON_LIST):
 		{
             MAKESTRING (Params$, "{\"tvshowid\":%d,%s,\"properties\":[\"season\"]%s }"
-					, TvShowID, Limits$, Sort$);
+					, CurrentListCxt.tvShowID, Limits$, Sort$);
 			Method$ = "VideoLibrary.GetSeasons"; 
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETTVSEASONS, Method$, Params$);
 			BREAK;
@@ -3923,7 +4081,8 @@ FUNCTION List_Retrieve(INTEGER listID)
 		{
 				MAKESTRING (Params$, 
 					"{\"tvshowid\":%d,\"season\":%d,%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s }"
-					, TvShowID, TvShowSeasonID, Limits$, "\"thumbnail\"","\"rating\""
+					, CurrentListCxt.tvShowID, CurrentListCxt.tvSeasonID
+					, Limits$, "\"thumbnail\"","\"rating\""
 					,"\"showtitle\"","\"runtime\"","\"episode\"","\"director\""
 					,"\"firstaired\"","\"playcount\"","\"season\"", Sort$);
 			Method$ = "VideoLibrary.GetEpisodes"; 
@@ -3935,7 +4094,7 @@ FUNCTION List_Retrieve(INTEGER listID)
            	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"artist\"", "\"thumbnail\""
 				,"\"genre\"", "\"year\"", Sort$);
-			IF (RecentlyAdded)
+			IF (CurrentListCxt.recentlyAdded)
 				Method$ = "AudioLibrary.GetRecentlyAddedAlbums"; 
 			ELSE
 				Method$ = "AudioLibrary.GetAlbums"; 
@@ -3971,7 +4130,57 @@ FUNCTION List_Retrieve(INTEGER listID)
 													, Method$, Params$);
 			BREAK;
 		}
-
+		CASE(MUSIC_GENRE_LIST):
+		{
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s]%s }"
+				,Filter$, Limits$, "\"thumbnail\"", Sort$);
+			Method$ = "AudioLibrary.GetGenres"; 
+			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETGENRES
+													, Method$, Params$);
+			BREAK;
+		}
+        CASE (HOME_LIST):
+		{ 
+        	FOR (ListIndex = 1 TO 5)
+			{
+				Title$[ListIndex] = HomeListItems$[ListIndex-1];
+				CSWITCH (ListIndex)
+				{
+					CASE (1):
+					{ListIDs[ListIndex] = MOVIE_TITLE_LIST; BREAK;}
+					CASE (2):
+					{ListIDs[ListIndex] = TV_SHOW_LIST; BREAK;}
+					CASE (3):
+					{ListIDs[ListIndex] = MUSIC_LIST; BREAK;}
+					CASE (4):
+					{ListIDs[ListIndex] = PICTURE_LIST; BREAK;}
+					CASE (5):
+					{ListIDs[ListIndex] = ADDON_LIST; BREAK;}
+				}
+			}
+			IF (StepAmount - 5 > 0)
+				InitOutputArrays(6);
+			BREAK;	
+		}
+        CASE (MUSIC_LIST):
+		{ 
+        	FOR (ListIndex = 1 TO 3)
+			{
+				Title$[ListIndex] = MusicListItems$[ListIndex-1];
+				CSWITCH (ListIndex)
+				{
+					CASE (1):
+					{ListIDs[ListIndex] = MUSIC_ARTIST_LIST; BREAK;}
+					CASE (2):
+					{ListIDs[ListIndex] = MUSIC_ALBUM_LIST; BREAK;}
+					CASE (3):
+					{ListIDs[ListIndex] = MUSIC_GENRE_LIST; BREAK;}
+				}
+			}
+			IF (StepAmount - 3 > 0)
+				InitOutputArrays(4);
+			BREAK;	
+		}
 		DEFAULT:
 		{
          	GenerateUserError("List_Retrieve: Unknown list: %d", CurrentList);
@@ -3999,7 +4208,7 @@ FUNCTION Play()
 	INTEGER itemid;
          
 	position = 0;
-                     PRINT("position %d" , position);
+    
 	IF (SelectedItem)
 		itemid = ListIDs[SelectedItem];
 	ELSE
@@ -4024,18 +4233,18 @@ FUNCTION Play()
 		{          			
             PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
             
-			IF (AlbumID || ArtistID)
+			IF (CurrentListCxt.albumID || CurrentListCxt.artistID)
             {
-				position = ListStart+SelectedItem-1;                     
-				IF (AlbumID)
+				position = CurrentListCxt.start+SelectedItem-1;                     
+				IF (CurrentListCxt.albumID)
 				{
        				ItemType$ = "albumid";
-					itemid = AlbumID;
+					itemid = CurrentListCxt.albumID;
 				}
 				ELSE
 				{
 					ItemType$ = "artistid";
-					itemid = ArtistID;
+					itemid = CurrentListCxt.artistID;
 				}
 				BREAK;				
 			}
@@ -4070,7 +4279,7 @@ FUNCTION Play()
 	// Following a batch command like this sometimes the messages from xbmc get 'stuck'
 	// in the buffer. Give it a nudge by sending the cheapest communication: a ping
 	// This WAIT will be cancelled if a OnPlay event is received before the trigger
-	WAIT (500, SendPing2)
+	WAIT (250, SendPing2)
 	{
     	SendJsonCommand(REQUESTID_PING,"JSONRPC.Ping","");
 	}
@@ -4097,36 +4306,59 @@ RELEASE Connect
 PUSH List_TopPage
 {
 	ListIndex=0;					// The index of the current object within the list
-	ListStart=0;                  	// limits.start      
-	ListEnd=StepAmount;				// limits.end
-    List_Retrieve(CurrentList);
+	CurrentListCxt.start=0;                  	
+	CurrentListCxt.end=StepAmount;				
+    List_Retrieve();
 }
 
 // Move to the last page in the list
 PUSH List_BottomPage
 {
 	ListIndex=0;					
-	ListEnd=ListTotal;
-	ListStart=ListEnd-StepAmount;
-	List_Retrieve(CurrentList);
+	CurrentListCxt.end=ListTotal;
+	CurrentListCxt.start=CurrentListCxt.end-StepAmount;
+	List_Retrieve();
 }
 
 // Move to the previous page in the list
 PUSH List_PageMinus
 {
 	ListIndex=0;				
-	ListStart=MAX(0,ListStart-StepAmount);
-	ListEnd=ListStart+StepAmount;			
-    List_Retrieve(CurrentList);
+	CurrentListCxt.start=MAX(0,CurrentListCxt.start-StepAmount);
+	CurrentListCxt.end=CurrentListCxt.start+StepAmount;			
+    List_Retrieve();
 }
 // Move to the next page in the list
 PUSH List_PagePlus
 {
 	ListIndex=0;					
-	ListEnd=MIN(ListTotal,ListEnd+StepAmount);	
-	ListStart=ListEnd-StepAmount;
-	List_Retrieve(CurrentList);
+	CurrentListCxt.end=MIN(ListTotal,CurrentListCxt.end+StepAmount);	
+	CurrentListCxt.start=CurrentListCxt.end-StepAmount;
+	List_Retrieve();
 }
+
+FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
+{
+	INTEGER i;
+       
+	CurrentListCxt.listID = listID;
+    CurrentListCxt.artistID = 0;
+	CurrentListCxt.albumID = 0;
+	CurrentListCxt.start=0;                  	
+	CurrentListCxt.end=StepAmount;				
+	CurrentListCxt.startsWith="";
+	CurrentListCxt.sortMethod=SortMethod;
+
+    TvShowDetails = OFF;	
+   	MovieDetails = OFF;
+	FOR (i = 1 TO StepAmount)
+	{
+		Watched[i] = OFF;
+	}					
+
+	List_Retrieve();
+}
+
 // Return to the previous list  
 PUSH List_Back
 {
@@ -4134,28 +4366,18 @@ PUSH List_Back
 	{
 		CASE (MOVIE_TITLE_LIST)					: 
 		{
-			MovieDetails = OFF;
-			TERMINATEEVENT;	// don't need to reload current list values;
+			IF (MovieDetails)
+			{
+				MovieDetails = OFF;
+				TERMINATEEVENT;	// don't need to reload current list values;
+			}
+			ELSE
+			{
+				ListContext_Pop();
+				List_Retrieve();
+			}
 		}
-		CASE (TV_SEASON_LIST) 	: 
-		{
-			ListIndex=0;
-			ListStart=ListStart_Prev;
-			ListEnd=ListStart+StepAmount;
-			StartsWith$= "";
-			SortMethod$="title";
-
-			CurrentList = TV_SHOW_LIST;
-		}
-		CASE (TV_EPISODE_LIST)  : 
-		{ 
-			TvShowDetails = OFF; // Just in case
-			ListIndex=0;
-			ListStart=0;
-			ListEnd=StepAmount;
-			CurrentList = TV_SEASON_LIST;
-		}
-		CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
+		/*CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
 		{ 
 			ListIndex=0;
 			ListStart=ListStart_Prev;
@@ -4196,114 +4418,57 @@ PUSH List_Back
 				ELSE
 					CurrentList = MUSIC_ALBUM_LIST;
 			}
-		}
+		}*/
         DEFAULT: 
 		{
-					
+			ListContext_Pop();
+			List_Retrieve();		
 		}
 	}
 	
-	List_Retrieve(CurrentList);
+	
 }
 
+PUSH List_Home
+{
+	List_Reset(HOME_LIST, "");
+}
 PUSH List_Albums
 {
-	INTEGER i;
-    ArtistID = 0;
-	AlbumID = 0;
-	ArtistID_Prev = 0;
-	FOR (i = 1 TO StepAmount)
-	{
-		Watched[i] = OFF;
-	}	
-	ListIndex=0;					// The index of the current object within the list
-	ListStart=0;                  	// limits.start      
-	ListEnd=StepAmount;				// limits.end
-	StartsWith$= "";
-	SortMethod$="label";
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;
-	List_Retrieve(MUSIC_ALBUM_LIST);
-	CurrentList = MUSIC_ALBUM_LIST;
+	List_Reset(MUSIC_ALBUM_LIST, "label");
 }
 PUSH List_Artists
 {
-	INTEGER i;
-    ArtistID = 0;
-	AlbumID = 0;
-	ArtistID_Prev = 0;
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;
-	FOR (i = 1 TO StepAmount)
-	{
-		Watched[i] = OFF;
-	}
-	ListIndex=0;					
-	ListStart=0;                  	
-	ListEnd=StepAmount;				
-
-	StartsWith$= "";
-	SortMethod$="label";
-
-	List_Retrieve(MUSIC_ARTIST_LIST);
-	CurrentList = MUSIC_ARTIST_LIST;	
+	List_Reset(MUSIC_ARTIST_LIST, "label");	
 }
-
 PUSH List_Movies
 {
-    ArtistID = 0;
-	AlbumID = 0;
-	ListIndex=0;					// The index of the current object within the list
-	ListStart=0;                  	// limits.start      
-	ListEnd=StepAmount;				// limits.end
-	StartsWith$= "";
-	SortMethod$="title";
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;
-	List_Retrieve(MOVIE_TITLE_LIST);
-	CurrentList = MOVIE_TITLE_LIST;	
+    List_Reset(MOVIE_TITLE_LIST,"title");
 }
 PUSH List_TvShows
 {
-    ArtistID = 0;
-	AlbumID = 0;	
-	ListIndex=0;					
-	ListStart=0;                  	
-	ListEnd=StepAmount;				
-	StartsWith$= "";
-	SortMethod$="title";
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;
-	List_Retrieve(TV_SHOW_LIST);
-	CurrentList = TV_SHOW_LIST;
+    List_Reset(TV_SHOW_LIST,"title");
 }
 PUSH List_UnWatchedOnly
 {
-	UnWatched = 1;
-	ListIndex=0;
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;
-	List_Retrieve(CurrentList);	
+	CurrentListCxt.unWatched = 1;
+	List_Retrieve();	
 }
 RELEASE List_UnWatchedOnly
 {
-	UnWatched = 0;
-	ListIndex=0;
-	List_Retrieve(CurrentList);	
+	CurrentListCxt.unWatched = 1;
+	List_Retrieve();	
 }
 PUSH List_RecentItems
 {
-	RecentlyAdded = 1;
-	ListIndex=0;
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;
-	List_Retrieve(CurrentList);	
+	CurrentListCxt.recentlyAdded = 1;
+	List_Retrieve();	
 }
 RELEASE List_RecentItems
 {
-	RecentlyAdded = 0;
-	ListIndex=0;
-	List_Retrieve(CurrentList);	
+	CurrentListCxt.recentlyAdded = 0;
+	CurrentListCxt.recentlyAdded = 0;
+	List_Retrieve();	
 }
 PUSH List_Exit_Details_Page
 {
@@ -4410,12 +4575,12 @@ CHANGE SearchCriteria$
 	IF (LEN(SearchCriteria$))
 	{
 		// Limit search filter to 20 characters (which is a lot)
-		StartsWith$= LEFT(RemoveByLength(LEN(SearchCriteria$),SearchCriteria$),20);
+		CurrentListCxt.startsWith= LEFT(RemoveByLength(LEN(SearchCriteria$),SearchCriteria$),20);
 
 		ListIndex=0;
-		ListStart=0;                  	     
-		ListEnd=StepAmount;
-		List_Retrieve(CurrentList);
+		CurrentListCxt.start=0;                  	     
+		CurrentListCxt.end=StepAmount;
+		List_Retrieve();
 	}
 }
 
@@ -4445,34 +4610,34 @@ CHANGE SelectedItem
 		}
 		CASE (TV_SHOW_LIST) 	: 
 		{
-	        
-			ListStart_Prev = ListStart;
-			ListIndex=0;					
-			ListStart=0;                  	
-			ListEnd=StepAmount;				
-			StartsWith$= "";
-			SortMethod$ = "season";
-			TvShowID = ListIDs[SelectedItem];
-			List_Retrieve(TV_SEASON_LIST);
-			CurrentList = TV_SEASON_LIST;
+	        ListIndex=0;
+			ListContext_Push();	// Store previous context in stack				
+			CurrentListCxt.listID = TV_SEASON_LIST;				
+			CurrentListCxt.start=0;                  	
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith= "";
+			CurrentListCxt.sortMethod = "season";
+			CurrentListCxt.tvShowID = ListIDs[SelectedItem];			
+			List_Retrieve();
 			Break;
 		}
 		CASE (TV_SEASON_LIST) 	: 
 		{
 			IF (ListIDs[SelectedItem])
-			{		        
+			{
+				ListContext_Push();	// Store previous context in stack		        
 				IF (ListIDs[SelectedItem] = SPECIAL_SEASON)
-					TvShowSeasonID = 0;
+					CurrentListCxt.tvSeasonID = 0;
 				else				
-					TvShowSeasonID = ListIDs[SelectedItem];
+					CurrentListCxt.tvSeasonID = ListIDs[SelectedItem];
 
-				ListIndex=0;	
-				ListStart=0;      
-				ListEnd=StepAmount;				
-				StartsWith$= "";
-				SortMethod$ = "episode";
-				List_Retrieve(TV_EPISODE_LIST);
-				CurrentList = TV_EPISODE_LIST;
+				ListIndex=0;
+				CurrentListCxt.listID = TV_EPISODE_LIST;	
+				CurrentListCxt.start=0;      
+				CurrentListCxt.end=StepAmount;				
+				CurrentListCxt.startsWith= "";
+				CurrentListCxt.sortMethod = "episode";
+				List_Retrieve();
 			}
 			Break;
 		}
@@ -4488,67 +4653,92 @@ CHANGE SelectedItem
 		}
 		CASE (MUSIC_ALBUM_LIST) : 
 		{ 
-			AlbumID = ListIDs[SelectedItem];
-			ArtistID = 0;
-            
-			// Store current list parameters
-			ListStart_Prev = ListStart; 
-			StartsWith_Prev$ = StartsWith$;
-
-			ListIndex=0;	
-			ListStart=0;      
-			ListEnd=StepAmount;							
-			StartsWith$= "";
-			SortMethod$ = "track";
-			List_Retrieve(MUSIC_SONG_LIST);
-			CurrentList = MUSIC_SONG_LIST;
+			ListContext_Push();	// Store previous context in stack
+			
+			CurrentListCxt.albumID = ListIDs[SelectedItem];
+			CurrentListCxt.artistID = 0;
+			CurrentListCxt.listID = MUSIC_SONG_LIST;	
+			CurrentListCxt.start=0;      
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith= "";
+			CurrentListCxt.sortMethod = "track";
+			List_Retrieve();
 			Break;
 		}
 		CASE (MUSIC_ARTIST_LIST) : 
 		{ 
-			ArtistID = ListIDs[SelectedItem];
-			AlbumID = 0;
-             
-			// Store current list parameters
-			ListStart_Prev = ListStart; 
-			StartsWith_Prev$ = StartsWith$;
-             
-			ListIndex=0;	
-			ListStart=0;      
-			ListEnd=StepAmount;				
-			StartsWith$= "";
-			SortMethod$ = "label";
-			List_Retrieve(MUSIC_ARTIST_CHOOSE_LIST);
-			CurrentList = MUSIC_ARTIST_CHOOSE_LIST;
+			ListContext_Push();	// Store previous context in stack
+			
+			CurrentListCxt.albumID = 0;
+			CurrentListCxt.artistID = ListIDs[SelectedItem];
+			CurrentListCxt.listID = MUSIC_ARTIST_CHOOSE_LIST;	
+			CurrentListCxt.start=0;      
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith= "";
+			CurrentListCxt.sortMethod = "label";
+			List_Retrieve();
 			Break;
-
 		}
 		CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
 		{ 	        
+            ListContext_Push();	// Store previous context in stack
+
 			// If albumID = 0 then 'All songs' has been selected
 			// So keep the reference to artistID. 
-			AlbumID = ListIDs[SelectedItem];
-			IF (AlbumID)
+			IF (ListIDs[SelectedItem])
 			{
-				ArtistID_Prev = ArtistID;
-				ArtistID = 0;
-                SortMethod$ = "track";
+				CurrentListCxt.albumID = ListIDs[SelectedItem];
+				CurrentListCxt.artistID = 0;
+                CurrentListCxt.sortMethod = "track";
 			}
 			ELSE
 			{
-				SortMethod$ = "";
+				CurrentListCxt.albumID = 0;
+				CurrentListCxt.sortMethod = "";
             } 
-			ListIndex=0;	
-			ListStart=0;      
-			ListEnd=StepAmount;				
-			StartsWith$= "";			
-			List_Retrieve(MUSIC_SONG_LIST);
-			CurrentList = MUSIC_SONG_LIST;
+			CurrentListCxt.listID = MUSIC_SONG_LIST;
+			CurrentListCxt.start=0;      
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith= "";			
+			List_Retrieve();
 			Break;
 		}
 		CASE (MUSIC_SONG_LIST)  : 
 		{ 
 			Play();
+			Break;
+		}
+		CASE (HOME_LIST)  : 
+		{ 			
+            CurrentList = ListIDs[SelectedItem];
+			IF (CurrentList = MOVIE_TITLE_LIST || CurrentList = TV_SHOW_LIST)
+				List_Reset(CurrentList,"title");
+			ELSE IF (CurrentList = MUSIC_LIST)
+			{
+         		List_Reset(MUSIC_LIST,"");   	
+			}
+			ELSE IF (CurrentList = PICTURE_LIST)
+			{
+            	GenerateUserError("Picture List not Implemented.");
+			}
+			ELSE IF (CurrentList = ADDON_LIST)
+			{
+            	GenerateUserError("Addon List not Implemented.");
+			}
+			Break;
+		}
+		CASE (MUSIC_LIST)  : 
+		{ 
+			ListContext_Push();	// Store previous context in stack
+			List_Reset(ListIDs[SelectedItem],"label");
+			Break;
+		}
+		CASE (PICTURE_LIST)  : 
+		{ 
+			Break;
+		}
+		CASE (ADDON_LIST)  : 
+		{ 
 			Break;
 		}
         DEFAULT: 
@@ -5572,4 +5762,30 @@ Function Main()
 	Store.listIndex = 0;
 	Store.arrayPosition = 0;
 	SetArray(StoredStrings,"");
+
+	// Init Home List, Music List
+	HomeListItems$[0] = "Movies";
+	HomeListItems$[1] = "TV Shows";
+	HomeListItems$[2] = "Music";
+	HomeListItems$[3] = "Pictures";
+	HomeListItems$[4] = "Addons";
+	MusicListItems$[0] = "Artists";
+	MusicListItems$[1] = "Albums";
+	MusicListItems$[2] = "Genres";
+    
+	// Set current browse list parameters
+	Stack[StackPosition].listID = HOME_LIST;
+	Stack[StackPosition].start = 0;
+	Stack[StackPosition].end = StepAmount;
+	Stack[StackPosition].unWatched = OFF;
+	Stack[StackPosition].recentlyAdded = OFF;
+	Stack[StackPosition].startsWith = "";
+	Stack[StackPosition].sortMethod = "";
+	Stack[StackPosition].artistID = 0;
+	Stack[StackPosition].albumID = 0;
+	Stack[StackPosition].genreID = 0;
+	Stack[StackPosition].tvShowID = 0;
+	Stack[StackPosition].tvSeasonID = 0;
+	ListContext_Pop();
+	List_Retrieve();
 }
