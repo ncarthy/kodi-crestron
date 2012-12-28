@@ -123,6 +123,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETSONGDETAILS  29
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS 30
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETGENRES 		31
+#DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETGENREARTISTS 32
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARAUDIO			40 
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARVIDEO			41 
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					42 
@@ -137,6 +138,8 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_SCAN			57
 #DEFINE_CONSTANT REQUESTID_SEEKTIME						58
 #DEFINE_CONSTANT REQUESTID_SEEKPERCENTAGE				59
+#DEFINE_CONSTANT REQUESTID_GETADDONS 					70
+#DEFINE_CONSTANT REQUESTID_GETADDONDETAILS				71
 #DEFINE_CONSTANT REQUESTID_VERSION						99
 #DEFINE_CONSTANT REQUESTID_PING							100
 
@@ -156,12 +159,13 @@ Comments:
 #DEFINE_CONSTANT MUSIC_ARTIST_LIST                   5
 #DEFINE_CONSTANT MUSIC_ALBUM_LIST                    6
 #DEFINE_CONSTANT MUSIC_SONG_LIST                     7 
-#DEFINE_CONSTANT MUSIC_ARTIST_CHOOSE_LIST            8	// AllSongs & Albums  
-#DEFINE_CONSTANT MUSIC_GENRE_LIST                    9  
-#DEFINE_CONSTANT HOME_LIST		                     10
-#DEFINE_CONSTANT MUSIC_LIST		                     11
-#DEFINE_CONSTANT PICTURE_LIST	                     12
-#DEFINE_CONSTANT ADDON_LIST		                     13                                                        
+#DEFINE_CONSTANT MUSIC_GENRE_LIST                    8  
+#DEFINE_CONSTANT MUSIC_ARTIST_ALBUM_LIST             9	// AllSongs & Albums  
+#DEFINE_CONSTANT MUSIC_GENRE_ARTIST_LIST             10	// AllArtists & Artists  
+#DEFINE_CONSTANT HOME_LIST		                     20
+#DEFINE_CONSTANT MUSIC_LIST		                     21
+#DEFINE_CONSTANT PICTURE_LIST	                     22
+#DEFINE_CONSTANT ADDON_LIST		                     23                                                        
 
 #DEFINE_CONSTANT SPECIAL_SEASON						 65535
 
@@ -354,7 +358,7 @@ DYNAMIC INTEGER Playlist[25];		// An array of the item IDs in the active playlis
 INTEGER ListIDs[10];				// A store of the IDs of objects in current list
 INTEGER ListIndex;					// The index of the current object within the list
 INTEGER ListTotal;					// Total number of items in list (limits.total)
-
+STRING AddonIDs[10][40];			// A store of AddonIDs
 
 STRING HomeListItems$[4][8];		// Labels for the Home List	
 STRING MusicListItems$[3][7];		// Labels for the Music List	
@@ -1015,7 +1019,7 @@ STRUCTURE ListContext 			// Information used to Retrieve a Browse List
 	STRING sortMethod[10];		// The property (title, label, trackno etc) to sort the list
 	INTEGER artistID;			// ID of artist, used to generate artist-albums list
 	INTEGER albumID;			// ID of album, used to generate songs list
-	INTEGER genreID;
+	INTEGER genreID;			// ID of genre, used in music lists
 	INTEGER tvShowID;			// ID of curent Tv Show in List view
 	INTEGER tvSeasonID;			// ID of current Tv Show Season in List view
 };
@@ -1027,7 +1031,7 @@ FUNCTION ListContext_Push()
 {
 	StackPosition = StackPosition + 1;
 	IF (StackPosition>5) StackPosition = 5;
-	PRINT("ListContext_Push: StackPosition %d", StackPosition);
+	#IF_DEFINED DEBUG PRINT("ListContext_Push: StackPosition %d", StackPosition); #ENDIF
 	Stack[StackPosition].listID = CurrentListCxt.listID;
 	Stack[StackPosition].start = CurrentListCxt.start;
 	Stack[StackPosition].end = CurrentListCxt.end;
@@ -1044,7 +1048,7 @@ FUNCTION ListContext_Push()
 
 FUNCTION ListContext_Pop()
 {
-	PRINT("ListContext_Pop: StackPosition %d", StackPosition);
+	#IF_DEFINED DEBUG PRINT("ListContext_Pop: StackPosition %d", StackPosition); #ENDIF
 	CurrentListCxt.listID = Stack[StackPosition].listID;
 	CurrentListCxt.start = Stack[StackPosition].start;
 	CurrentListCxt.end = Stack[StackPosition].end;
@@ -1059,7 +1063,7 @@ FUNCTION ListContext_Pop()
 	CurrentListCxt.tvSeasonID = Stack[StackPosition].tvSeasonID;
 	IF (StackPosition)
 		StackPosition = StackPosition - 1;
-	PRINT("ListContext_Pop: New StackPosition %d", StackPosition);
+	#IF_DEFINED DEBUG PRINT("ListContext_Pop: New StackPosition %d", StackPosition); #ENDIF
 
 }
 
@@ -1189,6 +1193,18 @@ FUNCTION Movie_GetDetails(INTEGER movieid)
 
 	CALL SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS
 						, "VideoLibrary.GetMovieDetails", Params$);
+}
+
+FUNCTION Addon_GetDetails(STRING addonid)
+{
+	STRING Params$[150];
+
+	MAKESTRING(Params$, "{\"addonid\":%s,\"properties\":[%s,%s,%s,%s,%s,%s]}"
+			, addonid, "\"description\"", "\"path\"", "\"disclaimer\""
+			,"\"broken\"", "\"extrainfo\"", "\"rating\"");
+
+	CALL SendJsonCommand (REQUESTID_GETADDONDETAILS
+						, "Addons.GetAddonDetails", Params$);
 }
 
 /*
@@ -2882,7 +2898,7 @@ FUNCTION Process_TvShow(INTEGER requestId,INTEGER inList)
 
 }
   
-FUNCTION Process_Artist()
+FUNCTION Process_Artist(INTEGER requestId)
 {
 	INTEGER ArraySize;
 	STRING name$[15];
@@ -2892,7 +2908,20 @@ FUNCTION Process_Artist()
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		ListIndex = ListIndex+1; 
+		// Add the 'All Songs' option for Artists/Albums
+		IF (requestId = REQUESTID_AUDIOLIBRARY_GETGENREARTISTS && ListIndex = 0)
+		{	
+			SeasonOrAlbumName$[1] = "";
+			Genre$[1] = "";
+			Thumb$[1] = "";
+			SeriesOrArtistName$[1] = "All Artists";
+			Year$[1] = "";
+			ListIDs[1] = 0;
+            Watched[1] = OFF;
+			ListIndex = 2;//Next iitem will be #2
+		}
+		ELSE
+			ListIndex = ListIndex+1; 
         
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
@@ -2948,9 +2977,71 @@ FUNCTION Process_Artist()
 }
 
 
+FUNCTION Process_Addon()
+{
+	STRING name$[15];
+	INTEGER numberOfProperties;
+	INTEGER i;
+                   
+	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
+	{
+		ListIndex = ListIndex+1; 
+        
+		numberOfProperties = Tokens[tokenIndex].size/2;
+
+    	FOR (i = 1 TO numberOfProperties)
+		{
+			Read();
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "addonid")
+			{		
+				AddonIDs[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "thumbnail")
+			{
+				Thumb$[ListIndex] = EscapeThumbnailUri(GetString());
+			}
+			ELSE IF (name$ = "name")
+			{
+				Title$[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "summary")
+			{
+				PlotDescription$[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "author")
+			{
+				SeriesOrArtistName$[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "version")
+			{
+				Year$[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "type")
+			{
+				Genre$[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "enabled")
+			{
+				IF(GetBool())
+					Watched[ListIndex] = ON;
+				ELSE
+					Watched[ListIndex] = OFF;
+			}
+			ELSE
+			{
+				GenerateUserError("Process_Addon: Unknown property: %s", name$);
+			}
+		}
+	}
+}
+
 FUNCTION Process_Genre()
 {
-	INTEGER ArraySize;
 	STRING name$[15];
 	INTEGER numberOfProperties;
 	INTEGER i;
@@ -3267,7 +3358,12 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 					}
 					CASE (MUSIC_ARTIST_LIST):
 					{
-						Process_Artist();
+						Process_Artist(requestId);
+						BREAK;
+					}
+					CASE (MUSIC_GENRE_ARTIST_LIST):
+					{
+						Process_Artist(requestId);
 						BREAK;
 					}
 					CASE (MUSIC_ALBUM_LIST):
@@ -3285,11 +3381,17 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 						Process_Genre();
 						BREAK;
 					}
+					CASE (ADDON_LIST):
+					{
+						Process_Addon();
+						BREAK;
+					}
 				}
 			}
 	
 			// The 'All songs' item must be counted
-			IF (requestId = REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS)
+			IF (requestId = REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS || 
+					requestId = REQUESTID_AUDIOLIBRARY_GETGENREARTISTS)
 				numberOfListItems = numberOfListItems + 1;
         
 			IF (StepAmount - numberOfListItems > 0)
@@ -3430,6 +3532,11 @@ FUNCTION ProcessResult(INTEGER requestId)
 			Process_List(MUSIC_ARTIST_LIST,requestId);
         	BREAK;
 		}
+		CASE (REQUESTID_AUDIOLIBRARY_GETGENREARTISTS):
+		{
+			Process_List(MUSIC_GENRE_ARTIST_LIST,requestId);
+        	BREAK;
+		}
 		CASE (REQUESTID_AUDIOLIBRARY_GETALBUMS):
 		{
 			Process_List(MUSIC_ALBUM_LIST,requestId);
@@ -3480,6 +3587,19 @@ FUNCTION ProcessResult(INTEGER requestId)
 		CASE (REQUESTID_SEEKPERCENTAGE):
 		{
 			BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_VIDEOLIBRARY_SCAN):
+		{
+			BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_AUDIOLIBRARY_SCAN):
+		{
+			BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_GETADDONS) :
+		{
+			Process_List(ADDON_LIST,requestId);
+			BREAK;
 		}
     	CASE (REQUESTID_VERSION):
 		{
@@ -3696,7 +3816,6 @@ FUNCTION ProcessNotification(STRING method$)
 	ELSE IF (method$ = "Playlist.OnClear")
 	{
 		SETARRAY(Playlist,0);	// reset playlist array		
-
 	}
 	ELSE IF (method$ = "Playlist.OnAdd")
 	{
@@ -3705,14 +3824,13 @@ FUNCTION ProcessNotification(STRING method$)
 
 		Process_PlayerNotification(1);		
 
-		// Following a batch command like this sometimes the messages from xbmc get 'stuck'
-		// in the buffer. Give it a nudge by sending the cheapest communication: a ping
-		// This WAIT will be cancelled if a OnPlay event is received before the trigger
+		// Following a batch command like this sometimes the messages from xbmc get 
+		// 'stuck' in the buffer. This WAIT will be cancelled if another OnAdd or an
+		// OnPlay event is received before the trigger expires
 		WAIT (300, SendPing)
 		{
-	    	SendJsonCommand(REQUESTID_PING,"JSONRPC.Ping","");
+	    	PollForMetadata();
 		}
-
 	}
 	ELSE
 	{
@@ -3933,7 +4051,12 @@ STRING_FUNCTION List_FieldName(INTEGER listID)
 			RETURN ("title");
 			BREAK;
 		}
-		CASE(MUSIC_ARTIST_CHOOSE_LIST):
+		CASE(MUSIC_GENRE_LIST):
+		{
+			RETURN ("genre");
+			BREAK;
+		}
+		CASE(MUSIC_ARTIST_ALBUM_LIST):
 		{
 			RETURN ("album");
 			BREAK;
@@ -3953,12 +4076,12 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	INTEGER numberFilters;
 	
 	IF (listID = HOME_LIST || listID = MUSIC_LIST 
-			|| listID = PICTURE_LIST || listID = MUSIC_LIST)
+			|| listID = PICTURE_LIST || listID = ADDON_LIST)
 		RETURN ("");
 
     // Do not apply unwatched filter to Artist list
 	IF (CurrentListCxt.unWatched && listID != MUSIC_ARTIST_LIST 
-										&& CurrentListCxt.artistID = 0)
+			&& listID != MUSIC_GENRE_ARTIST_LIST && CurrentListCxt.artistID = 0)
 	{
     	numberFilters = 1;	
 		Filter$[0]="{\"field\":\"playcount\",\"operator\":\"is\",\"value\":\"0\"}";
@@ -3966,8 +4089,10 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	ELSE
 		numberFilters = 0;
     
-	// Do not apply startswith filter to Song list
-	IF (LEN(CurrentListCxt.startsWith) && listID != MUSIC_SONG_LIST)
+	// Do not apply startswith filter to Song list or Genre List
+	// GetGenres does not allow a filter parameter in Frodo release
+	IF (LEN(CurrentListCxt.startsWith) && listID != MUSIC_SONG_LIST
+				&& (VersionID != 6 || listID != MUSIC_GENRE_LIST))
 	{
         MAKESTRING(Filter$[numberFilters]
 			,"{\"field\":\"%s\",\"operator\":\"startswith\",\"value\":\"%s\"}"
@@ -3976,8 +4101,7 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	}
 
 	IF (CurrentListCxt.albumID)
-	{
-		
+	{		
 	    MAKESTRING(Filter$[numberFilters]
 				,"{\"%s\":%d }"
 				,"albumid",CurrentListCxt.albumID);		
@@ -3988,6 +4112,13 @@ STRING_FUNCTION List_Filter(INTEGER listID)
         MAKESTRING(Filter$[numberFilters]
 			,"{\"%s\":%d }"
 			,"artistid",CurrentListCxt.artistID);
+    	numberFilters = numberFilters + 1;    	
+	}
+	ELSE IF (CurrentListCxt.genreID)
+	{
+        MAKESTRING(Filter$[numberFilters]
+			,"{\"%s\":%d }"
+			,"genreid",CurrentListCxt.genreID);
     	numberFilters = numberFilters + 1;    	
 	}
 
@@ -4120,7 +4251,16 @@ FUNCTION List_Retrieve()
          
 			BREAK;
 		}
-		CASE(MUSIC_ARTIST_CHOOSE_LIST):
+		CASE(MUSIC_GENRE_ARTIST_LIST):
+		{
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s]%s }"
+				,Filter$, Limits$, "\"thumbnail\""
+				,"\"genre\"","\"style\"", Sort$);
+			Method$ = "AudioLibrary.GetArtists"; 
+			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETGENREARTISTS, Method$, Params$);
+			BREAK;
+		}
+		CASE(MUSIC_ARTIST_ALBUM_LIST):
 		{
            	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"artist\"", "\"thumbnail\""
@@ -4139,27 +4279,27 @@ FUNCTION List_Retrieve()
 													, Method$, Params$);
 			BREAK;
 		}
+		CASE(ADDON_LIST):
+		{
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s]%s }"
+				,Filter$, Limits$, "\"thumbnail\"", "\"enabled\"", "\"name\""
+				, "\"version\"", "\"summary\"", "\"author\"", Sort$);
+			Method$ = "Addons.GetAddons"; 
+			SendJsonCommand (REQUESTID_GETADDONS, Method$, Params$);
+			BREAK;
+		}
         CASE (HOME_LIST):
 		{ 
-        	FOR (ListIndex = 1 TO 5)
+        	FOR (ListIndex = 1 TO 4)
 			{
 				Title$[ListIndex] = HomeListItems$[ListIndex-1];
-				CSWITCH (ListIndex)
-				{
-					CASE (1):
-					{ListIDs[ListIndex] = MOVIE_TITLE_LIST; BREAK;}
-					CASE (2):
-					{ListIDs[ListIndex] = TV_SHOW_LIST; BREAK;}
-					CASE (3):
-					{ListIDs[ListIndex] = MUSIC_LIST; BREAK;}
-					CASE (4):
-					{ListIDs[ListIndex] = PICTURE_LIST; BREAK;}
-					CASE (5):
-					{ListIDs[ListIndex] = ADDON_LIST; BREAK;}
-				}
 			}
-			IF (StepAmount - 5 > 0)
-				InitOutputArrays(6);
+			ListIDs[1] = MOVIE_TITLE_LIST;
+			ListIDs[2] = TV_SHOW_LIST;
+			ListIDs[3] = MUSIC_LIST;
+			ListIDs[4] = ADDON_LIST;
+
+			InitOutputArrays(5);// Clear all lines starting with #5
 			BREAK;	
 		}
         CASE (MUSIC_LIST):
@@ -4167,18 +4307,12 @@ FUNCTION List_Retrieve()
         	FOR (ListIndex = 1 TO 3)
 			{
 				Title$[ListIndex] = MusicListItems$[ListIndex-1];
-				CSWITCH (ListIndex)
-				{
-					CASE (1):
-					{ListIDs[ListIndex] = MUSIC_ARTIST_LIST; BREAK;}
-					CASE (2):
-					{ListIDs[ListIndex] = MUSIC_ALBUM_LIST; BREAK;}
-					CASE (3):
-					{ListIDs[ListIndex] = MUSIC_GENRE_LIST; BREAK;}
-				}
 			}
-			IF (StepAmount - 3 > 0)
-				InitOutputArrays(4);
+			ListIDs[1] = MUSIC_ARTIST_LIST;
+			ListIDs[2] = MUSIC_ALBUM_LIST;
+			ListIDs[3] = MUSIC_GENRE_LIST;
+
+			InitOutputArrays(4); // Clear all lines starting with #4
 			BREAK;	
 		}
 		DEFAULT:
@@ -4228,7 +4362,7 @@ FUNCTION Play()
 			ItemType$ = "episodeid";
 			BREAK;
 		}
-		CASE (MUSIC_ARTIST_CHOOSE_LIST)  : 
+		CASE (MUSIC_ARTIST_ALBUM_LIST)  : 
 		CASE (MUSIC_SONG_LIST)  : 
 		{          			
             PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
@@ -4340,7 +4474,9 @@ PUSH List_PagePlus
 FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
 {
 	INTEGER i;
-       
+
+	ListContext_Clear();    
+   
 	CurrentListCxt.listID = listID;
     CurrentListCxt.artistID = 0;
 	CurrentListCxt.albumID = 0;
@@ -4362,71 +4498,16 @@ FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
 // Return to the previous list  
 PUSH List_Back
 {
-	SWITCH (CurrentList)
+	IF (CurrentList = MOVIE_TITLE_LIST && MovieDetails)	
 	{
-		CASE (MOVIE_TITLE_LIST)					: 
-		{
-			IF (MovieDetails)
-			{
-				MovieDetails = OFF;
-				TERMINATEEVENT;	// don't need to reload current list values;
-			}
-			ELSE
-			{
-				ListContext_Pop();
-				List_Retrieve();
-			}
-		}
-		/*CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
-		{ 
-			ListIndex=0;
-			ListStart=ListStart_Prev;
-			ListEnd=ListStart+StepAmount;
-			StartsWith$= StartsWith_Prev$;
-			ArtistID = 0;
-			SortMethod$="label";
-
-			CurrentList = MUSIC_ARTIST_LIST;
-		}
-		CASE (MUSIC_SONG_LIST)  : 
-		{
-			IF (ArtistID)
-			{
-				ListIndex=0;
-				ListStart=ListStart_Prev;
-				ListEnd=ListStart+StepAmount;
-				StartsWith$= StartsWith_Prev$;
-				SortMethod$="label";
-				ArtistID=0;
-	
-				CurrentList = MUSIC_ARTIST_CHOOSE_LIST;
-			}
-			ELSE IF (AlbumID)
-			{
-				ListIndex=0;
-				ListStart=ListStart_Prev;
-				ListEnd=ListStart+StepAmount;
-				StartsWith$= StartsWith_Prev$;
-				SortMethod$="label";
-				AlbumID=0;
-	
-				IF (ArtistID_Prev)
-				{
-                    ArtistID = ArtistID_Prev;
-					CurrentList = MUSIC_ARTIST_CHOOSE_LIST;
-				}
-				ELSE
-					CurrentList = MUSIC_ALBUM_LIST;
-			}
-		}*/
-        DEFAULT: 
-		{
-			ListContext_Pop();
-			List_Retrieve();		
-		}
+		MovieDetails = OFF;
+		TERMINATEEVENT;	// don't need to reload current list values;
 	}
-	
-	
+    ELSE
+	{
+		ListContext_Pop();
+		List_Retrieve();		
+	}	
 }
 
 PUSH List_Home
@@ -4671,7 +4752,7 @@ CHANGE SelectedItem
 			
 			CurrentListCxt.albumID = 0;
 			CurrentListCxt.artistID = ListIDs[SelectedItem];
-			CurrentListCxt.listID = MUSIC_ARTIST_CHOOSE_LIST;	
+			CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST;	
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith= "";
@@ -4679,7 +4760,21 @@ CHANGE SelectedItem
 			List_Retrieve();
 			Break;
 		}
-		CASE (MUSIC_ARTIST_CHOOSE_LIST) : 
+		CASE (MUSIC_GENRE_LIST) :
+		{
+			ListContext_Push();	// Store previous context in stack			
+			CurrentListCxt.listID = MUSIC_GENRE_ARTIST_LIST;
+		    CurrentListCxt.artistID = 0;
+			CurrentListCxt.albumID = 0;
+			CurrentListCxt.genreID = ListIDs[SelectedItem];
+			CurrentListCxt.start=0;                  	
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith="";
+			CurrentListCxt.sortMethod = "label";
+			List_Retrieve();			
+         	Break;
+		}
+		CASE (MUSIC_ARTIST_ALBUM_LIST) : 
 		{ 	        
             ListContext_Push();	// Store previous context in stack
 
@@ -4703,6 +4798,26 @@ CHANGE SelectedItem
 			List_Retrieve();
 			Break;
 		}
+		CASE (MUSIC_GENRE_ARTIST_LIST) : 
+		{ 	        
+            ListContext_Push();	// Store previous context in stack
+
+			// If artistID = 0 then 'All artists' has been selected
+			// So keep the reference to genreID. 
+			IF (ListIDs[SelectedItem])
+			{
+				CurrentListCxt.artistID = ListIDs[SelectedItem];
+				CurrentListCxt.genreID = 0;
+			}
+ 
+			CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST;
+			CurrentListCxt.start=0;      
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith= "";			
+			CurrentListCxt.sortMethod = "label";
+			List_Retrieve();
+			Break;
+		}
 		CASE (MUSIC_SONG_LIST)  : 
 		{ 
 			Play();
@@ -4723,22 +4838,29 @@ CHANGE SelectedItem
 			}
 			ELSE IF (CurrentList = ADDON_LIST)
 			{
-            	GenerateUserError("Addon List not Implemented.");
+            	List_Reset(ADDON_LIST,"");
 			}
 			Break;
 		}
 		CASE (MUSIC_LIST)  : 
 		{ 
 			ListContext_Push();	// Store previous context in stack
-			List_Reset(ListIDs[SelectedItem],"label");
-			Break;
-		}
-		CASE (PICTURE_LIST)  : 
-		{ 
+			CurrentListCxt.listID = ListIDs[SelectedItem];
+		    CurrentListCxt.artistID = 0;
+			CurrentListCxt.albumID = 0;
+			CurrentListCxt.start=0;                  	
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith="";
+			CurrentListCxt.sortMethod="label";				
+			List_Retrieve();
+
 			Break;
 		}
 		CASE (ADDON_LIST)  : 
 		{ 
+			//AddonDetails = ON;
+			//Addon_GetDetails(AddonIDs[SelectedItem]);        				
+			GenerateUserError("Addon_GetDetails not implemented yet.");
 			Break;
 		}
         DEFAULT: 
@@ -5728,7 +5850,7 @@ FUNCTION UnitTest(INTEGER number)
 	}
 
 }         
-
+#ENDIF
  
 CHANGE UnitTestNumber#
 {
@@ -5739,7 +5861,6 @@ CHANGE UnitTestNumber#
 
 PUSH RunAllTests
 {
-
 	INTEGER i;
 #IF_DEFINED DEBUG
 	FOR (i = 1 TO 31)
@@ -5749,8 +5870,7 @@ PUSH RunAllTests
 	PRINT("%s","Unit Tests complete.");
 #ENDIF
 }
-
-#ENDIF               
+               
 
 ///////////// Initialization script
 Function Main()
@@ -5767,8 +5887,7 @@ Function Main()
 	HomeListItems$[0] = "Movies";
 	HomeListItems$[1] = "TV Shows";
 	HomeListItems$[2] = "Music";
-	HomeListItems$[3] = "Pictures";
-	HomeListItems$[4] = "Addons";
+	HomeListItems$[3] = "Addons";
 	MusicListItems$[0] = "Artists";
 	MusicListItems$[1] = "Albums";
 	MusicListItems$[2] = "Genres";
