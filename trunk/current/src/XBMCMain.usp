@@ -4375,7 +4375,7 @@ FUNCTION Play()
 		{          			
             PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
             
-			IF (CurrentListCxt.albumID || CurrentListCxt.artistID)
+			IF (CurrentListCxt.albumID || CurrentListCxt.artistID || CurrentListCxt.genreID)
             {
 				position = CurrentListCxt.start+SelectedItem-1;                     
 				IF (CurrentListCxt.albumID)
@@ -4383,15 +4383,23 @@ FUNCTION Play()
        				ItemType$ = "albumid";
 					itemid = CurrentListCxt.albumID;
 				}
-				ELSE
+				ELSE IF (CurrentListCxt.artistID)
 				{
 					ItemType$ = "artistid";
 					itemid = CurrentListCxt.artistID;
 				}
+				ELSE IF (CurrentListCxt.genreID)
+				{
+					ItemType$ = "genreid";
+					itemid = CurrentListCxt.genreID;
+				}
 				BREAK;				
 			}
 			ELSE
+			{
+				GenerateUserError("Play(): No Songs to Add");
 				RETURN; // Exit Event
+			}
 		}
 		DEFAULT :
 		{
@@ -4689,6 +4697,7 @@ CHANGE PlayItem
 */
 CHANGE SelectedItem
 {	
+	#IF_DEFINED DEBUG Print("SelectedItem: CurrentList %d", CurrentList); #ENDIF
 	CSWITCH (CurrentList)
 	{
 		CASE (MOVIE_TITLE_LIST) : 
@@ -4873,7 +4882,7 @@ CHANGE SelectedItem
 		}
         DEFAULT: 
 		{
-			// do Nothing			
+			GenerateUserError("SelectedItem: Unknown listID %d", CurrentList);			
 		}
 	}
 }
