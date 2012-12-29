@@ -1598,6 +1598,9 @@ FUNCTION InitOutputArrays(INTEGER start)
 		SeriesOrArtistName$[i] = "";
 		Fanart$[i] = "";
 		Watched[i] = OFF;
+		Banner$[i] = "";
+		PlotDescription$[i] = "";
+		Filename$[i] = "";
 	}
 		
 }
@@ -2963,7 +2966,10 @@ FUNCTION Process_Artist(INTEGER requestId)
 				// Can only process one of mood/style
 				Tagline$[ListIndex] = LEFT(GetStringArray(),60);
 			}
-
+			ELSE IF (name$ = "yearsactive")
+			{
+             	Year$[ListIndex] = GetStringArray();
+			}
 			ELSE IF (name$ = "label")
 			{
              	//Do Nothing
@@ -4079,9 +4085,11 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 			|| listID = PICTURE_LIST || listID = ADDON_LIST)
 		RETURN ("");
 
-    // Do not apply unwatched filter to Artist list
+    // Do not apply unwatched filter to Artist list or Genre list
 	IF (CurrentListCxt.unWatched && listID != MUSIC_ARTIST_LIST 
-			&& listID != MUSIC_GENRE_ARTIST_LIST && CurrentListCxt.artistID = 0)
+			&& listID != MUSIC_GENRE_LIST
+			&& listID != MUSIC_GENRE_ARTIST_LIST 
+			&& CurrentListCxt.artistID = 0)
 	{
     	numberFilters = 1;	
 		Filter$[0]="{\"field\":\"playcount\",\"operator\":\"is\",\"value\":\"0\"}";
@@ -4234,8 +4242,8 @@ FUNCTION List_Retrieve()
 		}
 		CASE(MUSIC_ARTIST_LIST):
 		{
-           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s]%s }"
-				,Filter$, Limits$, "\"thumbnail\""
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s }"
+				,Filter$, Limits$, "\"thumbnail\"","\"yearsactive\""
 				,"\"genre\"","\"style\"", Sort$);
 			Method$ = "AudioLibrary.GetArtists"; 
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETARTISTS, Method$, Params$);
