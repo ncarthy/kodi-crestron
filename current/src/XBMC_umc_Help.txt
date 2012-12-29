@@ -1,0 +1,160 @@
+PARAMETERS
+----------
+Item_Count              - Amount of item to display on the Touch Panel at a time. Value of 1-10d
+Name                    - Name to identify module to XBMC.
+Address                 - IP Address of the XBMC
+httpport                - Port # of the HTTP Server on XBMC. Usually 8080 or 80
+tcpport                 - Port # of the JSON Server on XBMC. Almost always 9090
+
+DIGITAL INPUTS
+--------------
+
+ENABLE               - Set High and keep High to communicate with XBMC.
+BUTTON_xxx           - Remote Control Functions
+ACTION_xxx           - XBMC Actions
+
+Repeat_Playlist      - Press once to repeat playlist, twice to repeat current item and 
+					 - three times to clear. See RepeatStatus$ output.
+Shuffle_Playlist     - Toggle shuffle on or off. See ShuffleStatus$ Output.
+
+Movies_List          - Pulse to start working with Movie Items
+TVShow_List          - Pulse to start working with TVShow Items
+Albums_List          - Pulse to see a list of music albums on Xbmc
+Artists_List         - Pulse to see a list of music artists on Xbmc
+Pictures_List        - Pulse to see a list of songs on Xbmc. NOT CURRENTLY IMPLEMETED.
+Addons_List        - Pulse to see a list of Addons on Xbmc. NOT CURRENTLY IMPLEMETED.
+
+List_Unwatched_Only  - High to display recently added items. ONly works for Movies and Albums.
+List_Unwatched_Only  - High to display items that have not yet been watched/listen to ONLY.
+
+List_Home		     - Pulse to go to the top level list
+List_Top_Page        - Pulse to go to the start of the list
+List_Bottom_Page     - Pulse to go to the end of the list
+List_Page_Up         - Pulse to display the next page of items
+List_Page_Down       - Pulse to display the previous page of items
+List_Back            - For TV Shows and Music, back up to the previous layer.
+Exit_Details_Page    - Pulse to exit movie details or TV show episode details layer
+
+Start_Selected       - Play the currently selected item
+
+List_Item_1-9        - Items 1-9 to be displayed
+
+Search               - Pulse to bring up the search screen
+search_key_xxxx      - Keyboard for the search popup
+
+Poll 	             - Poll for currently playing time,position and percentage. Normally not required
+					 - as all metadata is now driven by notificaitons received from Xbmc.
+
+Update_Movie_Library - Update Xbmc movie metadata library, looking for new content
+Update_Music_Library - Update Xbmc music metadata library, looking for new content
+
+Play_Next            - Skip to next item in Playlist
+Play_Prev            - Return to previous item in Playlist
+Jump_Fwd_Small       - Move forward 30s in currently playing track/movie.
+Jump_Back_Small      - Move back 30s in currently playing track/movie.
+Jump_Fwd_Large       - Move forward 10% or 10 minutes in currently playing track/movie.
+Jump_Back_Large      - Move back 10% or 10 minutes in currently playing track/movie.
+
+Seek_Time_Percentage# - Go to this percentage time played on the current track/movie. [0-100]
+Seek_Time_Seconds#    - Go to this exact point on the current track/movie. [0-65535]
+
+SendNotification$    - Make a popup message appear on the Xbmc Screen.
+LogMessage$          - Append message to Xbmc log file. Xbmc Log file is described at 
+							http://wiki.xbmc.org/index.php?title=Log_file
+ 
+WindowName$          - Activate this window by name. List of names is at 
+							http://wiki.xbmc.org/index.php?title=Window_IDs  
+Window_xxxxx         - Pulse to activate the named window.
+
+
+
+ALL OUTPUTS
+-----------
+IsConnected          - High while connection to Xbmc is active
+Loading              - High if control system is receiving data from Xbmc. 
+					 - NB: Other requests are suspended until loading finishes.
+LoadingAnimationIndex   - Cycles from 1-6 while Loading is High (Analog)
+
+STOP_FB              - High if we are not playing anything
+PLAY_FB              - High if media is playing
+PAUSE_FB             - High if media is currently paused
+REWIND_FB            - High if media is being rewound
+FASTFORWARD_FB       - High if media is being fast forwarded
+
+Nothing_Playing_FB      - High is no media type is playing
+Movie_Playing_FB        - High if Movie is currently playing
+Audio_Playing_FB        - High if audio is currently playing
+Series_Playing_FB       - High if a TV Show is currently Playing
+Pictures_Playing_FB     - High if we are only displaying pictures
+Other_Video_Playing_FB  - High if an unknow video type is playing
+
+Home_List_Page   - High when on the top level list
+Movie_Title_List_Page   - High when the list contains movies
+TV_Show_List_Page       - High when the list is TV Shows
+TV_Season_List_Page     - High when the list is Seasons for a selected Show
+TV_Episode_List_Page    - High when the list is Episode for a TV show Season
+Music_List_Page		    - High when the list is the top level Music list
+Music_Artist_List_Page  - High when the list is Music Artists
+Music_Album_List_Page   - High when the list is Albums for a selected Artist
+Music_Song_List_Page    - High when the list is Songs for a selected Artist and Album
+Music_Genre_List_Page   - High when the list is Genres
+Picture_List_Page   - High when the list is Pictures (not implemented)
+Addon_List_Page   - High when the list is Addons (only partially implemented)
+Movie_Details_Page      - High when we should display details of selected Movie item
+TV_Episode_Details_Page - High when we should display details of selected Episode
+Music_Details_Page      - High when we should display details of selected Music Track
+
+SEARCH_PAGE             - High when the search page is required
+SMS_Search_Available	- High when user can use SMS keys to filter list
+RecentlyAdded_Available	- High when user can see RecentlyAdded items (Movies, Albums only)
+Unwatched_Available		- High when user can filter list by 'unwatched'
+
+Current_XXXXXXXX        - Details for the currently playing Media
+Next_XXXXXXXX           - Details for the next track in the playlist
+
+Position_in_Seconds		- Position in current track/movie, in seconds [0-65535]
+Duration_in_Seconds		- Duration of current track/movie, in seconds [0-65535]
+Current_Percentage      - Shows distance through current track/movie. [0-100]
+Current_Percentage_Scaled - Shows distance through current track/movie. [0-65535]
+ScrollBarPercentage     - Shows distance through browse list. [0-100]
+ScrollBarPercentageScaled - Shows distance through browse list. [0-65535]
+ScrollBarPercentageScaledAndFlipped - Shows distance through browse list. [65535-0]
+
+List_Summary$           - Shows position on current list. E.g. "50 - 55 of 205"
+Plot_of_Selected_Movie  - The plot of the selected movie/episode. Only activated on details screen. 
+                          Appends text in chunks using "\xFE\x02" to avoid 255 character limitation 
+                          on serial strings.
+RepeatStatus            - String showing repeat status on current playlist. 
+						-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or ''
+ShuffleStatus           - String showing shuffle status on current playlist. 
+						-		Allowed values = 'Shuffle' or ''	
+Search_Text             - Search criteria that we are matching on for the list
+
+List_Item_1-10_FB       - High for the item we have selected in the list
+
+
+Watched_1-10            - High if item has been watched already
+Movie/Episode/Name_1-10 - Movie or Episode Name or Addon name
+Year_1-10               - First Aired date or year movie/album was released
+Genre_1-10              - Genre
+UserRating_1-10         - User Rating
+Runtime_1-10            - Length of the media formatted as "h:mm:ss"
+Director_1-10           - Movie/Tv Show Director
+Tagline_1-10            - Tagline for Movie
+Thumbnail_1-10          - URL for thumbnail
+Writer_1-10             - Writer
+Episode/Track_1-10      - Episode number for TV Shows or Track Number for Music
+Season/AlbumName_1-10   - Season Number for TV Shows or Album Name for Music
+Studio_1-10             - Studio
+MPAA_1-10               - MPAA or RIA rating
+Series/ArtistName_1-10  - Series Name for TV Shows or Artist Name for Music
+Fanart_1-10             - URL for fanart
+Filename_1-10           - Filename
+Banner_1-10           	- Tv Show Banner uri
+
+
+
+
+
+
+                     
