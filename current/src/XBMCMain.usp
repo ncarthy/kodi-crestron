@@ -4321,6 +4321,11 @@ FUNCTION List_Retrieve()
 			ListIDs[2] = TV_SHOW_LIST;
 			ListIDs[3] = MUSIC_LIST;
 			ListIDs[4] = ADDON_LIST;
+            ListTotal = 4;
+
+			MAKESTRING(List_Summary$, "%d to %d of %d", 
+				1, ListTotal, ListTotal);
+
 
 			InitOutputArrays(5);// Clear all lines starting with #5
 			BREAK;	
@@ -4334,6 +4339,10 @@ FUNCTION List_Retrieve()
 			ListIDs[1] = MUSIC_ARTIST_LIST;
 			ListIDs[2] = MUSIC_ALBUM_LIST;
 			ListIDs[3] = MUSIC_GENRE_LIST;
+            ListTotal = 3;
+
+			MAKESTRING(List_Summary$, "%d to %d of %d", 
+				1, ListTotal, ListTotal);
 
 			InitOutputArrays(4); // Clear all lines starting with #4
 			BREAK;	
