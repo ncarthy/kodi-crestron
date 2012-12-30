@@ -6,7 +6,7 @@ ObjTp=FSgntr
 Sgntr=UserMacro
 RelVrs=4.01.10
 IntStrVrs=2
-MinSMWVrs=2.07.04
+MinSMWVrs=3.00.00
 MinTIOVrs=0
 SavedBy=SMW3.02.04
 ]
@@ -88,7 +88,7 @@ Cmn48=||3- Make a popup message appear on the Xbmc Screen.\\LogMessage$||1
 Cmn49=||9- Append message to Xbmc log file. Xbmc Log file is described||1
 Cmn50=at \\							http://wiki.xbmc.org/index.php?title=Log_file\\ \\WindowName$||1
 Cmn51=||9- Activate this window by name. List of names is at \\	
-Cmn52=						http://wiki.xbmc.org/index.php?title=Window_IDs  \\Window_xxxxx||1
+Cmn52=http://wiki.xbmc.org/index.php?title=Window_IDs  \\Window_xxxxx||1
 Cmn53=||8- Pulse to activate the named window.\\\\\\\\ALL OUTPUTS\\
 Cmn54=-----------\\IsConnected          - High while connection to Xbmc||1
 Cmn55=is active\\Loading              - High if control system is receiving||1
@@ -141,8 +141,8 @@ Cmn101=||1Only activated on details screen. \\                          Appends|
 Cmn102=text in chunks using "\xFE\x02" to avoid 255 character limitation||1
 Cmn103=\\                          on serial strings.\\RepeatStatus||4
 Cmn104=||8- String showing repeat status on current playlist. \\		
-Cmn105=				-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or||1
-Cmn106=''\\ShuffleStatus           - String showing shuffle status on current||1
+Cmn105=-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or ''\\
+Cmn106=ShuffleStatus           - String showing shuffle status on current||1
 Cmn107=playlist. \\						-		Allowed values = 'Shuffle' or ''	\\Search_Text||1
 Cmn108=||<- Search criteria that we are matching on for the list\\
 Cmn109=\\List_Item_1-10_FB       - High for the item we have selected in||1
@@ -178,7 +178,7 @@ Smpl-C=3
 CompilerTimePrecision=Single_Or_Double_Precision
 Exclusions=1,19,20,21,88,89,167,168,179,216,225,248,249,266,302,305,310,213,214,215,217,226,267,718,756,854,
 Hint=XBMC V2
-SMWRev=2.07.04
+SMWRev=3.00.00
 TIORev=0
 S+=1
 HelpID=1055
@@ -3120,7 +3120,7 @@ I104=329
 I105=330
 I106=331
 I107=332
-I108=333
+I108=392
 I109=23
 I110=33
 I111=36
@@ -3488,10 +3488,10 @@ Nm=XBMCMain.usp
 ObjVer=1
 PrH=4
 CF=2
-n1I=40
+n1I=41
 n2I=9
 n1O=25
-mI=49
+mI=50
 I8=9
 I11=12
 I14=383
@@ -3517,13 +3517,14 @@ I34=86
 I35=87
 I37=154
 I38=77
-I40=253
-I42=10
-I44=6
-I45=311
-I46=94
-I47=93
-I49=15
+I39=333
+I41=253
+I43=10
+I45=6
+I46=311
+I47=94
+I48=93
+I50=15
 mO=255
 tO=255
 O1=114
@@ -6410,6 +6411,11 @@ Nm=Set_SMS_Available
 ObjTp=Sg
 H=391
 Nm=Set_SMS_Unavailable
+]
+[
+ObjTp=Sg
+H=392
+Nm=//ACTION_CONTEXT_MENU
 ]
 [
 ObjTp=Sg
