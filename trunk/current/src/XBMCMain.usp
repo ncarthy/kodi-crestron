@@ -94,7 +94,7 @@ Comments:
 #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
-#DEFINE_CONSTANT BUFFER_SIZE 10000		// Socket buffer size
+#DEFINE_CONSTANT BUFFER_SIZE 20000		// Socket buffer size
 #DEFINE_CONSTANT STORED_STRING_SIZE 1000  // Size of each string in the temporary string store
 #DEFINE_CONSTANT STORED_STRING_RET_SIZE 10000 // The maximum size of strings that can be outputted from the store
 
@@ -138,6 +138,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_SCAN			57
 #DEFINE_CONSTANT REQUESTID_SEEKTIME						58
 #DEFINE_CONSTANT REQUESTID_SEEKPERCENTAGE				59
+#DEFINE_CONSTANT REQUESTID_INPUT_CONTEXTMENU 			60
 #DEFINE_CONSTANT REQUESTID_GETADDONS 					70
 #DEFINE_CONSTANT REQUESTID_GETADDONDETAILS				71
 #DEFINE_CONSTANT REQUESTID_VERSION						99
@@ -288,7 +289,8 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 				JumpFwd_Lg, 
 				JumpBack_Lg,
 				_SKIP_,UpdateMovies, 
-				UpdateMusic;
+				UpdateMusic,
+				ContextMenu;
 
 
 DIGITAL_INPUT _SKIP_,RunAllTests;		// Run all unit tests. Only works in DEBUG
@@ -1227,7 +1229,8 @@ FUNCTION DisconnectFromXbmc()
 			count = count + 1;
 		}
     } 
-
+                      
+	Loading = OFF;
     IsConnected = OFF;
 }
 
@@ -3594,11 +3597,23 @@ FUNCTION ProcessResult(INTEGER requestId)
 		{
 			BREAK; // Do Nothing
 		}
+		CASE (REQUESTID_SKIPNEXT) : 
+		{
+            BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_SKIPPREV) : 
+		{
+            BREAK; // Do Nothing
+		}
 		CASE (REQUESTID_VIDEOLIBRARY_SCAN):
 		{
 			BREAK; // Do Nothing
 		}
 		CASE (REQUESTID_AUDIOLIBRARY_SCAN):
+		{
+			BREAK; // Do Nothing
+		}
+		CASE (REQUESTID_INPUT_CONTEXTMENU) :
 		{
 			BREAK; // Do Nothing
 		}
@@ -4496,6 +4511,7 @@ FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
 	CurrentListCxt.listID = listID;
     CurrentListCxt.artistID = 0;
 	CurrentListCxt.albumID = 0;
+	CurrentListCxt.genreID = 0;
 	CurrentListCxt.start=0;                  	
 	CurrentListCxt.end=StepAmount;				
 	CurrentListCxt.startsWith="";
@@ -4617,7 +4633,11 @@ PUSH UpdateMusic
     CALL SendJsonCommand (REQUESTID_AUDIOLIBRARY_SCAN, 
 								"AudioLibrary.Scan", "");
 } 
- 
+PUSH ContextMenu
+{
+    CALL SendJsonCommand (REQUESTID_INPUT_CONTEXTMENU, 
+								"Input.ContextMenu", "");
+} 
 CHANGE Seek_Percentage
 {
 	STRING Params$[100];
@@ -4890,33 +4910,36 @@ CHANGE SelectedItem
 
 THREADSAFE SOCKETRECEIVE XBMC
 {
- 	STRING Xbmc$[BUFFER_SIZE];
-	
+ 	STRING Xbmc$[BUFFER_SIZE];	
 	INTEGER length;
                  
 	length = LEN(XBMC.SocketRxBuf);
 
-	Xbmc$ = XBMC.SocketRxBuf;
-	ClearBuffer(XBMC.SocketRxBuf);
-	
-    // Prefix with any bytes leftover from previous pass
-	IF (LEN(Remainder$))
-		MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
-
-	// Process the characters, retain any unprocessed 
-	// characters in module-level variable Remainder$
-	Remainder$ = ProcessResponse(Xbmc$, length);
-	WHILE (length)
+    IF (length)
 	{
-		Remainder$ = ProcessResponse(RIGHT(Xbmc$,length), length);
-	}
+		Xbmc$ = GATHERBYLENGTH(length,XBMC.SocketRxBuf);
+		//ClearBuffer(XBMC.SocketRxBuf);
+	
+    	// Prefix with any bytes leftover from previous pass
+		IF (LEN(Remainder$))
+			MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
 
+		#IF_DEFINED DEBUG PRINT("Received: %d bytes, %s",length,LEFT(Xbmc$,200)); #ENDIF
+
+		// Process the characters, retain any unprocessed 
+		// characters in module-level variable Remainder$
+		Remainder$ = ProcessResponse(Xbmc$, length);
+		WHILE (length)
+		{
+			Remainder$ = ProcessResponse(RIGHT(Xbmc$,length), length);
+		}
+    }
 }
 
 /*******************************************************************************************
   Unit Test Logic.
 
-  Not compile unless DEBUG is set
+  Not compiled unless DEBUG is set
   
 *******************************************************************************************/
             

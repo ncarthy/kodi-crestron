@@ -95,10 +95,12 @@
   InputSigType37=Digital
   InputCue38=UpdateMusic
   InputSigType38=Digital
-  InputCue39=[~UNUSED~]
+  InputCue39=ContextMenu
   InputSigType39=Digital
-  InputCue40=RunAllTests
+  InputCue40=[~UNUSED~]
   InputSigType40=Digital
+  InputCue41=RunAllTests
+  InputSigType41=Digital
   OutputCue1=IsConnected
   OutputSigType1=Digital
   OutputCue2=Loading
@@ -600,8 +602,8 @@
   ParamSigType4=Constant
   ParamCue5=XBMC_TcpPort$
   ParamSigType5=String
-  MinVariableInputs=40
-  MaxVariableInputs=40
+  MinVariableInputs=41
+  MaxVariableInputs=41
   MinVariableInputsList2=9
   MaxVariableInputsList2=9
   MinVariableOutputs=16
