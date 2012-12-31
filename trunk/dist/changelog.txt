@@ -1,5 +1,11 @@
 xbmc-crestron history
 
+1.02-beta 31 Dec 2012
+* Added new 'Home' button that returns user to toplevel list
+* Top level browse list contains Movies, TV Shows, Music and Addons
+* Allow 4-tap SMS jumps (Q and Z)
+* Bug fixes
+
 1.01-beta 23 Dec 2012
 * Added workaround for 3-series firmware bug
 * New 'RecentlyAdded' button for movies and albums
