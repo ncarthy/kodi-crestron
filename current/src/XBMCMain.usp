@@ -981,7 +981,7 @@ STRING_FUNCTION GetStringArray()
 }
             
 /* 
-*  Reset all internal variables to clean state
+*  Reset all internal variables connected with JSON parsing to a clean state
 */
 FUNCTION Init()
 {
@@ -1085,22 +1085,21 @@ FUNCTION ListContext_Clear()
 Function SendToSocket(STRING Command$)
 {
     
-	// don't send anything if the socket isn't open
-	IF (IsConnected = OFF)
+	// don't send anything if the socket isn't open or there's nothing to send
+	IF (IsConnected = OFF || !LEN(Command$))
 		RETURN;
-
-	// don't send anything if a long running query is already in progress
-	IF (Loading = ON)
-		RETURN;
-                   
+           
 	// If the Socket is busy then set a flag to get control of it
 	WHILE (SocketLock)
 	{
-    	Loading = ON;
-		Delay(1);
+		Delay(2);
 	}
 	// Set the lock before doing anything else
 	SocketLock = ON;
+
+	#IF_DEFINED DEBUG
+		PRINT("SendToSocket: %s" ,LEFT(Command$,200));
+	#ENDIF
 
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
@@ -1144,10 +1143,6 @@ Function SendJsonCommand(INTEGER id,  STRING Method , STRING Arguments)
 			"{\x22id\x22:%d,\x22jsonrpc\x22:\x222.0\x22,\x22method\x22:\x22%s\x22,\x22params\x22:%s }"
 			,id ,Method, Arguments);
 	}
-
-	#IF_DEFINED DEBUG
-		PRINT("SendJsonCommand: %s" ,LEFT(Command$,200));
-	#ENDIF
                    
 	SendToSocket(Command$);                     
 }
@@ -1209,6 +1204,17 @@ FUNCTION Addon_GetDetails(STRING addonid)
 						, "Addons.GetAddonDetails", Params$);
 }
 
+/* 
+	Return internal JSON parsing variables to a clean state and then clear all semaphores
+*/
+FUNCTION ResetSocket()
+{
+	Init();
+	ReceiveLock = OFF;
+	Loading = OFF;	
+	SocketLock = OFF;
+}
+
 /*
   	Close the connection and wait for status to show 'disconnected'
 */        
@@ -1229,9 +1235,9 @@ FUNCTION DisconnectFromXbmc()
 			count = count + 1;
 		}
     } 
-                      
-	Loading = OFF;
-    IsConnected = OFF;
+       
+	// Reset socket               
+	ResetSocket();
 }
 
 /*
@@ -1268,24 +1274,6 @@ SOCKETSTATUS XBMC
 		IsConnected = ON;
 		Init();
 		SendJsonCommand(REQUESTID_VERSION,"JSONRPC.Version","");
-       	FOR (ListIndex = 1 TO GetNumArrayRows(HomeListItems$)+1)
-		{
-			Title$[ListIndex] = HomeListItems$[ListIndex-1];
-			CSWITCH (ListIndex)
-			{
-				CASE (1):
-				{ListIDs[ListIndex] = MOVIE_TITLE_LIST; BREAK;}
-				CASE (2):
-				{ListIDs[ListIndex] = TV_SHOW_LIST; BREAK;}
-				CASE (3):
-				{ListIDs[ListIndex] = MUSIC_LIST; BREAK;}
-				CASE (4):
-				{ListIDs[ListIndex] = PICTURE_LIST; BREAK;}
-				CASE (5):
-				{ListIDs[ListIndex] = ADDON_LIST; BREAK;}
-			}
-		}
-
 	}
 	ELSE
 	{
@@ -1651,7 +1639,10 @@ FUNCTION Player_GetItemExtended(INTEGER id)
 	{
 		// Find metadata about the next track in the playlist
 		nextSongId=Playlist[PlaylistPosition+1];
+		
 		// Check for a valid songId (>0)
+		// The playlist array is populated by receiving OnAdd notifications
+		// If we missed those then we can't determine nextSongId.
 		IF (nextSongId)
 		{
 			MAKESTRING(Params$, "{\"songid\":%d,\"properties\":[%s,%s,%s,%s]}"
@@ -1660,7 +1651,7 @@ FUNCTION Player_GetItemExtended(INTEGER id)
 			requestId = REQUESTID_AUDIOLIBRARY_GETSONGDETAILS;
 		}
 		ELSE
-			Return; //Exit function
+			Return; //Exit function 
 	}
     
 	IF (LEN(method$))
@@ -1693,14 +1684,10 @@ FUNCTION PollForMetadata()
 	WAIT (100)
 	{
 		// First data about the activeplayer
-		Player_GetProperties();			
-	}
-	WAIT (200)
-	{
+		Player_GetProperties();	
 		// then the item itself			
-		Player_GetItem();
+		Player_GetItem();		
 	}
-	
 }
 
 /*
@@ -3802,12 +3789,9 @@ FUNCTION ProcessNotification(STRING method$)
 		WAIT (100)
 		{
 			// First data about the activeplayer
-			Player_GetProperties();			
-		}
-		WAIT (200)
-		{
+			Player_GetProperties();
 			// then the item itself			
-			Player_GetItem();
+			Player_GetItem();			
 		}
 	}
 	ELSE IF (method$ = "Player.OnPause")
@@ -3849,7 +3833,7 @@ FUNCTION ProcessNotification(STRING method$)
 		// Following a batch command like this sometimes the messages from xbmc get 
 		// 'stuck' in the buffer. This WAIT will be cancelled if another OnAdd or an
 		// OnPlay event is received before the trigger expires
-		WAIT (300, SendPing)
+		WAIT (300, PollNow)
 		{
 	    	PollForMetadata();
 		}
@@ -3861,6 +3845,8 @@ FUNCTION ProcessNotification(STRING method$)
 		//Some of the events that are ignored:
 
 		//AudioLibrary.OnAdd & VideoLibrary.OnAdd
+		//AudioLibrary.OnUpdate & VideoLibrary.OnUpdate 
+		// Note VideoLibrary.OnUpdate is also received when a Resume position is recorded.
         //AudioLibrary.OnRemove & VideoLibrary.OnRemove
 		//AudioLibrary.OnScanStarted & VideoLibrary.OnScanStarted
 		//AudioLibrary.OnScanFinished & VideoLibrary.OnScanFinished
@@ -3939,14 +3925,6 @@ FUNCTION ProcessBasedOnResponseType()
 	{
 		GenerateUserError("ProcessBasedOnResponseType: Response was not an object or array.");
 	}
-}
-
-FUNCTION ResetSocket()
-{
-	Init();
-	ReceiveLock = OFF;
-	Loading = OFF;	
-	SocketLock = OFF;
 }
 
 /*
@@ -4450,14 +4428,6 @@ FUNCTION Play()
 					);
 
 	SendToSocket(BatchCommand$);
-      
-	// Following a batch command like this sometimes the messages from xbmc get 'stuck'
-	// in the buffer. Give it a nudge by sending the cheapest communication: a ping
-	// This WAIT will be cancelled if a OnPlay event is received before the trigger
-	WAIT (250, SendPing2)
-	{
-    	SendJsonCommand(REQUESTID_PING,"JSONRPC.Ping","");
-	}
 }
 
 /*******************************************************************************************
@@ -4579,7 +4549,7 @@ PUSH List_UnWatchedOnly
 }
 RELEASE List_UnWatchedOnly
 {
-	CurrentListCxt.unWatched = 1;
+	CurrentListCxt.unWatched = 0;
 	List_Retrieve();	
 }
 PUSH List_RecentItems
@@ -4589,7 +4559,6 @@ PUSH List_RecentItems
 }
 RELEASE List_RecentItems
 {
-	CurrentListCxt.recentlyAdded = 0;
 	CurrentListCxt.recentlyAdded = 0;
 	List_Retrieve();	
 }
@@ -5065,7 +5034,44 @@ FUNCTION TestToken(INTEGER token_number, INTEGER start,
 	}	
 }
 
+FUNCTION Test_PlayGenre(INTEGER genreId)
+{	STRING BatchCommand$[500];
+	INTEGER PlayerID;
+	STRING ItemType$[20];
+    STRING Id$[5];
+	STRING Params$[25];
+	STRING Item$[7];
+	STRING Playlist$[13];
+	STRING Position$[12];
+	STRING MethodClear$[25];
+	STRING MethodAdd$[25];
+	STRING MethodOpen$[25];
+	INTEGER position;
+         
+	position = 0;
+	ItemType$ = "genreid";
+	PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+    
+    Id$ = "\"id\":";
+	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
+	Item$ = "\"item\":";
+	Playlist$ = "\"playlistid\":";
+	Position$ = "\"position\":";
+	MethodClear$ = "\"method\":\"Playlist.Clear\"";
+	MethodAdd$ = "\"method\":\"Playlist.Add\"";
+	MethodOpen$ = "\"method\":\"Player.Open\"";
+	
+	MAKESTRING(BatchCommand$,"[{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d,%s{\"%s\":%d }}},{%s%d,%s,%s{%s{%s%d,%s%d }}}]"
+					,Id$,REQUESTID_PLAYLIST_CLEARAUDIO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
+					,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO
+                    ,Id$,REQUESTID_PLAYLIST_ADD,MethodAdd$,Params$,Playlist$,PlayerID,Item$,ItemType$,genreId
+					,Id$,REQUESTID_PLAYER_OPEN,MethodOpen$,Params$,Item$,Playlist$,PlayerID,Position$,position
+					);
+    PRINT("%s", LEFT(BatchCommand$,200));
+	PRINT("%s", RIGHT(BatchCommand$,200));
 
+	SendToSocket(BatchCommand$);
+}
 
 FUNCTION UnitTest(INTEGER number)
 {
@@ -5890,6 +5896,30 @@ FUNCTION UnitTest(INTEGER number)
 			{
             	ProcessResponse(s$,length);
 			}
+
+			BREAK;
+		}
+		CASE (32):
+		{
+			IF (!IsConnected)
+			{
+				PRINT ("%s", "Connect to Xbmc first");
+				BREAK;
+			}
+			SendJsonCommand(REQUESTID_GETACTIVEPLAYERS,"Player.GetActivePlayers","");
+			Player_GetProperties();			
+			Player_GetItem();
+
+			BREAK;
+		}
+		CASE (33):
+		{
+			IF (!IsConnected)
+			{
+				PRINT ("%s", "Connect to Xbmc first");
+				BREAK;
+			}
+			Test_PlayGenre(57);
 
 			BREAK;
 		}
