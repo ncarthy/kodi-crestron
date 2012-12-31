@@ -2370,6 +2370,7 @@ FUNCTION Process_PlayerProperties()
 				}
 				ELSE IF (PlaySpeed=0)
 				{
+					PlayFB=OFF;
     				PauseFb = ON;
 					RewindFB = OFF;
 					FastForwardFB = OFF;
@@ -3812,7 +3813,7 @@ FUNCTION ProcessNotification(STRING method$)
 	ELSE IF (method$ = "Player.OnPause")
 	{
 		StopFb = OFF;
-		PlayFb = ON;
+		PlayFb = OFF;
 		PauseFb = ON;		
     	Process_PlayerNotification(0);
 	}
