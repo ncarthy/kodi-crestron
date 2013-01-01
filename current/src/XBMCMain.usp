@@ -4292,6 +4292,8 @@ FUNCTION List_Retrieve()
 		}
         CASE (HOME_LIST):
 		{ 
+			InitOutputArrays(1);// Clear all lines starting with #1
+
         	FOR (ListIndex = 1 TO 4)
 			{
 				Title$[ListIndex] = HomeListItems$[ListIndex-1];
@@ -4305,12 +4307,11 @@ FUNCTION List_Retrieve()
 			MAKESTRING(List_Summary$, "%d to %d of %d", 
 				1, ListTotal, ListTotal);
 
-
-			InitOutputArrays(5);// Clear all lines starting with #5
 			BREAK;	
 		}
         CASE (MUSIC_LIST):
 		{ 
+			InitOutputArrays(1); // Clear all lines starting with #1
         	FOR (ListIndex = 1 TO 3)
 			{
 				Title$[ListIndex] = MusicListItems$[ListIndex-1];
@@ -4323,7 +4324,6 @@ FUNCTION List_Retrieve()
 			MAKESTRING(List_Summary$, "%d to %d of %d", 
 				1, ListTotal, ListTotal);
 
-			InitOutputArrays(4); // Clear all lines starting with #4
 			BREAK;	
 		}
 		DEFAULT:
