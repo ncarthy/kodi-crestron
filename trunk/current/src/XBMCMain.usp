@@ -144,13 +144,13 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_VERSION						99
 #DEFINE_CONSTANT REQUESTID_PING							100
 
-/* Types of playing media, output via Currently_Playing_Type*/
+/* Types of playing media, output via CurrentlyPlayingType AOUT*/
 #DEFINE_CONSTANT TYPE_NONE 0
 #DEFINE_CONSTANT TYPE_MOVIE 1
 #DEFINE_CONSTANT TYPE_AUDIO 2
-#DEFINE_CONSTANT TYPE_SERIES 3
-#DEFINE_CONSTANT TYPE_PICTURES 4
-#DEFINE_CONSTANT TYPE_OTHERVIDEO 5
+#DEFINE_CONSTANT TYPE_SERIES 4
+#DEFINE_CONSTANT TYPE_PICTURES 8
+#DEFINE_CONSTANT TYPE_OTHERVIDEO 16
                                                       
 /* Types of List */ 
 #DEFINE_CONSTANT MOVIE_TITLE_LIST					 1
@@ -2045,41 +2045,65 @@ FUNCTION Process_StreamDetails()
 FUNCTION Process_ActivePlayers()
 {	
 	STRING name$[10];
+	INTEGER numberOfArrayItems;
+	INTEGER numberOfProperties;
+	INTEGER i;
+	SIGNED_INTEGER playerid;
+	INTEGER SlideshowIsActive;
+
+	SlideshowIsActive = 0;
                                                
 	// It must be an array... with greater than zero children
 	IF (Tokens[tokenIndex].type = JSMN_ARRAY && Tokens[tokenIndex].size > 0)
 	{
-		//Enter the first object in the array
-		Read();
+		numberOfArrayItems = Tokens[tokenIndex].size;
 
-    	WHILE (Read())
+    	FOR (i = 1 TO numberOfArrayItems)
 		{
-         	name$ = GetString();
-
-			// Advance to next token
-			Read();			
-
-			IF (name$ = "playerid")
-			{		
-				ActivePlayerID = GetInteger();
-				IsPlaying = 1;
-				BREAK; // We only process the 1st object in the array, then exit.			
-			}
-            ELSE IF (name$ = "type")
+			Read();
+			IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 			{
-				//Do nothing
+				Read();
+	         	name$ = GetString();
+	
+				// Advance to next token
+				Read();			
+	
+				IF (name$ = "playerid")
+				{	
+					playerid = GetSignedInteger();
+					IF (playerid = 0 || playerid = 1) // audio or video
+						ActivePlayerID = playerid;
+					ELSE IF (playerid = 2)
+						SlideshowIsActive = 1;					
+					IsPlaying = 1;
+				}
+	            ELSE IF (name$ = "type")
+				{
+					//Do nothing
+				}
+				ELSE
+				{
+					GenerateUserError("Process_ActivePlayers: Unknown property: %s", name$);
+				}
 			}
 			ELSE
 			{
-				GenerateUserError("Process_ActivePlayers: Unknown property: %s", name$);
-				BREAK;
+				GenerateUserError("Process_ActivePlayers: Not an object!");
 			}
 		}
+         
+		//Set or Unset the 'Slideshow playing' bit in CurrentlyPlayingType
+		IF (SlideshowIsActive)
+        	CurrentlyPlayingType = CurrentlyPlayingType | TYPE_PICTURES;
+		ELSE
+			CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_PICTURES);
 	}
 	ELSE
 	{
     	// No active players
 		ActivePlayerID = 0;
+		CurrentlyPlayingType = 0;
 	}
 }
 
@@ -2088,26 +2112,17 @@ FUNCTION Process_PlayingType()
     PlayingItemType$ = GetString();
 	
 	if (PlayingItemType$ = "episode")
-	{
-		CurrentlyPlayingType = TYPE_SERIES;
-	}    
-       else if (PlayingItemType$ = "movie")
-	{
-		CurrentlyPlayingType = TYPE_MOVIE;
-	}
-       else if (PlayingItemType$ = "unknown")
-	{
-		CurrentlyPlayingType = TYPE_OTHERVIDEO;
-	}			
-       else if (PlayingItemType$ = "musicvideo")
-	{
-		CurrentlyPlayingType = TYPE_OTHERVIDEO;
-	}
-       else if (PlayingItemType$ = "song")
-	{
-		CurrentlyPlayingType = TYPE_AUDIO;
-	}
-
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_SERIES;
+    else if (PlayingItemType$ = "movie")
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_MOVIE;
+    else if (PlayingItemType$ = "unknown")
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_OTHERVIDEO;			
+    else if (PlayingItemType$ = "musicvideo")
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_OTHERVIDEO;
+    else if (PlayingItemType$ = "song")
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_AUDIO;
+    else if (PlayingItemType$ = "picture")
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_PICTURES;
 }
 
 FUNCTION Process_GetItem(INTEGER requestId)
@@ -2504,14 +2519,21 @@ FUNCTION Process_Movie(INTEGER inList)
   
 /*
   	Information about the Player, usually provided by a notification.
+
+	Returns the playerid
 */
-FUNCTION Process_Player()
+SIGNED_INTEGER_FUNCTION Process_Player()
 {
 
 	STRING name$[15];
 	INTEGER numberOfProperties;
 	INTEGER i;
 	INTEGER offset;
+	SIGNED_INTEGER playerid;
+	SIGNED_INTEGER playspeed_local;
+
+	playerid = -1; //default values
+	playspeed_local = 0;
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
@@ -2529,22 +2551,11 @@ FUNCTION Process_Player()
 
 			IF (name$ = "playerid")
 			{		
-				ActivePlayerID = GetInteger();
+				playerid = GetSignedInteger();
 			}
 			ELSE IF (name$ = "speed")
 			{		
-				PlaySpeed = GetSignedInteger();
-				IF (PlaySpeed<0)
-					RewindFB = ON;
-				ELSE IF (PlaySpeed>1)
-					FastForwardFB = ON;
-				ELSE
-				{
-					RewindFB = OFF;
-					FastForwardFB = OFF;
-				}
-				
-            	MAKESTRING(PlayingSpeed$,"%dx",PlaySpeed);
+				playspeed_local = GetSignedInteger();
 			}
 			ELSE IF (name$ = "seekoffset")
 			{
@@ -2564,6 +2575,25 @@ FUNCTION Process_Player()
 
 		}
 	} 	
+               
+	// Only update output signals for audio & video, not slideshow
+	IF (playerid = 0 || playerid = 1)
+	{
+		PlaySpeed = playspeed_local;
+		IF (playspeed_local<0)
+			RewindFB = ON;
+		ELSE IF (playspeed_local>1)
+			FastForwardFB = ON;
+		ELSE
+		{
+			RewindFB = OFF;
+			FastForwardFB = OFF;
+		}
+		
+        MAKESTRING(PlayingSpeed$,"%dx",playspeed_local);
+	}
+
+	RETURN (playerid);
 }
 
    
@@ -2588,7 +2618,7 @@ FUNCTION Process_OnPlayItem()
 			// Advance to next token
 			Read();			
 
-			IF (name$ = "id")
+			IF (name$ = "id" || name$ = "file")
 			{		
             	//Do Nothing
 			}
@@ -2604,8 +2634,13 @@ FUNCTION Process_OnPlayItem()
 		}
 	} 	
 }
-
-FUNCTION Process_OnAdd()
+ 
+/*
+	Process OnAdd notification
+	 
+	Returns: 1 if the Notification is for audio/video, 0 if for pictures
+*/
+INTEGER_FUNCTION Process_OnAdd()
 {
 	STRING name$[15];
 	INTEGER numberOfProperties;
@@ -2613,14 +2648,13 @@ FUNCTION Process_OnAdd()
 	INTEGER i,j;
 	INTEGER id;
 	SIGNED_INTEGER pos;
+	SIGNED_INTEGER playlistid;
 
 	id = 0;
 	pos = -1;
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		ListIndex = ListIndex+1; 
-        
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
     	FOR (i = 1 TO numberOfProperties)
@@ -2635,7 +2669,7 @@ FUNCTION Process_OnAdd()
 			{		
 				numberOfInnerProperties = Tokens[tokenIndex].size/2;
 		
-		    	FOR (j = 1 TO numberOfProperties)
+		    	FOR (j = 1 TO numberOfInnerProperties)
 				{
 					Read();
 		         	name$ = GetString();		
@@ -2644,53 +2678,63 @@ FUNCTION Process_OnAdd()
 					IF (name$ = "id")
                     {
 						id = GetInteger();
-	
-						if (id && pos>=0)
-						{
-							// Playlist is dynamic
-							IF (pos >= GetNumArrayCols(Playlist))
-								ResizeArray(Playlist,pos*2+1);
-
-							Playlist[pos] = id;
-                         	RETURN;
-						}
+					}
+					ELSE IF (name$ = "file" || name$ = "type")
+					{
+                     	//skip
 					}
 				}
 			}
 			ELSE IF (name$ = "position")
 			{		
-            	pos = GetInteger();
-
-				if (id && pos>=0)
-				{
-					// Playlist is dynamic
-					IF (pos >= GetNumArrayCols(Playlist))
-						ResizeArray(Playlist,pos*2+1);
-
-					Playlist[pos] = id;
-					RETURN;
-				}
+            	pos = GetSignedInteger();
 			}
 			ELSE IF (name$ = "playlistid")
 			{		
-            	//Do Nothing
+            	playlistid = GetSignedInteger();
 			}
 			ELSE
 			{
-				GenerateUserError("Process_OnPlayPauseSeek: Unknown property: %s", name$);
+				GenerateUserError("Process_OnAdd: Unknown property: %s", name$);
 			}
 
 		}
-	} 	
-}
+                                                         
+		#IF_DEFINED DEBUG PRINT("Process_OnAdd: id %d, pos %d, playlistid %d, ActivePlayerID %d",id,pos,playlistid,ActivePlayerID); #ENDIF
+		if (id && pos>=0 && (playlistid = ActivePlayerID))
+		{
+			// Playlist is dynamic
+			IF (pos >= GetNumArrayCols(Playlist))
+				ResizeArray(Playlist,pos*2+1);
 
-FUNCTION Process_OnPlayPauseSeek()
+			Playlist[pos] = id;
+		}
+
+	} 	
+
+	IF (playlistid = 0 || playlistid = 1)
+		RETURN (1); 	
+	ELSE
+		RETURN (0);}
+
+/*
+	Process a notification received form the xbmc player
+	 
+	IsPlaylistOnAddNotification: 1 when its a Playlist.OnAdd notification, 0 otherwise
+
+	Returns: 1 if the Notification is for audio/video, 0 if for pictures
+*/
+INTEGER_FUNCTION Process_OnPlayPauseSeek()
 {
 
 	STRING name$[15];
 	INTEGER numberOfProperties;
 	INTEGER i;
+	INTEGER playerid;
+	INTEGER playlistid;
                    
+	playerid = -1;
+
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
 		ListIndex = ListIndex+1; 
@@ -2711,7 +2755,17 @@ FUNCTION Process_OnPlayPauseSeek()
 			}
 			ELSE IF (name$ = "player")
 			{		
-            	Process_Player();
+            	playerid = Process_Player();
+			}
+			ELSE IF (name$ = "playlistid")
+			{		
+         		playlistid = GetInteger(); 
+				IF (playlistid != 2) 	
+					SETARRAY(Playlist,0);	// reset playlist array	
+			}
+			ELSE IF (name$ = "end")
+			{		
+         		// skip
 			}
 			ELSE
 			{
@@ -2719,16 +2773,30 @@ FUNCTION Process_OnPlayPauseSeek()
 			}
 
 		}
-	} 	
+	}
+               
+	IF (playerid = 0 || playerid = 1)
+		RETURN (1); 	
+	ELSE
+		RETURN (0);
 }
+            
+/*
+	Process a notificaiton recieved form the xbmc player
+	 
+	IsPlaylistOnAddNotification: 1 when its a Playlist.OnAdd notification, 0 otherwise
 
-// when IsPlaylistOnAddNotification = 1 then its a Playlist.OnAdd notification
-FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification)
+	Returns: 1 if the Notification is for audio/video, 0 if for pictures
+*/
+INTEGER_FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification)
 {
 
 	STRING name$[15];
 	INTEGER numberOfProperties;
 	INTEGER i;
+	INTEGER return_value;
+
+	return_value = 0;
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
@@ -2747,9 +2815,9 @@ FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification)
 			IF (name$ = "data")
 			{		
 				IF (IsPlaylistOnAddNotification)
-                    Process_OnAdd();
+                    return_value = Process_OnAdd();
 				ELSE
-					Process_OnPlayPauseSeek();
+					return_value = Process_OnPlayPauseSeek();
 			}
 			ELSE IF (name$ = "sender")
 			{		
@@ -2761,7 +2829,9 @@ FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification)
 			}
 
 		}
-	} 	
+	}
+
+	RETURN (return_value); 	
 }
 
 /*
@@ -3775,45 +3845,56 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE IF (method$ = "Player.OnPlay")
 	{
-		// Cancel any requests that are in the wait queue
-		CANCELALLWAIT();
-
 		IsPlaying = 1;
 		PauseFb = OFF;
 		StopFb = OFF;
 		PlayFb = ON;
-		Process_PlayerNotification(0);
-                                    		
-		// Wait one second, then retrieve metadata about
-		// the currently playing item
-		WAIT (100)
-		{
-			// First data about the activeplayer
-			Player_GetProperties();
-			// then the item itself			
-			Player_GetItem();			
+		
+		IF (Process_PlayerNotification(0))
+		{                                    		
+			// Cancel any requests that are in the wait queue
+			CANCELALLWAIT();
+
+			// Wait one second, then retrieve metadata about
+			// the currently playing item
+			WAIT (100)
+			{
+				// First data about the activeplayer
+				Player_GetProperties();
+				// then the item itself			
+				Player_GetItem();			
+			}
 		}
 	}
 	ELSE IF (method$ = "Player.OnPause")
 	{
-		StopFb = OFF;
-		PlayFb = OFF;
-		PauseFb = ON;		
-    	Process_PlayerNotification(0);
+		IF (Process_PlayerNotification(0))
+		{
+			StopFb = OFF;
+			PlayFb = OFF;
+			PauseFb = ON;		
+		}    	
 	}
 	ELSE IF (method$ = "Player.OnSpeedChanged")
 	{
-		PauseFb = OFF;
-		StopFb = OFF;
-		PlayFb = ON;
-        Process_PlayerNotification(0);
+		IF (Process_PlayerNotification(0))
+		{
+			PauseFb = OFF;
+			StopFb = OFF;
+			PlayFb = ON;		
+		} 
 	}
 	ELSE IF (method$ = "Player.OnStop")
 	{
-		PauseFb = OFF;
-		PlayFb = OFF;
-		StopFb = ON;
-		IsPlaying = 0;		
+		IF (Process_PlayerNotification(0))
+		{
+			PauseFb = OFF;
+			PlayFb = OFF;
+			StopFb = ON;
+			IsPlaying = 0;	
+
+			PollForMetadata();	
+		}
 	}
 	ELSE IF (method$ = "Player.OnSeek")
 	{
@@ -3821,22 +3902,24 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE IF (method$ = "Playlist.OnClear")
 	{
-		SETARRAY(Playlist,0);	// reset playlist array		
+		Process_PlayerNotification(0);
 	}
 	ELSE IF (method$ = "Playlist.OnAdd")
 	{
-		// Cancel any requests that are in the wait queue
-		CANCELALLWAIT();
+		IF (Process_PlayerNotification(1))
+		{                                    		
+			// Cancel any requests that are in the wait queue
+			CANCELALLWAIT();
 
-		Process_PlayerNotification(1);		
+			// This WAIT will be cancelled if another OnAdd or OnPlay event
+			// is received before the trigger expires.
+			WAIT (300, PollNow)
+			{
+		    	PollForMetadata();
+			}
 
-		// Following a batch command like this sometimes the messages from xbmc get 
-		// 'stuck' in the buffer. This WAIT will be cancelled if another OnAdd or an
-		// OnPlay event is received before the trigger expires
-		WAIT (300, PollNow)
-		{
-	    	PollForMetadata();
 		}
+		
 	}
 	ELSE
 	{
@@ -3846,11 +3929,11 @@ FUNCTION ProcessNotification(STRING method$)
 
 		//AudioLibrary.OnAdd & VideoLibrary.OnAdd
 		//AudioLibrary.OnUpdate & VideoLibrary.OnUpdate 
-		// Note VideoLibrary.OnUpdate is also received when a Resume position is recorded.
+		// Note: VideoLibrary.OnUpdate is also received when a Resume position is recorded.
         //AudioLibrary.OnRemove & VideoLibrary.OnRemove
 		//AudioLibrary.OnScanStarted & VideoLibrary.OnScanStarted
 		//AudioLibrary.OnScanFinished & VideoLibrary.OnScanFinished
-		//System.OnSleep
+		//System.OnSleep & System.OnQuit
 		//System.OnWake
 	}
 }
