@@ -163,6 +163,11 @@ Comments:
 #DEFINE_CONSTANT MUSIC_GENRE_LIST                    8  
 #DEFINE_CONSTANT MUSIC_ARTIST_ALBUM_LIST             9	// AllSongs & Albums  
 #DEFINE_CONSTANT MUSIC_GENRE_ARTIST_LIST             10	// AllArtists & Artists  
+
+#DEFINE_CONSTANT MOVIE_DETAILS             			 15	// Movie Details
+#DEFINE_CONSTANT TVSHOW_DETAILS						 16 // TVShow Details
+#DEFINE_CONSTANT MUSIC_DETAILS			             17	// Music Details  
+
 #DEFINE_CONSTANT HOME_LIST		                     20
 #DEFINE_CONSTANT MUSIC_LIST		                     21
 #DEFINE_CONSTANT PICTURE_LIST	                     22
@@ -182,14 +187,13 @@ Comments:
 *******************************************************************************************/
 DIGITAL_OUTPUT  IsConnected,
 				Loading, 				// HIGH when a JSON reply is being received;
-				_SKIP_,	MovieDetails,   // HIGH when on Movie details popup
-                TvShowDetails,			// HIGH when on Episode details popup
-				MusicDetails,			// HIGH when on Album details popup
-				_SKIP_,PlayFb,			// HIGH when something is playing
-			   StopFb,					// HIGH when playback is stopped
-		       PauseFb,					// HIGH when playback is paused
-			   RewindFB,				// HIGH when we are rewinding. (Note this is not the same as seeking)
-			   FastForwardFB,			// HIGH when we are fastforwarding. (Note this is not the same as seeking)
+				_SKIP_,	
+				_SKIP_,
+				PlayFb,					// HIGH when something is playing
+			   	StopFb,					// HIGH when playback is stopped
+		       	PauseFb,				// HIGH when playback is paused
+			   	RewindFB,				// HIGH when we are rewinding. (Note this is not the same as seeking)
+			   	FastForwardFB,			// HIGH when we are fastforwarding. (Note this is not the same as seeking)
 				_SKIP_,ScreensaverActive,	// HIGH when screensaver is active
 				ShuffleStatus,		// HIGH when playlist is being shuffled
 				Watched[10];		// HIGH when item has already been watched, i.e. when Playcount>0
@@ -232,7 +236,8 @@ STRING_OUTPUT   _SKIP_,
 				CurrentVideoCodec$,			// video codec
 				CurrentVideoAspect$,		// video aspect ratio
 				CurrentVideoHeight$,		// video picture height
-				CurrentVideoWidth$,_SKIP_,	// video picture width
+				CurrentVideoWidth$,			// video picture width
+				CurrentResolution$,_SKIP_,	// video resolution       
 				NextTitle$,					// Metadata about next item on playlist
 				NextArtist$,				// Metadata about next item on playlist
 				NextGenre$,					// Metadata about next item on playlist
@@ -280,7 +285,6 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 				List_Artists,				// Show music artists list
 				List_Pictures,				// Show Pictures list
 				List_Addons,				// Show Addons list
-				List_Exit_Details_Page,
 				_SKIP_,
 				PlayNext, 
 				PlayPrev,
@@ -1595,7 +1599,8 @@ FUNCTION InitOutputArrays(INTEGER start)
 	}
 		
 }
-         
+
+        
 // Get information about the item that is currently playing
 FUNCTION Player_GetItem()
 {
@@ -1611,6 +1616,8 @@ FUNCTION Player_GetItem()
 
 	IF (IsPlaying)
 		SendJsonCommand(REQUESTID_PLAYER_GETITEM,"Player.GetItem",Params$);
+	ELSE
+		StopFB = ON;
 }
 
 // Get MORE information about the item that is currently playing
@@ -1856,13 +1863,42 @@ FUNCTION Process_AudioStream(INTEGER Skip)
 		GenerateUserError("Process_AudioStream: Not an Object.");
 
 }
- 
+
+/*
+	Calculate approximate resolution using the Height and Width of the video
+
+   	As per CStreamDetails::VideoDimsToResolutionDescription
+   	in StreamDetails.cpp of XBMC
+*/
+
+STRING_FUNCTION GenerateResolution(INTEGER width , INTEGER height)
+{
+	STRING Resolution$[4];
+    
+	IF ((width = 0) || (height = 0))
+		Resolution$ = "";
+	ELSE IF ((width <= 720) && (height <= 480))
+		Resolution$ = "480";
+	ELSE IF ((width <= 768) && (height <= 576))
+		Resolution$ = "576";
+	ELSE IF ((width <= 960) && (height <= 544))
+		Resolution$ = "540";
+	ELSE IF ((width <= 1280) && (height <= 720))
+		Resolution$ = "720";
+	ELSE
+		Resolution$ = "1080";
+
+	RETURN (Resolution$); 	
+}
+
 /*
 *	If Skip = 1 then do not update any output signals;
 */                      
 FUNCTION Process_VideoStream(INTEGER Skip)
 {
 	STRING name$[15];
+	STRING sHeight[5];
+	STRING sWidth[5];
 	INTEGER numberOfProperties;
 	INTEGER i;
 
@@ -1897,17 +1933,22 @@ FUNCTION Process_VideoStream(INTEGER Skip)
 			}
 			ELSE IF (name$ = "height")
 			{
-	           	CurrentVideoHeight$ = GetString();	
+				sHeight = GetString();
+	           	CurrentVideoHeight$ = sHeight; 	
 			}	
 			ELSE IF (name$ = "width")
 			{
-	           	CurrentVideoWidth$ = GetString();	
+				sWidth = GetString();
+	           	CurrentVideoWidth$ = sWidth;	
 			}	
 			ELSE
 			{
 				GenerateUserError("Process_VideoStream: Unknown property: %s", name$);
 			}
 		}
+        
+		CurrentResolution$ = GenerateResolution(ATOI(sWidth), ATOI(sHeight));
+
 	}
 	ELSE
 		GenerateUserError("Process_VideoStream: Not an Object.");
@@ -3358,8 +3399,13 @@ FUNCTION Process_Limits()
 	}	
     
 	// Send to signals
-	MAKESTRING(List_Summary$, "%d to %d of %d", 
+
+	IF (ListTotal = 0)
+		List_Summary$ = "No items found.";
+	ELSE
+		MAKESTRING(List_Summary$, "%d to %d of %d", 
 				CurrentListCxt.start+1, CurrentListCxt.end, ListTotal);
+
 	IF (CurrentListCxt.end = ListTotal)
 		ScrollBarPercentage# = 100;
 	ELSE
@@ -4160,7 +4206,8 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	STRING FilterFinal$[500];
 	STRING Filter$[3][255];
 	INTEGER numberFilters;
-	
+	STRING SearchType$[10];
+
 	IF (listID = HOME_LIST || listID = MUSIC_LIST 
 			|| listID = PICTURE_LIST || listID = ADDON_LIST)
 		RETURN ("");
@@ -4182,9 +4229,16 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	IF (LEN(CurrentListCxt.startsWith) && listID != MUSIC_SONG_LIST
 				&& (VersionID != 6 || listID != MUSIC_GENRE_LIST))
 	{
+		
+        IF (LEN(CurrentListCxt.startsWith) = 1)
+			SearchType$ = "startswith"; // Match from the begining of the field only.
+		ELSE
+            SearchType$ = "contains";   // Match anywhere in the field.
+
         MAKESTRING(Filter$[numberFilters]
-			,"{\"field\":\"%s\",\"operator\":\"startswith\",\"value\":\"%s\"}"
-			,List_FieldName(listID),CurrentListCxt.startsWith);
+			,"{\"field\":\"%s\",\"operator\":\"%s\",\"value\":\"%s\"}"
+			,List_FieldName(listID),SearchType$,CurrentListCxt.startsWith);
+
     	numberFilters = numberFilters + 1;
 	}
 
@@ -4447,13 +4501,15 @@ FUNCTION Play()
 
 	CSWITCH (CurrentList)
 	{
-		CASE (MOVIE_TITLE_LIST) :
+		CASE (MOVIE_TITLE_LIST):
+		CASE (MOVIE_DETAILS):
 		{
             PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
 			ItemType$ = "movieid";
 			BREAK;
 		}
-		CASE (TV_EPISODE_LIST)  : 
+		CASE (TV_EPISODE_LIST):
+		CASE (TVSHOW_DETAILS): 
 		{
             PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
 			ItemType$ = "episodeid";
@@ -4583,8 +4639,6 @@ FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
 	CurrentListCxt.startsWith="";
 	CurrentListCxt.sortMethod=SortMethod;
 
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;
 	FOR (i = 1 TO StepAmount)
 	{
 		Watched[i] = OFF;
@@ -4596,16 +4650,12 @@ FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
 // Return to the previous list  
 PUSH List_Back
 {
-	IF (CurrentList = MOVIE_TITLE_LIST && MovieDetails)	
-	{
-		MovieDetails = OFF;
-		TERMINATEEVENT;	// don't need to reload current list values;
-	}
-    ELSE
-	{
-		ListContext_Pop();
+	ListContext_Pop();
+
+	IF ((CurrentList = MOVIE_DETAILS) || (CurrentList = TVSHOW_DETAILS) || (CurrentList = MUSIC_DETAILS))
+		CurrentList = CurrentListCxt.listID;
+	ELSE
 		List_Retrieve();		
-	}	
 }
 
 PUSH List_Home
@@ -4648,11 +4698,7 @@ RELEASE List_RecentItems
 	CurrentListCxt.recentlyAdded = 0;
 	List_Retrieve();	
 }
-PUSH List_Exit_Details_Page
-{
-    TvShowDetails = OFF;	
-   	MovieDetails = OFF;	
-}
+
 PUSH Poll
 {
 	PollForMetadata();
@@ -4751,19 +4797,16 @@ CHANGE Seek_Time
 
 
 CHANGE SearchCriteria$
-{
-	STRING Search$[256];
-           
-	IF (LEN(SearchCriteria$))
-	{
-		// Limit search filter to 20 characters (which is a lot)
-		CurrentListCxt.startsWith= LEFT(RemoveByLength(LEN(SearchCriteria$),SearchCriteria$),20);
-
-		ListIndex=0;
-		CurrentListCxt.start=0;                  	     
-		CurrentListCxt.end=StepAmount;
-		List_Retrieve();
-	}
+{         
+	IF (LEN(SearchCriteria$))	
+		CurrentListCxt.startsWith= LEFT(RemoveByLength(LEN(SearchCriteria$),SearchCriteria$),20);		
+	ELSE
+		CurrentListCxt.startsWith = "";		
+	
+	ListIndex=0;
+	CurrentListCxt.start=0;                  	     
+	CurrentListCxt.end=StepAmount;
+	List_Retrieve();
 }
 
 /*
@@ -4771,9 +4814,6 @@ CHANGE SearchCriteria$
 */
 CHANGE PlayItem
 {
-	MovieDetails = OFF;
-    TvShowDetails = OFF;
-
 	Play();
 }
 
@@ -4787,7 +4827,8 @@ CHANGE SelectedItem
 	{
 		CASE (MOVIE_TITLE_LIST) : 
 		{
-			MovieDetails = ON;
+			ListContext_Push();	// Store previous context in stack				
+			CurrentList = MOVIE_DETAILS;
 			Movie_GetDetails(ListIDs[SelectedItem]);        				
 			Break;
 		}
@@ -4828,9 +4869,9 @@ CHANGE SelectedItem
 		{ 
 			IF (ListIDs[SelectedItem])
 			{
-				Episode_GetDetails(ListIDs[SelectedItem]);	
-	    		MovieDetails = OFF;
-    	    	TvShowDetails = ON;
+				ListContext_Push();
+				Episode_GetDetails(ListIDs[SelectedItem]);
+				CurrentList = TVSHOW_DETAILS;
 			}
 			Break;
 		}
