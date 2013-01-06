@@ -2776,7 +2776,11 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek()
 	}
                
 	IF (playerid = 0 || playerid = 1)
+	{
+		// Set the active player id and exit
+		ActivePlayerID = playerid;
 		RETURN (1); 	
+	}
 	ELSE
 		RETURN (0);
 }
@@ -3886,15 +3890,14 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE IF (method$ = "Player.OnStop")
 	{
-		IF (Process_PlayerNotification(0))
-		{
-			PauseFb = OFF;
-			PlayFb = OFF;
-			StopFb = ON;
-			IsPlaying = 0;	
+		Process_PlayerNotification(0);
 
-			PollForMetadata();	
-		}
+		PauseFb = OFF;
+		PlayFb = OFF;
+		StopFb = ON;
+		IsPlaying = 0;	
+
+		PollForMetadata();			
 	}
 	ELSE IF (method$ = "Player.OnSeek")
 	{
