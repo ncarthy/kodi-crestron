@@ -1292,6 +1292,63 @@ SOCKETSTATUS XBMC
   XBMC Response logic
 *******************************************************************************************/
 /*
+  	Reset the outputs that show metadata about currently playing track/movie
+*/
+FUNCTION ResetCurrentlyPlayingOutputs()
+{
+	// Internal Variables
+	ActivePlayerID = 0;
+	PlaySpeed = 0;
+	IsPlaying = 0;
+	PlayingItemType$ = "";
+	PlayingItemId = 0;
+	NextItemId = 0;
+	PlaylistPosition = 0;
+	SetArray(Playlist,0);
+	// Analog outputs
+	CurrentlyPlayingType = 0;
+	Position_Seconds = 0;
+	Duration_Seconds = 0;
+	NumberAudioStreams = 0;
+	NumberSubtitleStreams = 0;
+	RepeatStatus = 0;
+	// Serial outputs
+	CurrentFilename$ = "";
+	CurrentTitle$ = "";
+	CurrentCoverArt$ = "";
+ 	CurrentGenre$ = "";
+	CurrentStudio$ = "";
+	CurrentDirector$ = "";
+    CurrentWriter$ = "";
+	CurrentTagLine$ = "";
+	CurrentRating$ = "";
+	CurrentMPAA$ = "";
+	CurrentYear$ = "";
+	CurrentShowTitle$ = "";
+	CurrentSeason$ = "";
+	CurrentEpisode$ = "";
+	CurrentFirstAired$ = "";
+	CurrentTrackNumber$ = "";
+	CurrentArtist$ = "";
+	CurrentAlbum$ = "";
+	CurrentAudioBitRate$ = "";
+	CurrentAudioCodec$ = "";
+	CurrentAudioChannels$ = "";
+	CurrentAudioLanguage$ = "";
+	CurrentVideoCodec$ = "";
+	CurrentVideoAspect$ = "";
+	CurrentVideoHeight$ = "";
+	CurrentVideoWidth$ = "";
+	CurrentResolution$ = "";
+	NextTitle$ = "";
+	NextArtist$ = "";
+	NextGenre$ = "";
+	NextAlbum$ = "";
+	NextTrackNumber$ = "";
+	PlayingSpeed$ = "";
+}
+
+/*
     Take the uri given by XBMC and escape it
 
 	Maximum string length is 1024 characters. This is longer than the max
@@ -2142,9 +2199,8 @@ FUNCTION Process_ActivePlayers()
 	}
 	ELSE
 	{
-    	// No active players
-		ActivePlayerID = 0;
-		CurrentlyPlayingType = 0;
+    	// Nothing playing
+		ResetCurrentlyPlayingOutputs();
 	}
 }
 
