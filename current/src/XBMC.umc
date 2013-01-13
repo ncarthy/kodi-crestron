@@ -6,7 +6,7 @@ ObjTp=FSgntr
 Sgntr=UserMacro
 RelVrs=4.01.10
 IntStrVrs=2
-MinSMWVrs=3.00.00
+MinSMWVrs=2.07.04
 MinTIOVrs=0
 SavedBy=SMW3.02.04
 ]
@@ -81,86 +81,93 @@ Cmn41=playing track/movie.\\Jump_Back_Small      - Move back 30s in currently||1
 Cmn42=playing track/movie.\\Jump_Fwd_Large       - Move forward 10% or||1
 Cmn43=10 minutes in currently playing track/movie.\\Jump_Back_Large||3
 Cmn44=||3- Move back 10% or 10 minutes in currently playing track/movie.
-Cmn45=\\\\Seek_Time_Percentage# - Go to this percentage time played on||1
-Cmn46=the current track/movie. {{**{{0-100}}**}}\\Seek_Time_Seconds#    - Go to||1
-Cmn47=this exact point on the current track/movie. {{**{{0-65535}}**}}\\\\SendNotification$||1
-Cmn48=||3- Make a popup message appear on the Xbmc Screen.\\LogMessage$||1
-Cmn49=||9- Append message to Xbmc log file. Xbmc Log file is described||1
-Cmn50=at \\							http://wiki.xbmc.org/index.php?title=Log_file\\ \\WindowName$||1
-Cmn51=||9- Activate this window by name. List of names is at \\	
-Cmn52=http://wiki.xbmc.org/index.php?title=Window_IDs  \\Window_xxxxx||1
-Cmn53=||8- Pulse to activate the named window.\\\\\\\\ALL OUTPUTS\\
-Cmn54=-----------\\IsConnected          - High while connection to Xbmc||1
-Cmn55=is active\\Loading              - High if control system is receiving||1
-Cmn56=data from Xbmc. \\					 - NB: Other requests are suspended until||1
-Cmn57=loading finishes.\\LoadingAnimationIndex   - Cycles from 1-6 while||1
-Cmn58=Loading is High (Analog)\\\\STOP_FB              - High if we are||1
-Cmn59=not playing anything\\PLAY_FB              - High if media is playing\\
-Cmn60=PAUSE_FB             - High if media is currently paused\\REWIND_FB||1
-Cmn61=||;- High if media is being rewound\\FASTFORWARD_FB||5
-Cmn62=||2- High if media is being fast forwarded\\\\Nothing_Playing_FB||1
-Cmn63=||5- High is no media type is playing\\Movie_Playing_FB||7
-Cmn64=||1- High if Movie is currently playing\\Audio_Playing_FB        -
-Cmn65=||1High if audio is currently playing\\Series_Playing_FB       - High||1
-Cmn66=if a TV Show is currently Playing\\Pictures_Playing_FB     - High||1
-Cmn67=if we are only displaying pictures\\Other_Video_Playing_FB  - High||1
-Cmn68=if an unknow video type is playing\\\\Home_List_Page   - High when||1
-Cmn69=on the top level list\\Movie_Title_List_Page   - High when the list||1
-Cmn70=contains movies\\TV_Show_List_Page       - High when the list is||1
-Cmn71=TV Shows\\TV_Season_List_Page     - High when the list is Seasons||1
-Cmn72=for a selected Show\\TV_Episode_List_Page    - High when the list||1
-Cmn73=is Episode for a TV show Season\\Music_List_Page		    - High when||1
-Cmn74=the list is the top level Music list\\Music_Artist_List_Page  -||1
-Cmn75=High when the list is Music Artists\\Music_Album_List_Page   - High||1
-Cmn76=when the list is Albums for a selected Artist\\Music_Song_List_Page||1
-Cmn77=||3- High when the list is Songs for a selected Artist and Album\\
-Cmn78=Music_Genre_List_Page   - High when the list is Genres\\Picture_List_Page||1
-Cmn79=||2- High when the list is Pictures (not implemented)\\Addon_List_Page||1
-Cmn80=||2- High when the list is Addons (only partially implemented)\\Movie_Details_Page
-Cmn81=||6- High when we should display details of selected Movie item\\
-Cmn82=TV_Episode_Details_Page - High when we should display details of||1
-Cmn83=selected Episode\\Music_Details_Page      - High when we should||1
-Cmn84=display details of selected Music Track\\\\SEARCH_PAGE||:
-Cmn85=||3- High when the search page is required\\SMS_Search_Available	
-Cmn86=- High when user can use SMS keys to filter list\\RecentlyAdded_Available	
-Cmn87=- High when user can see RecentlyAdded items (Movies, Albums only)\\
-Cmn88=Unwatched_Available		- High when user can filter list by 'unwatched'\\
-Cmn89=\\Current_XXXXXXXX        - Details for the currently playing Media\\
-Cmn90=Next_XXXXXXXX           - Details for the next track in the playlist\\
-Cmn91=\\Position_in_Seconds		- Position in current track/movie, in seconds||1
-Cmn92={{**{{0-65535}}**}}\\Duration_in_Seconds		- Duration of current track/movie,||1
-Cmn93=in seconds {{**{{0-65535}}**}}\\Current_Percentage      - Shows distance through||1
-Cmn94=current track/movie. {{**{{0-100}}**}}\\Current_Percentage_Scaled - Shows||1
-Cmn95=distance through current track/movie. {{**{{0-65535}}**}}\\ScrollBarPercentage||1
-Cmn96=||4- Shows distance through browse list. {{**{{0-100}}**}}\\ScrollBarPercentageScaled||1
-Cmn97=- Shows distance through browse list. {{**{{0-65535}}**}}\\ScrollBarPercentageScaledAndFlip
-Cmn98=ped - Shows distance through browse list. {{**{{65535-0}}**}}\\\\List_Summary$||1
-Cmn99=||:- Shows position on current list. E.g. "50 - 55 of 205"\\
-Cmn100=Plot_of_Selected_Movie  - The plot of the selected movie/episode.
-Cmn101=||1Only activated on details screen. \\                          Appends||1
-Cmn102=text in chunks using "\xFE\x02" to avoid 255 character limitation||1
-Cmn103=\\                          on serial strings.\\RepeatStatus||4
-Cmn104=||8- String showing repeat status on current playlist. \\		
-Cmn105=-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or ''\\
-Cmn106=ShuffleStatus           - String showing shuffle status on current||1
-Cmn107=playlist. \\						-		Allowed values = 'Shuffle' or ''	\\Search_Text||1
-Cmn108=||<- Search criteria that we are matching on for the list\\
-Cmn109=\\List_Item_1-10_FB       - High for the item we have selected in||1
-Cmn110=the list\\\\\\Watched_1-10            - High if item has been watched||1
-Cmn111=already\\Movie/Episode/Name_1-10 - Movie or Episode Name or Addon||1
-Cmn112=name\\Year_1-10               - First Aired date or year movie/album||1
-Cmn113=was released\\Genre_1-10              - Genre\\UserRating_1-10||2
-Cmn114=||7- User Rating\\Runtime_1-10            - Length of the media||1
-Cmn115=formatted as "h:mm:ss"\\Director_1-10           - Movie/Tv Show||1
-Cmn116=Director\\Tagline_1-10            - Tagline for Movie\\Thumbnail_1-
-Cmn117=10          - URL for thumbnail\\Writer_1-10             - Writer\\
-Cmn118=Episode/Track_1-10      - Episode number for TV Shows or Track Number||1
-Cmn119=for Music\\Season/AlbumName_1-10   - Season Number for TV Shows||1
-Cmn120=or Album Name for Music\\Studio_1-10             - Studio\\MPAA_1-
-Cmn121=10               - MPAA or RIA rating\\Series/ArtistName_1-10  -
-Cmn122=||1Series Name for TV Shows or Artist Name for Music\\Fanart_1-10||1
-Cmn123=||<- URL for fanart\\Filename_1-10           - Filename\\
-Cmn124=Banner_1-10           	- Tv Show Banner uri\\
+Cmn45=\\\\Sort_Direction       - Press to toggle between ascending and||1
+Cmn46=desending sorting of the browse list\\\\Sort_List_By_xxxxx   - Press||1
+Cmn47=to sort current browse list by xxxx\\\\\\Seek_Time_Percentage# -
+Cmn48=||1Go to this percentage time played on the current track/movie. {{**{{0-
+Cmn49=100}}**}}\\Seek_Time_Seconds#    - Go to this exact point on the current||1
+Cmn50=track/movie. {{**{{0-65535}}**}}\\\\SendNotification$    - Make a popup message||1
+Cmn51=appear on the Xbmc Screen.\\LogMessage$          - Append message||1
+Cmn52=to Xbmc log file. Xbmc Log file is described at \\							http://wiki.
+Cmn53=xbmc.org/index.php?title=Log_file\\ \\WindowName$          - Activate||1
+Cmn54=this window by name. List of names is at \\	http://wiki.xbmc.org/index.
+Cmn55=php?title=Window_IDs  \\Window_xxxxx         - Pulse to activate||1
+Cmn56=the named window.\\\\\\\\ALL OUTPUTS\\-----------\\IsConnected||2
+Cmn57=||8- High while connection to Xbmc is active\\Loading||6
+Cmn58=||8- High if control system is receiving data from Xbmc. \\
+Cmn59=					 - NB: Other requests are suspended until loading finishes.
+Cmn60=\\LoadingAnimationIndex   - Cycles from 1-6 while Loading is High||1
+Cmn61=(Analog)\\\\STOP_FB              - High if we are not playing anything\\
+Cmn62=PLAY_FB              - High if media is playing\\PAUSE_FB||7
+Cmn63=||6- High if media is currently paused\\REWIND_FB||<
+Cmn64=- High if media is being rewound\\FASTFORWARD_FB       - High if||1
+Cmn65=media is being fast forwarded\\\\Nothing_Playing_FB      - High||1
+Cmn66=is no media type is playing\\Movie_Playing_FB        - High if Movie||1
+Cmn67=is currently playing\\Audio_Playing_FB        - High if audio is||1
+Cmn68=currently playing\\Series_Playing_FB       - High if a TV Show is||1
+Cmn69=currently Playing\\Pictures_Playing_FB     - High if we are only||1
+Cmn70=displaying pictures\\Other_Video_Playing_FB  - High if an unknow||1
+Cmn71=video type is playing\\\\Home_List_Page   - High when on the top||1
+Cmn72=level list\\Movie_Title_List_Page   - High when the list contains||1
+Cmn73=movies\\TV_Show_List_Page       - High when the list is TV Shows\\
+Cmn74=TV_Season_List_Page     - High when the list is Seasons for a selected||1
+Cmn75=Show\\TV_Episode_List_Page    - High when the list is Episode for||1
+Cmn76=a TV show Season\\Music_List_Page		    - High when the list is the||1
+Cmn77=top level Music list\\Music_Artist_List_Page  - High when the list||1
+Cmn78=is Music Artists\\Music_Album_List_Page   - High when the list is||1
+Cmn79=Albums for a selected Artist\\Music_Song_List_Page    - High when||1
+Cmn80=the list is Songs for a selected Artist and Album\\Music_Genre_List_Page||1
+Cmn81=||2- High when the list is Genres\\Picture_List_Page   - High when||1
+Cmn82=the list is Pictures (not implemented)\\Addon_List_Page   - High||1
+Cmn83=when the list is Addons (only partially implemented)\\Movie_Details_Page||1
+Cmn84=||5- High when we should display details of selected Movie item\\
+Cmn85=TV_Episode_Details_Page - High when we should display details of||1
+Cmn86=selected Episode\\Music_Details_Page      - High when we should||1
+Cmn87=display details of selected Music Track\\\\SEARCH_PAGE||:
+Cmn88=||3- High when the search page is required\\SMS_Search_Available	
+Cmn89=- High when user can use SMS keys to filter list\\RecentlyAdded_Available	
+Cmn90=- High when user can see RecentlyAdded items (Movies, Albums only)\\
+Cmn91=Unwatched_Available		- High when user can filter list by 'unwatched'\\
+Cmn92=\\Current_XXXXXXXX        - Details for the currently playing Media\\
+Cmn93=Next_XXXXXXXX           - Details for the next track in the playlist\\
+Cmn94=\\Position_in_Seconds		- Position in current track/movie, in seconds||1
+Cmn95={{**{{0-65535}}**}}\\Duration_in_Seconds		- Duration of current track/movie,||1
+Cmn96=in seconds {{**{{0-65535}}**}}\\Current_Percentage      - Shows distance through||1
+Cmn97=current track/movie. {{**{{0-100}}**}}\\Current_Percentage_Scaled - Shows||1
+Cmn98=distance through current track/movie. {{**{{0-65535}}**}}\\ScrollBarPercentage||1
+Cmn99=||4- Shows distance through browse list. {{**{{0-100}}**}}\\ScrollBarPercentageScaled||1
+Cmn100=- Shows distance through browse list. {{**{{0-65535}}**}}\\ScrollBarPercentageScaledAndFlip
+Cmn101=ped - Shows distance through browse list. {{**{{65535-0}}**}}\\\\List_Summary$||1
+Cmn102=||:- Shows position on current list. E.g. "50 - 55 of 205"\\
+Cmn103=Plot_of_Selected_Movie  - The plot of the selected movie/episode.
+Cmn104=||1Only activated on details screen. \\                          Appends||1
+Cmn105=text in chunks using "\xFE\x02" to avoid 255 character limitation||1
+Cmn106=\\                          on serial strings.\\RepeatStatus||4
+Cmn107=||8- String showing repeat status on current playlist. \\		
+Cmn108=-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or ''\\
+Cmn109=ShuffleStatus           - String showing shuffle status on current||1
+Cmn110=playlist. \\						-		Allowed values = 'Shuffle' or ''	\\Search_Text||1
+Cmn111=||<- Search criteria that we are matching on for the list\\
+Cmn112=\\List_Item_1-10_FB       - High for the item we have selected in||1
+Cmn113=the list\\\\\\Watched_1-10            - High if item has been watched||1
+Cmn114=already\\Movie/Episode/Name_1-10 - Movie or Episode Name or Addon||1
+Cmn115=name\\Year_1-10               - First Aired date or year movie/album||1
+Cmn116=was released\\Genre_1-10              - Genre\\UserRating_1-10||2
+Cmn117=||7- User Rating\\Runtime_1-10            - Length of the media||1
+Cmn118=formatted as "h:mm:ss"\\Director_1-10           - Movie/Tv Show||1
+Cmn119=Director\\Tagline_1-10            - Tagline for Movie\\Thumbnail_1-
+Cmn120=10          - URL for thumbnail\\Writer_1-10             - Writer\\
+Cmn121=Episode/Track_1-10      - Episode number for TV Shows or Track Number||1
+Cmn122=for Music\\Season/AlbumName_1-10   - Season Number for TV Shows||1
+Cmn123=or Album Name for Music\\Studio_1-10             - Studio\\MPAA_1-
+Cmn124=10               - MPAA or RIA rating\\Series/ArtistName_1-10  -
+Cmn125=||1Series Name for TV Shows or Artist Name for Music\\Fanart_1-10||1
+Cmn126=||<- URL for fanart\\Filename_1-10           - Filename\\
+Cmn127=Banner_1-10           	- Tv Show Banner uri\\\\Current_Sort_Field$||1
+Cmn128=||4- Field that the current browse list is sorted on.\\Current_Sort_Order$||1
+Cmn129=||4- The description of the sort direction.\\\\Sort_List_By_xxxx_Available_FB||1
+Cmn130=||1-  High is the field xxxx is available to be\\||A
+Cmn131=||Bsorted on for the current browse list.\\
 ]
 [
 ObjTp=Bk
@@ -168,6 +175,162 @@ Nm1=\
 Sx1=0
 Sy1=0
 Mx1=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=6
+Z=100
+P=7355
+Ht=1
+Hi=266
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=10
+Z=100
+Ht=1
+Hi=3
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=1153
+Ry=540
+Xm=-1
+Ym=-1
+SH=100
+Z=100
+Ht=1
+Hi=16
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=101
+Z=100
+Ht=4
+Hi=15
+]
+[
+ObjTp=Bw
+H=1
+Lx=40
+Ly=40
+Rx=300
+Ry=240
+Xm=-1
+Ym=-1
+SH=99
+Z=100
+Ht=1
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=98
+Z=100
+Ht=4
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=87
+Z=100
+Ht=3
+Hi=18
+]
+[
+ObjTp=Bw
+H=1
+Lx=-40
+Ly=486
+Rx=1081
+Ry=964
+Xm=-1
+Ym=-1
+SH=86
+Z=100
+Ht=1
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=18
+Z=100
+Ht=1
+Hi=2
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=59
+Z=100
+P=710
+Ht=4
+Hi=37
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=76
+Z=100
+Ht=1
+Hi=3
 ]
 [
 ObjTp=Bw
@@ -210,50 +373,6 @@ SH=34
 Z=100
 Ht=1
 Hi=1
-]
-[
-ObjTp=Bw
-H=1
-Lx=20
-Ly=20
-Rx=280
-Ry=220
-Xm=-1
-Ym=-1
-SH=59
-Z=100
-P=998
-Ht=4
-Hi=34
-]
-[
-ObjTp=Bw
-H=1
-Lx=20
-Ly=20
-Rx=280
-Ry=220
-Xm=-1
-Ym=-1
-SH=6
-Z=100
-P=1613
-Ht=4
-Hi=80
-]
-[
-ObjTp=Bw
-H=1
-Lx=20
-Ly=20
-Rx=280
-Ry=220
-Xm=-1
-Ym=-1
-SH=18
-Z=100
-Ht=1
-Hi=2
 ]
 [
 ObjTp=Bw
@@ -516,7 +635,7 @@ Smpl-C=3
 CompilerTimePrecision=Single_Or_Double_Precision
 Exclusions=1,19,20,21,88,89,167,168,179,216,225,248,249,266,302,305,310,213,214,215,217,226,267,718,756,854,
 Hint=XBMC V2
-SMWRev=3.00.00
+SMWRev=2.07.04
 TIORev=0
 S+=1
 HelpID=1055
@@ -526,8 +645,8 @@ APg=0
 StdCmd=0
 FltTmp=1
 FpCS=0
-NumFixedInputs=264
-NumFixedOutputs=323
+NumFixedInputs=284
+NumFixedOutputs=343
 NumFixedParams=5
 MinVariableInputs=0
 MinVariableInputsList2=0
@@ -1076,6 +1195,11 @@ OutputSigType319=Digital
 OutputSigType320=Digital
 OutputSigType321=Serial
 OutputSigType322=Digital
+OutputSigType323=Digital
+OutputSigType324=Digital
+OutputSigType325=Serial
+OutputSigType326=Serial
+OutputSigType327=Digital
 ParamSigType1=Constant
 ParamSigType2=String
 ParamSigType3=String
@@ -1345,6 +1469,26 @@ InputCue261=[Window_MovieLibraryTvShows]
 InputCue262=[Window_MovieLibraryTitles]
 InputCue263=[Window_MusicLibraryAlbums]
 InputCue264=[Window_MusicLibraryArtists]
+InputCue265=[~UNUSED~]
+InputCue266=[~UNUSED~]
+InputCue267=Sort_Direction
+InputCue268=[~UNUSED~]
+InputCue269=Sort_List_By_Title
+InputCue270=Sort_List_By_Year
+InputCue271=Sort_List_By_Rating
+InputCue272=Sort_List_By_Mpaa
+InputCue273=Sort_List_By_Duration
+InputCue274=Sort_List_By_Date_Added
+InputCue275=Sort_List_By_Play_Count
+InputCue276=Sort_List_By_Episodes
+InputCue277=Sort_List_By_Production_Codes
+InputCue278=Sort_List_By_Date
+InputCue279=Sort_List_By_Name
+InputCue280=Sort_List_By_Episode
+InputCue281=Sort_List_By_Artist
+InputCue282=Sort_List_By_Album
+InputCue283=Sort_List_By_Track
+InputCue284=Sort_List_By_Genre
 OutputCue1=[IsConnected]
 OutputCue2=[Loading]
 OutputCue3=[LoadingAnimationIndex]
@@ -1668,6 +1812,26 @@ OutputCue320=Display_Message
 OutputCue321=Message$
 OutputCue322=[~UNUSED~]
 OutputCue323=ScreensaverActivated
+OutputCue324=[~UNUSED~]
+OutputCue325=Current_Sort_Field$
+OutputCue326=Current_Sort_Order$
+OutputCue327=[~UNUSED~]
+OutputCue328=Sort_List_By_Title_Available_FB
+OutputCue329=Sort_List_By_Year_Available_FB
+OutputCue330=Sort_List_By_Rating_Available_FB
+OutputCue331=Sort_List_By_Mpaa_Available_FB
+OutputCue332=Sort_List_By_Duration_Available_FB
+OutputCue333=Sort_List_By_Date_Added_Available_FB
+OutputCue334=Sort_List_By_Play_Count_Available_FB
+OutputCue335=Sort_List_By_Episodes_Available_FB
+OutputCue336=Sort_List_By_Production_Codes_Available_FB
+OutputCue337=Sort_List_By_Date_Available_FB
+OutputCue338=Sort_List_By_Name_Available_FB
+OutputCue339=Sort_List_By_Episode_Available_FB
+OutputCue340=Sort_List_By_Artist_Available_FB
+OutputCue341=Sort_List_By_Album_Available_FB
+OutputCue342=Sort_List_By_Track_Available_FB
+OutputCue343=Sort_List_By_Genre_Available_FB
 ParamCue1=Item_Count
 ParamCue2=Name
 ParamCue3=Address
@@ -1729,7 +1893,7 @@ SmC=156
 Nm=Logic
 ObjVer=1
 CF=2
-mC=17
+mC=18
 C1=11
 C2=19
 C3=33
@@ -1745,8 +1909,9 @@ C12=72
 C13=18
 C14=29
 C15=59
-C16=10
+C16=50
 C17=92
+C18=10
 ]
 [
 ObjTp=Sm
@@ -1773,9 +1938,9 @@ Nm=Argument Definition
 ObjVer=1
 PrH=5
 CF=2
-n1I=264
-n1O=323
-mI=264
+n1I=284
+n1O=343
+mI=284
 I1=9
 I2=133
 I3=135
@@ -2040,8 +2205,28 @@ I261=279
 I262=280
 I263=281
 I264=282
-mO=323
-tO=323
+I265=133
+I266=133
+I267=97
+I268=133
+I269=418
+I270=417
+I271=419
+I272=420
+I273=421
+I274=422
+I275=423
+I276=424
+I277=425
+I278=426
+I279=427
+I280=428
+I281=429
+I282=430
+I283=431
+I284=432
+mO=343
+tO=343
 O1=114
 O2=98
 O3=125
@@ -2365,6 +2550,26 @@ O320=4
 O321=5
 O322=133
 O323=344
+O324=133
+O325=347
+O326=118
+O327=133
+O328=433
+O329=434
+O330=435
+O331=436
+O332=437
+O333=438
+O334=439
+O335=440
+O336=441
+O337=442
+O338=443
+O339=444
+O340=445
+O341=450
+O342=451
+O343=452
 mP=5
 P1=Item_Count
 P2=Name
@@ -2446,10 +2651,12 @@ Nm=Make String Permanent
 ObjVer=1
 PrH=4
 CF=2
-n1I=2
-mI=2
+n1I=4
+mI=4
 I1=28
 I2=5
+I3=347
+I4=118
 mP=1
 P1=255d
 ]
@@ -3588,6 +3795,23 @@ C2=89
 ]
 [
 ObjTp=Sm
+H=50
+SmC=156
+Nm=SUBSYSTEM
+ObjVer=1
+PrH=4
+CF=2
+Cmn1=Sorting Logic\\
+mC=6
+C1=86
+C2=87
+C3=98
+C4=99
+C5=100
+C6=101
+]
+[
+ObjTp=Sm
 H=51
 SmC=155
 Nm=SecondsToTimeString.umc
@@ -3754,10 +3978,10 @@ Nm=XBMCMain.usp
 ObjVer=1
 PrH=4
 CF=2
-n1I=40
-n2I=9
-n1O=22
-mI=49
+n1I=41
+n2I=11
+n1O=23
+mI=52
 I8=9
 I11=12
 I14=383
@@ -3774,24 +3998,26 @@ I24=468
 I25=149
 I26=152
 I27=153
-I29=82
-I30=83
-I31=84
-I32=85
-I33=86
-I34=87
-I36=154
-I37=77
-I38=333
-I40=253
-I42=10
-I44=6
-I45=311
-I46=94
-I47=93
-I49=15
-mO=253
-tO=253
+I29=97
+I30=82
+I31=83
+I32=84
+I33=85
+I34=86
+I35=87
+I37=154
+I38=77
+I39=333
+I41=253
+I43=10
+I45=6
+I46=311
+I47=94
+I48=93
+I50=416
+I52=15
+mO=256
+tO=256
 O1=114
 O2=98
 O5=456
@@ -3801,242 +4027,245 @@ O8=76
 O9=108
 O11=344
 O12=253
-O13=476
-O14=477
-O15=478
-O16=479
-O17=480
-O18=481
-O19=482
-O20=483
-O21=484
-O22=485
-O24=7
-O25=449
-O26=352
-O27=145
-O28=349
-O29=284
-O30=363
-O31=119
-O32=15
-O34=103
-O35=92
-O37=490
-O38=492
-O40=493
-O41=497
-O42=498
-O43=499
-O44=500
-O45=501
-O46=502
-O47=17
-O48=503
-O49=19
-O50=95
-O51=63
-O52=56
-O54=55
-O55=54
-O56=53
-O57=75
-O58=21
-O59=342
-O60=109
-O61=107
-O62=361
-O63=365
-O64=368
-O65=398
-O67=66
-O68=67
-O69=72
-O70=73
-O71=74
-O72=489
-O74=20
-O75=115
-O76=346
-O77=362
-O78=364
-O79=366
-O80=367
-O81=369
-O82=370
-O83=371
-O84=27
-O85=38
-O86=48
-O87=58
-O88=68
-O89=78
-O90=88
-O91=99
-O92=110
-O93=121
-O94=29
-O95=39
-O96=49
-O97=59
-O98=69
-O99=79
-O100=89
-O101=100
-O102=111
-O103=122
-O104=30
-O105=40
-O106=50
-O107=60
-O108=70
-O109=80
-O110=90
-O111=101
-O112=112
-O113=123
-O114=31
-O115=41
-O116=51
-O117=61
-O118=71
-O119=81
-O120=91
-O121=102
-O122=113
-O123=124
-O124=590
-O125=591
-O126=592
-O127=593
-O128=594
-O129=595
-O130=596
-O131=597
-O132=598
-O133=599
-O134=600
-O135=601
-O136=602
-O137=603
-O138=604
-O139=605
-O140=606
-O141=607
-O142=608
-O143=609
-O144=610
-O145=611
-O146=612
-O147=613
-O148=614
-O149=615
-O150=616
-O151=617
-O152=618
-O153=619
-O154=620
-O155=621
-O156=622
-O157=623
-O158=624
-O159=625
-O160=626
-O161=627
-O162=628
-O163=629
-O164=630
-O165=631
-O166=632
-O167=633
-O168=634
-O169=635
-O170=636
-O171=637
-O172=638
-O173=639
-O174=640
-O175=641
-O176=642
-O177=643
-O178=644
-O179=645
-O180=646
-O181=647
-O182=648
-O183=649
-O184=650
-O185=651
-O186=652
-O187=653
-O188=654
-O189=655
-O190=656
-O191=657
-O192=658
-O193=659
-O194=660
-O195=661
-O196=662
-O197=663
-O198=664
-O199=665
-O200=666
-O201=667
-O202=668
-O203=669
-O204=670
-O205=671
-O206=672
-O207=673
-O208=674
-O209=675
-O210=676
-O211=677
-O212=678
-O213=679
-O214=287
-O215=288
-O216=289
-O217=290
-O218=291
-O219=292
-O220=293
-O221=294
-O222=295
-O223=296
-O224=283
-O225=286
-O226=297
-O227=302
-O228=303
-O229=304
-O230=305
-O231=306
-O232=307
-O233=308
-O234=350
-O235=351
-O236=353
-O237=354
-O238=355
-O239=356
-O240=357
-O241=358
-O242=359
-O243=360
-O244=374
-O245=372
-O246=375
-O247=376
-O248=377
-O249=378
-O250=379
-O251=380
-O252=381
-O253=382
+O13=414
+O14=476
+O15=477
+O16=478
+O17=479
+O18=480
+O19=481
+O20=482
+O21=483
+O22=484
+O23=485
+O25=7
+O26=449
+O27=352
+O28=145
+O29=349
+O30=284
+O31=363
+O32=119
+O33=15
+O34=345
+O35=415
+O37=103
+O38=92
+O40=490
+O41=492
+O43=493
+O44=497
+O45=498
+O46=499
+O47=500
+O48=501
+O49=502
+O50=17
+O51=503
+O52=19
+O53=95
+O54=63
+O55=56
+O57=55
+O58=54
+O59=53
+O60=75
+O61=21
+O62=342
+O63=109
+O64=107
+O65=361
+O66=365
+O67=368
+O68=398
+O70=66
+O71=67
+O72=72
+O73=73
+O74=74
+O75=489
+O77=20
+O78=115
+O79=346
+O80=362
+O81=364
+O82=366
+O83=367
+O84=369
+O85=370
+O86=371
+O87=27
+O88=38
+O89=48
+O90=58
+O91=68
+O92=78
+O93=88
+O94=99
+O95=110
+O96=121
+O97=29
+O98=39
+O99=49
+O100=59
+O101=69
+O102=79
+O103=89
+O104=100
+O105=111
+O106=122
+O107=30
+O108=40
+O109=50
+O110=60
+O111=70
+O112=80
+O113=90
+O114=101
+O115=112
+O116=123
+O117=31
+O118=41
+O119=51
+O120=61
+O121=71
+O122=81
+O123=91
+O124=102
+O125=113
+O126=124
+O127=590
+O128=591
+O129=592
+O130=593
+O131=594
+O132=595
+O133=596
+O134=597
+O135=598
+O136=599
+O137=600
+O138=601
+O139=602
+O140=603
+O141=604
+O142=605
+O143=606
+O144=607
+O145=608
+O146=609
+O147=610
+O148=611
+O149=612
+O150=613
+O151=614
+O152=615
+O153=616
+O154=617
+O155=618
+O156=619
+O157=620
+O158=621
+O159=622
+O160=623
+O161=624
+O162=625
+O163=626
+O164=627
+O165=628
+O166=629
+O167=630
+O168=631
+O169=632
+O170=633
+O171=634
+O172=635
+O173=636
+O174=637
+O175=638
+O176=639
+O177=640
+O178=641
+O179=642
+O180=643
+O181=644
+O182=645
+O183=646
+O184=647
+O185=648
+O186=649
+O187=650
+O188=651
+O189=652
+O190=653
+O191=654
+O192=655
+O193=656
+O194=657
+O195=658
+O196=659
+O197=660
+O198=661
+O199=662
+O200=663
+O201=664
+O202=665
+O203=666
+O204=667
+O205=668
+O206=669
+O207=670
+O208=671
+O209=672
+O210=673
+O211=674
+O212=675
+O213=676
+O214=677
+O215=678
+O216=679
+O217=287
+O218=288
+O219=289
+O220=290
+O221=291
+O222=292
+O223=293
+O224=294
+O225=295
+O226=296
+O227=283
+O228=286
+O229=297
+O230=302
+O231=303
+O232=304
+O233=305
+O234=306
+O235=307
+O236=308
+O237=350
+O238=351
+O239=353
+O240=354
+O241=355
+O242=356
+O243=357
+O244=358
+O245=359
+O246=360
+O247=374
+O248=372
+O249=375
+O250=376
+O251=377
+O252=378
+O253=379
+O254=380
+O255=381
+O256=382
 mP=5
-P1=XBMCMain
+P1=
 P2=#Address
 P3=#httpport
 P4=#Item_Count
@@ -4516,6 +4745,89 @@ O1=312
 ]
 [
 ObjTp=Sm
+H=86
+SmC=84
+Nm=Analog To Digital
+ObjVer=1
+PrH=50
+CF=2
+n1I=1
+n1O=16
+Cmn1=Sort Field Value\\
+mI=1
+I1=345
+mO=16
+tO=16
+O1=412
+O2=411
+O3=410
+O4=409
+O5=408
+O6=407
+O7=406
+O8=405
+O9=404
+O10=403
+O11=402
+O12=401
+O13=400
+O14=399
+O15=397
+O16=348
+]
+[
+ObjTp=Sm
+H=87
+SmC=101
+Nm=Serial I/O
+ObjVer=1
+PrH=50
+CF=2
+n1I=18
+n1O=2
+Cmn1=Sort Vield Value to String\\
+mI=18
+I3=412
+I4=411
+I5=410
+I6=409
+I7=408
+I8=407
+I9=406
+I10=405
+I11=404
+I12=403
+I13=402
+I14=401
+I15=400
+I16=399
+I17=397
+I18=348
+mO=2
+tO=2
+O1=347
+mP=18
+P1=
+P2=Genre
+P3=Track
+P4=Album
+P5=Artist
+P6=Episode
+P7=Name
+P8=Date
+P9=Production Code
+P10=Episodes
+P11=Play Count
+P12=Date Added
+P13=Duration
+P14=MPAA Rating
+P15=User Ratings
+P16=Year
+P17=Title
+P18=
+]
+[
+ObjTp=Sm
 H=88
 SmC=84
 Nm=Analog To Digital
@@ -4743,6 +5055,126 @@ I2=114
 mO=1
 tO=1
 O1=389
+]
+[
+ObjTp=Sm
+H=98
+SmC=101
+Nm=Serial I/O
+ObjVer=1
+PrH=50
+CF=2
+n1I=4
+n1O=2
+Cmn1=Ascending / Descending String\\
+mI=4
+I3=414
+I4=413
+mO=2
+tO=2
+O1=118
+mP=4
+P1=
+P2=Descending
+P3=Ascending
+P4=
+]
+[
+ObjTp=Sm
+H=99
+SmC=205
+Nm=NOT
+ObjVer=1
+PrH=50
+CF=2
+n1I=1
+n1O=1
+Cmn1=Sorted Ascending\\
+mI=1
+I1=414
+mO=1
+tO=1
+O1=413
+]
+[
+ObjTp=Sm
+H=100
+SmC=32
+Nm=Analog Initialize
+ObjVer=1
+PrH=50
+CF=2
+n1I=16
+n1O=1
+mI=16
+I1=418
+I2=417
+I3=419
+I4=420
+I5=421
+I6=422
+I7=423
+I8=424
+I9=425
+I10=426
+I11=427
+I12=428
+I13=429
+I14=430
+I15=431
+I16=432
+mO=1
+tO=1
+O1=416
+mP=16
+P1=1d
+P2=2d
+P3=4d
+P4=8d
+P5=16d
+P6=32d
+P7=64d
+P8=128d
+P9=256d
+P10=512d
+P11=1024d
+P12=2048d
+P13=4096d
+P14=8192d
+P15=16392d
+P16=32784d
+]
+[
+ObjTp=Sm
+H=101
+SmC=84
+Nm=Analog To Digital
+ObjVer=1
+PrH=50
+CF=2
+n1I=1
+n1O=16
+Cmn1=Sort Options That are Available\\
+mI=1
+I1=415
+mO=16
+tO=16
+O1=452
+O2=451
+O3=450
+O4=445
+O5=444
+O6=443
+O7=442
+O8=441
+O9=440
+O10=439
+O11=438
+O12=437
+O13=436
+O14=435
+O15=434
+O16=433
 ]
 [
 ObjTp=Sg
@@ -5274,6 +5706,11 @@ SgTp=2
 ]
 [
 ObjTp=Sg
+H=97
+Nm=Sort_Direction
+]
+[
+ObjTp=Sg
 H=98
 Nm=[Loading]
 ]
@@ -5385,6 +5822,12 @@ ObjTp=Sg
 H=117
 Nm=[Currently_Playing_Progress_Scaled]
 SgTp=2
+]
+[
+ObjTp=Sg
+H=118
+Nm=Current_Sort_Order$
+SgTp=4
 ]
 [
 ObjTp=Sg
@@ -6554,9 +6997,26 @@ Nm=ScreensaverActivated
 ]
 [
 ObjTp=Sg
+H=345
+Nm=Current_Sort_Field
+SgTp=2
+]
+[
+ObjTp=Sg
 H=346
 Nm=Runtime3
 SgTp=2
+]
+[
+ObjTp=Sg
+H=347
+Nm=Current_Sort_Field$
+SgTp=4
+]
+[
+ObjTp=Sg
+H=348
+Nm=Sort_By_Title_FB
 ]
 [
 ObjTp=Sg
@@ -6834,9 +7294,251 @@ Nm=MUSIC_Genre_Artist_List_Page
 ]
 [
 ObjTp=Sg
+H=397
+Nm=Sort_By_Year_FB
+]
+[
+ObjTp=Sg
 H=398
 Nm=[Current_Video_Resolution$]
 SgTp=4
+]
+[
+ObjTp=Sg
+H=399
+Nm=Sort_By_Rating_FB
+]
+[
+ObjTp=Sg
+H=400
+Nm=Sort_By_Mpaa_FB
+]
+[
+ObjTp=Sg
+H=401
+Nm=Sort_By_Duration_FB
+]
+[
+ObjTp=Sg
+H=402
+Nm=Sort_By_Date_Added_FB
+]
+[
+ObjTp=Sg
+H=403
+Nm=Sort_By_Play_Count_FB
+]
+[
+ObjTp=Sg
+H=404
+Nm=Sort_By_Episodes_FB
+]
+[
+ObjTp=Sg
+H=405
+Nm=Sort_By_Production_Codes_FB
+]
+[
+ObjTp=Sg
+H=406
+Nm=Sort_By_Date_FB
+]
+[
+ObjTp=Sg
+H=407
+Nm=Sort_By_Name_FB
+]
+[
+ObjTp=Sg
+H=408
+Nm=Sort_By_Episode_FB
+]
+[
+ObjTp=Sg
+H=409
+Nm=Sort_By_Artist_FB
+]
+[
+ObjTp=Sg
+H=410
+Nm=Sort_By_Album_FB
+]
+[
+ObjTp=Sg
+H=411
+Nm=Sort_By_Track_FB
+]
+[
+ObjTp=Sg
+H=412
+Nm=Sort_By_Genre_FB
+]
+[
+ObjTp=Sg
+H=413
+Nm=Sort_Ascending_FB
+]
+[
+ObjTp=Sg
+H=414
+Nm=Sort_Descending_FB
+]
+[
+ObjTp=Sg
+H=415
+Nm=Valid_Sort_Fields
+SgTp=2
+]
+[
+ObjTp=Sg
+H=416
+Nm=Field_to_Sort_By
+SgTp=2
+]
+[
+ObjTp=Sg
+H=417
+Nm=Sort_List_By_Year
+]
+[
+ObjTp=Sg
+H=418
+Nm=Sort_List_By_Title
+]
+[
+ObjTp=Sg
+H=419
+Nm=Sort_List_By_Rating
+]
+[
+ObjTp=Sg
+H=420
+Nm=Sort_List_By_Mpaa
+]
+[
+ObjTp=Sg
+H=421
+Nm=Sort_List_By_Duration
+]
+[
+ObjTp=Sg
+H=422
+Nm=Sort_List_By_Date_Added
+]
+[
+ObjTp=Sg
+H=423
+Nm=Sort_List_By_Play_Count
+]
+[
+ObjTp=Sg
+H=424
+Nm=Sort_List_By_Episodes
+]
+[
+ObjTp=Sg
+H=425
+Nm=Sort_List_By_Production_Codes
+]
+[
+ObjTp=Sg
+H=426
+Nm=Sort_List_By_Date
+]
+[
+ObjTp=Sg
+H=427
+Nm=Sort_List_By_Name
+]
+[
+ObjTp=Sg
+H=428
+Nm=Sort_List_By_Episode
+]
+[
+ObjTp=Sg
+H=429
+Nm=Sort_List_By_Artist
+]
+[
+ObjTp=Sg
+H=430
+Nm=Sort_List_By_Album
+]
+[
+ObjTp=Sg
+H=431
+Nm=Sort_List_By_Track
+]
+[
+ObjTp=Sg
+H=432
+Nm=Sort_List_By_Genre
+]
+[
+ObjTp=Sg
+H=433
+Nm=Sort_List_By_Title_Available_FB
+]
+[
+ObjTp=Sg
+H=434
+Nm=Sort_List_By_Year_Available_FB
+]
+[
+ObjTp=Sg
+H=435
+Nm=Sort_List_By_Rating_Available_FB
+]
+[
+ObjTp=Sg
+H=436
+Nm=Sort_List_By_Mpaa_Available_FB
+]
+[
+ObjTp=Sg
+H=437
+Nm=Sort_List_By_Duration_Available_FB
+]
+[
+ObjTp=Sg
+H=438
+Nm=Sort_List_By_Date_Added_Available_FB
+]
+[
+ObjTp=Sg
+H=439
+Nm=Sort_List_By_Play_Count_Available_FB
+]
+[
+ObjTp=Sg
+H=440
+Nm=Sort_List_By_Episodes_Available_FB
+]
+[
+ObjTp=Sg
+H=441
+Nm=Sort_List_By_Production_Codes_Available_FB
+]
+[
+ObjTp=Sg
+H=442
+Nm=Sort_List_By_Date_Available_FB
+]
+[
+ObjTp=Sg
+H=443
+Nm=Sort_List_By_Name_Available_FB
+]
+[
+ObjTp=Sg
+H=444
+Nm=Sort_List_By_Episode_Available_FB
+]
+[
+ObjTp=Sg
+H=445
+Nm=Sort_List_By_Artist_Available_FB
 ]
 [
 ObjTp=Sg
@@ -6860,6 +7562,21 @@ ObjTp=Sg
 H=449
 Nm=Currently_Playing_Type
 SgTp=2
+]
+[
+ObjTp=Sg
+H=450
+Nm=Sort_List_By_Album_Available_FB
+]
+[
+ObjTp=Sg
+H=451
+Nm=Sort_List_By_Track_Available_FB
+]
+[
+ObjTp=Sg
+H=452
+Nm=Sort_List_By_Genre_Available_FB
 ]
 [
 ObjTp=Sg
