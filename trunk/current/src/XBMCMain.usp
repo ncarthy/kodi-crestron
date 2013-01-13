@@ -91,7 +91,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+// #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 20000		// Socket buffer size
@@ -163,7 +163,7 @@ Comments:
 #DEFINE_CONSTANT MUSIC_GENRE_LIST                    8  
 #DEFINE_CONSTANT MUSIC_ARTIST_ALBUM_LIST             9	// AllSongs & Albums  
 #DEFINE_CONSTANT MUSIC_GENRE_ARTIST_LIST             10	// AllArtists & Artists  
-
+ 
 #DEFINE_CONSTANT MOVIE_DETAILS             			 15	// Movie Details
 #DEFINE_CONSTANT TVSHOW_DETAILS						 16 // TVShow Details
 #DEFINE_CONSTANT MUSIC_DETAILS			             17	// Music Details  
@@ -181,6 +181,24 @@ Comments:
 #DEFINE_CONSTANT XBMC_ACTIVEPLAYER_VIDEO 1
 #DEFINE_CONSTANT XBMC_ACTIVEPLAYER_SLIDESHOW 2
 
+/* Sort Fields */
+#DEFINE_CONSTANT SORT_TITLE			1
+#DEFINE_CONSTANT SORT_YEAR			2
+#DEFINE_CONSTANT SORT_RATING		4
+#DEFINE_CONSTANT SORT_MPAARATING	8
+#DEFINE_CONSTANT SORT_DURATION		16
+#DEFINE_CONSTANT SORT_DATEADDED		32
+#DEFINE_CONSTANT SORT_PLAYCOUNT		64
+#DEFINE_CONSTANT SORT_EPISODES		128
+#DEFINE_CONSTANT SORT_PRODCODE		256
+#DEFINE_CONSTANT SORT_DATE			512
+#DEFINE_CONSTANT SORT_NAME			1024
+#DEFINE_CONSTANT SORT_EPISODE		2048
+#DEFINE_CONSTANT SORT_ARTIST		4096
+#DEFINE_CONSTANT SORT_ALBUM			8192
+#DEFINE_CONSTANT SORT_TRACK			16392
+#DEFINE_CONSTANT SORT_GENRE			32784
+
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
   (Uncomment and declare inputs and outputs as needed)
@@ -195,19 +213,23 @@ DIGITAL_OUTPUT  IsConnected,
 			   	RewindFB,				// HIGH when we are rewinding. (Note this is not the same as seeking)
 			   	FastForwardFB,			// HIGH when we are fastforwarding. (Note this is not the same as seeking)
 				_SKIP_,ScreensaverActive,	// HIGH when screensaver is active
-				ShuffleStatus,		// HIGH when playlist is being shuffled
-				Watched[10];		// HIGH when item has already been watched, i.e. when Playcount>0
+				ShuffleStatus,		    // HIGH when playlist is being shuffled
+                SortedDescending_FB,    // High is the Current List is Sorted In descending order.
+				
+				Watched[10];		    // HIGH when item has already been watched, i.e. when Playcount>0
 
 ANALOG_OUTPUT   _SKIP_,VersionID#,		// The version id of the JSON api. 4 = Eden, 6 = Frodo
 			    CurrentlyPlayingType,	// 1 = movie, 2 = audio, 3 = tv, 4= picture, 5 = other video
-				CurrentList,				// The ID of the current list
-				Position_Seconds, 			// Position in track in seconds
-				Duration_Seconds, 			// Total length of track in seconds
-				ScrollBarPercentage#,// Percentage (0-99) user has moved through the media list (feedback for scroll bar)
-				NumberAudioStreams,		 	// Number of audio streams in movie/episode
-				NumberSubtitleStreams,		// Number of subtitle streams in movie/episode
-				RepeatStatus;				// 0 = 'off', 1 = 'all', 2 = 'one'
-
+				CurrentList,			// The ID of the current list
+				Position_Seconds, 		// Position in track in seconds
+				Duration_Seconds, 		// Total length of track in seconds
+				ScrollBarPercentage#,   // Percentage (0-99) user has moved through the media list (feedback for scroll bar)
+				NumberAudioStreams,		// Number of audio streams in movie/episode
+				NumberSubtitleStreams,	// Number of subtitle streams in movie/episode
+				RepeatStatus,			// 0 = 'off', 1 = 'all', 2 = 'one'
+				CurrentSortField,	    // Analog of the field that the current list is sorted by			
+                ValidSortFields;        // Bitmap of valid sort fields for current list
+                                                    
 STRING_OUTPUT   _SKIP_,
                 PlotSelected$,				// The plot of the Selected movie or TV showList_Summary$
 				List_Summary$,_SKIP_,		// e.g. "7 to 12 of 15"
@@ -286,6 +308,7 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 				List_Pictures,				// Show Pictures list
 				List_Addons,				// Show Addons list
 				_SKIP_,
+				SortDescending,		 		// Sort list items in descending order if High / Ascending otherwise
 				PlayNext, 
 				PlayPrev,
 				JumpFwd_Sm, 
@@ -296,7 +319,6 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 				UpdateMusic,
 				ContextMenu;
 
-
 DIGITAL_INPUT _SKIP_,RunAllTests;		// Run all unit tests. Only works in DEBUG
 
 STRING_INPUT _SKIP_,SearchCriteria$[100];	// Filter String
@@ -304,6 +326,7 @@ STRING_INPUT _SKIP_,SearchCriteria$[100];	// Filter String
 ANALOG_INPUT 	_SKIP_,PlayItem,			// Begin playing this listitem 
 				SelectedItem,				// We have selected this listitem
 				Seek_Percentage, Seek_Time,	// Seek to this %age, time.
+				_SKIP_, Selected_Sort_Field,// Field to Sort the current list by
 				_SKIP_,UnitTestNumber#;		// Run the specified unit test. DEBUG only.
 
 
@@ -369,6 +392,17 @@ STRING AddonIDs[10][40];			// A store of AddonIDs
 STRING HomeListItems$[4][8];		// Labels for the Home List	
 STRING MusicListItems$[3][7];		// Labels for the Music List	
 
+STRUCTURE SortDetails
+{
+	INTEGER ValidFields;    // BitMap of Valid Sort Fields
+    INTEGER DefaultField;   // Default field
+	INTEGER SortField;      // Field we are currently sorted on
+	INTEGER SortDescending; // Sort ascending or Descending (High for descending)
+};
+
+NONVOLATILE SortDetails ListSortInfo[10]; // One for every List type. 
+										  // Nonvolatile so we heep SortField and SortDescending
+										  // between reboots.	
 
 /*******************************************************************************************
   "StoredStrings"
@@ -4040,6 +4074,10 @@ FUNCTION ProcessNotification(STRING method$)
 		//AudioLibrary.OnScanFinished & VideoLibrary.OnScanFinished
 		//System.OnSleep & System.OnQuit
 		//System.OnWake
+
+		GenerateUserError("Unknow Message: %s", method$);
+		trace("Unknow Message: %s", method$);
+
 	}
 }
 
@@ -4344,6 +4382,50 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 
 }
 
+STRING_FUNCTION ReturnFieldString(INTEGER SortField)
+{
+
+	CSWITCH (SortField)
+	{
+		CASE (SORT_TITLE):	   { RETURN ("title");          }
+		CASE (SORT_YEAR):	   { RETURN ("year");			}
+		CASE (SORT_RATING):    { RETURN ("rating");			}
+		CASE (SORT_MPAARATING):{ RETURN ("mpaa");			}
+		CASE (SORT_DURATION):  { RETURN ("duration");       }
+		CASE (SORT_DATEADDED): { RETURN ("dateadded");      }
+		CASE (SORT_PLAYCOUNT): { RETURN ("playcount");      }
+		CASE (SORT_EPISODES):  { RETURN ("episode");        }
+		CASE (SORT_PRODCODE):  { RETURN ("productioncode"); }
+		CASE (SORT_DATE):      { RETURN ("date");           }
+		CASE (SORT_NAME):      { RETURN ("name");           }
+		CASE (SORT_EPISODE):   { RETURN ("episode");        }
+		CASE (SORT_ARTIST):    { RETURN ("artist");         }
+		CASE (SORT_ALBUM):     { RETURN ("album");          }
+		CASE (SORT_TRACK):     { RETURN ("track");          }
+		CASE (SORT_GENRE):     { RETURN ("genre");          }
+	}
+}
+
+STRING_FUNCTION GenerateSortString(INTEGER ListType)
+{
+	STRING sortDirection$[10];
+    STRING Sort$[255];
+
+	IF (ListSortInfo[ListType].SortDescending = 1)
+        sortDirection$="descending";
+    ELSE
+		sortDirection$="ascending";
+ 
+	IF (!(ListSortInfo[ListType].SortField & ListSortInfo[ListType].SortField))
+		ListSortInfo[ListType].SortField = ListSortInfo[ListType].DefaultField;
+
+   	MAKESTRING(Sort$,",\"sort\":{\"method\":\"%s\",\"order\":\"%s\",\"ignorearticle\":true}"
+				, ReturnFieldString(ListSortInfo[ListType].SortField) 
+                , sortDirection$);
+
+	RETURN (Sort$);
+}
+
 FUNCTION List_Retrieve()
 {
 	STRING Filter$[255];
@@ -4365,13 +4447,22 @@ FUNCTION List_Retrieve()
 		Filter$ = List_Filter(CurrentListCxt.listID);
 	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d }"
 				,CurrentListCxt.start,CurrentListCxt.end);
-	IF (CurrentListCxt.sortMethod="" || (CurrentListCxt.recentlyAdded 
-					&& (CurrentListCxt.listID = MOVIE_TITLE_LIST || CurrentListCxt.listID = MUSIC_ALBUM_LIST)) )
-		Sort$ = ""; // Recently added only works for Movies and Albums
+	
+	IF (CurrentListCxt.listID >= MOVIE_TITLE_LIST && CurrentListCxt.listID <= MUSIC_GENRE_ARTIST_LIST)
+	{
+			Sort$ = GenerateSortString(CurrentListCxt.listID);
+            ValidSortFields = ListSortInfo[CurrentListCxt.listID].ValidFields;
+			CurrentSortField = ListSortInfo[CurrentListCxt.listID].SortField;
+			SortedDescending_FB = ListSortInfo[CurrentListCxt.listID].SortDescending;
+	}
 	ELSE
-		MAKESTRING(Sort$,",\"sort\":{\"method\":\"%s\",\"order\":\"ascending\",\"ignorearticle\":true}"
-				,CurrentListCxt.sortMethod);
-    
+	{
+		Sort$ = "";
+		CurrentSortField = 0;
+        SortedDescending_FB = 0;
+		ValidSortFields = 0;
+	}
+     
 	// Use a switch to execute the JSON command
 	CSWITCH (CurrentListCxt.listID)
 	{
@@ -4386,12 +4477,13 @@ FUNCTION List_Retrieve()
 				Method$ = "VideoLibrary.GetRecentlyAddedMovies"; 
 			ELSE
 				Method$ = "VideoLibrary.GetMovies"; 
+			
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIES, Method$, Params$);
 			BREAK;
 		}
 		CASE(TV_SHOW_LIST):
 		{
-            MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s]%s }"
+			MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"title\"", "\"art\"", "\"studio\""
 				,"\"genre\"", "\"year\"", "\"playcount\"", Sort$);
 			Method$ = "VideoLibrary.GetTvShows"; 
@@ -4400,7 +4492,7 @@ FUNCTION List_Retrieve()
 		}
 		CASE(TV_SEASON_LIST):
 		{
-            MAKESTRING (Params$, "{\"tvshowid\":%d,%s,\"properties\":[\"season\"]%s }"
+			MAKESTRING (Params$, "{\"tvshowid\":%d,%s,\"properties\":[\"season\"]%s }"
 					, CurrentListCxt.tvShowID, Limits$, Sort$);
 			Method$ = "VideoLibrary.GetSeasons"; 
 			SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETTVSEASONS, Method$, Params$);
@@ -4408,7 +4500,7 @@ FUNCTION List_Retrieve()
 		}
 		CASE(TV_EPISODE_LIST):
 		{
-				MAKESTRING (Params$, 
+			MAKESTRING (Params$, 
 					"{\"tvshowid\":%d,\"season\":%d,%s,\"properties\":[%s,%s,%s,%s,%s,%s,%s,%s,%s]%s }"
 					, CurrentListCxt.tvShowID, CurrentListCxt.tvSeasonID
 					, Limits$, "\"thumbnail\"","\"rating\""
@@ -4427,11 +4519,12 @@ FUNCTION List_Retrieve()
 				Method$ = "AudioLibrary.GetRecentlyAddedAlbums"; 
 			ELSE
 				Method$ = "AudioLibrary.GetAlbums"; 
+
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETALBUMS, Method$, Params$);
 			BREAK;
 		}
 		CASE(MUSIC_ARTIST_LIST):
-		{
+		{ 			
            	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"thumbnail\"","\"yearsactive\""
 				,"\"genre\"","\"style\"", Sort$);
@@ -4445,9 +4538,9 @@ FUNCTION List_Retrieve()
 				,Filter$, Limits$, "\"track\"", "\"playcount\""
 				,"\"artist\"","\"album\"","\"duration\"", Sort$);
 			Method$ = "AudioLibrary.GetSongs"; 
+
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETSONGS, Method$, Params$);
-         
-			BREAK;
+   			BREAK;
 		}
 		CASE(MUSIC_GENRE_ARTIST_LIST):
 		{
@@ -4455,6 +4548,7 @@ FUNCTION List_Retrieve()
 				,Filter$, Limits$, "\"thumbnail\""
 				,"\"genre\"","\"style\"", Sort$);
 			Method$ = "AudioLibrary.GetArtists"; 
+
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETGENREARTISTS, Method$, Params$);
 			BREAK;
 		}
@@ -4464,6 +4558,7 @@ FUNCTION List_Retrieve()
 				,Filter$, Limits$, "\"artist\"", "\"thumbnail\""
 				,"\"genre\"", "\"year\"", Sort$);
 			Method$ = "AudioLibrary.GetAlbums"; 
+
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS
 													, Method$, Params$);
 			BREAK;
@@ -4473,6 +4568,7 @@ FUNCTION List_Retrieve()
            	MAKESTRING (Params$, "{%s%s,\"properties\":[%s]%s }"
 				,Filter$, Limits$, "\"thumbnail\"", Sort$);
 			Method$ = "AudioLibrary.GetGenres"; 
+
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETGENRES
 													, Method$, Params$);
 			BREAK;
@@ -4483,6 +4579,7 @@ FUNCTION List_Retrieve()
 				,Filter$, Limits$, "\"thumbnail\"", "\"enabled\"", "\"name\""
 				, "\"version\"", "\"summary\"", "\"author\"", Sort$);
 			Method$ = "Addons.GetAddons"; 
+
 			SendJsonCommand (REQUESTID_GETADDONS, Method$, Params$);
 			BREAK;
 		}
@@ -4849,6 +4946,36 @@ CHANGE Seek_Time
 
 		CALL SendJsonCommand (REQUESTID_SEEKTIME, "Player.Seek", Params$);
 	}
+}
+
+CHANGE Selected_Sort_Field
+{
+	IF (CurrentListCxt.listID < MOVIE_TITLE_LIST || CurrentListCxt.listID > MUSIC_GENRE_ARTIST_LIST)
+		TERMINATEEVENT;
+ 
+	IF (!(Selected_Sort_Field & ListSortInfo[CurrentListCxt.listID].ValidFields))
+		TERMINATEEVENT;
+
+	ListSortInfo[CurrentListCxt.listID].SortField = Selected_Sort_Field;
+   	ListSortInfo[CurrentListCxt.listID].SortDescending = SortDescending;
+ 
+	ListIndex=0;
+	CurrentListCxt.start=0;                  	     
+	CurrentListCxt.end=StepAmount;
+	List_Retrieve();
+}
+
+PUSH SortDescending
+{
+	IF (CurrentListCxt.listID < MOVIE_TITLE_LIST || CurrentListCxt.listID > MUSIC_GENRE_ARTIST_LIST)
+		TERMINATEEVENT;
+
+	ListSortInfo[CurrentListCxt.listID].SortDescending = !ListSortInfo[CurrentListCxt.listID].SortDescending;
+    
+	ListIndex=0;
+	CurrentListCxt.start=0;                  	     
+	CurrentListCxt.end=StepAmount;
+	List_Retrieve();
 }
 
 
@@ -6138,9 +6265,31 @@ PUSH RunAllTests
 ///////////// Initialization script
 Function Main()
 {              
-   
+  
 	WaitForInitializationComplete();
-                        
+
+	// Setup sort flags
+	ListSortInfo[MOVIE_TITLE_LIST].ValidFields        = SORT_TITLE|SORT_YEAR|SORT_RATING|SORT_MPAARATING|SORT_DURATION|SORT_DATEADDED|SORT_PLAYCOUNT;
+	ListSortInfo[TV_SHOW_LIST].ValidFields            = SORT_TITLE|SORT_YEAR|SORT_EPISODES;
+	ListSortInfo[TV_SEASON_LIST].ValidFields          = SORT_TITLE;
+	ListSortInfo[TV_EPISODE_LIST].ValidFields         = SORT_RATING|SORT_MPAARATING|SORT_PLAYCOUNT|SORT_PRODCODE|SORT_DATE|SORT_EPISODE;
+	ListSortInfo[MUSIC_ARTIST_LIST].ValidFields       = SORT_ARTIST;
+	ListSortInfo[MUSIC_GENRE_ARTIST_LIST].ValidFields = SORT_ARTIST;
+	ListSortInfo[MUSIC_ALBUM_LIST].ValidFields        = SORT_YEAR|SORT_ARTIST|SORT_ALBUM;
+	ListSortInfo[MUSIC_ARTIST_ALBUM_LIST].ValidFields = SORT_YEAR|SORT_ARTIST|SORT_ALBUM;
+	ListSortInfo[MUSIC_GENRE_LIST].ValidFields        = SORT_GENRE;
+	ListSortInfo[MUSIC_SONG_LIST].ValidFields = SORT_TITLE|SORT_YEAR|SORT_RATING|SORT_DURATION|SORT_PLAYCOUNT|SORT_NAME|SORT_ARTIST|SORT_ALBUM|SORT_TRACK;
+	ListSortInfo[MOVIE_TITLE_LIST].DefaultField        = SORT_TITLE;
+	ListSortInfo[TV_SHOW_LIST].DefaultField            = SORT_TITLE;
+	ListSortInfo[TV_SEASON_LIST].DefaultField          = SORT_TITLE;
+	ListSortInfo[TV_EPISODE_LIST].DefaultField         = SORT_EPISODE;
+	ListSortInfo[MUSIC_ARTIST_LIST].DefaultField       = SORT_ARTIST;
+	ListSortInfo[MUSIC_GENRE_ARTIST_LIST].DefaultField = SORT_ARTIST;
+	ListSortInfo[MUSIC_ALBUM_LIST].DefaultField        = SORT_ALBUM;
+	ListSortInfo[MUSIC_ARTIST_ALBUM_LIST].DefaultField = SORT_ALBUM;
+	ListSortInfo[MUSIC_GENRE_LIST].DefaultField        = SORT_GENRE;
+	ListSortInfo[MUSIC_SONG_LIST].DefaultField         = SORT_TRACK;
+                       
 	// Init StoredStrings                  
 	Store.listIndex = 0;
 	Store.arrayPosition = 0;
