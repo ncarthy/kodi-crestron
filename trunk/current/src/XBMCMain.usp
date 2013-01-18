@@ -63,7 +63,7 @@ Comments:
 	***** ******* *****
 
 	A note on the replacement of '%d}' and '%s}' with '%d }' and '%s }' 
-    (NOTE THE SPACE) in MAKESTRING function calls.
+    **NOTE THE SPACE** in the MAKESTRING function calls.
 	There is a bug in the Series 3 firmware that is having issue with the curly brackets 
 	in MAKESTRING. It has been confirmed with TB Support.  It can be worked around 
 	by replacing instances of a format specifier and a '}' with 
@@ -91,7 +91,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-// #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 20000		// Socket buffer size
@@ -1048,6 +1048,7 @@ FUNCTION Init()
 
   
 *******************************************************************************************/
+
 STRUCTURE ListContext 			// Information used to Retrieve a Browse List
 {
 	INTEGER listID; 			// ID of the list e.g. MOVIE_TITLE_LIST, TV_SHOW_LIST
@@ -1055,8 +1056,8 @@ STRUCTURE ListContext 			// Information used to Retrieve a Browse List
 	INTEGER end;				// Limits.end for database search
 	INTEGER unWatched;			// HIGH = show unwatched movies/tv shows only
 	INTEGER recentlyAdded;		// HIGH = show recently added movies/tv shows only
-	STRING startsWith[10];		// Filter list items to those that start with this string
-	STRING sortMethod[10];		// The property (title, label, trackno etc) to sort the list
+	STRING startsWith[1];		// Filter list items to those that start with this string
+	STRING contains[20];        // Fliter list items to those that contain this string
 	INTEGER artistID;			// ID of artist, used to generate artist-albums list
 	INTEGER albumID;			// ID of album, used to generate songs list
 	INTEGER genreID;			// ID of genre, used in music lists
@@ -1078,7 +1079,7 @@ FUNCTION ListContext_Push()
 	Stack[StackPosition].unWatched = CurrentListCxt.unWatched;
 	Stack[StackPosition].recentlyAdded = CurrentListCxt.recentlyAdded;
 	Stack[StackPosition].startsWith = CurrentListCxt.startsWith;
-	Stack[StackPosition].sortMethod = CurrentListCxt.sortMethod;
+	Stack[StackPosition].contains = CurrentListCxt.contains;
 	Stack[StackPosition].artistID = CurrentListCxt.artistID;
 	Stack[StackPosition].albumID = CurrentListCxt.albumID;
 	Stack[StackPosition].genreID = CurrentListCxt.genreID;
@@ -1095,7 +1096,7 @@ FUNCTION ListContext_Pop()
 	CurrentListCxt.unWatched = Stack[StackPosition].unWatched;
 	CurrentListCxt.recentlyAdded = Stack[StackPosition].recentlyAdded;
 	CurrentListCxt.startsWith = Stack[StackPosition].startsWith;
-	CurrentListCxt.sortMethod = Stack[StackPosition].sortMethod;
+	CurrentListCxt.contains = Stack[StackPosition].contains;
 	CurrentListCxt.artistID = Stack[StackPosition].artistID;
 	CurrentListCxt.albumID = Stack[StackPosition].albumID;
 	CurrentListCxt.genreID = Stack[StackPosition].genreID;
@@ -4294,13 +4295,12 @@ STRING_FUNCTION List_FieldName(INTEGER listID)
 
 	}
 }
-      
+   
 STRING_FUNCTION List_Filter(INTEGER listID)
 {
 	STRING FilterFinal$[500];
 	STRING Filter$[3][255];
 	INTEGER numberFilters;
-	STRING SearchType$[10];
 
 	IF (listID = HOME_LIST || listID = MUSIC_LIST 
 			|| listID = PICTURE_LIST || listID = ADDON_LIST)
@@ -4323,18 +4323,25 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	IF (LEN(CurrentListCxt.startsWith) && listID != MUSIC_SONG_LIST
 				&& (VersionID != 6 || listID != MUSIC_GENRE_LIST))
 	{
-		
-        IF (LEN(CurrentListCxt.startsWith) = 1)
-			SearchType$ = "startswith"; // Match from the begining of the field only.
-		ELSE
-            SearchType$ = "contains";   // Match anywhere in the field.
-
         MAKESTRING(Filter$[numberFilters]
-			,"{\"field\":\"%s\",\"operator\":\"%s\",\"value\":\"%s\"}"
-			,List_FieldName(listID),SearchType$,CurrentListCxt.startsWith);
+			,"{\"field\":\"%s\",\"operator\":\"startswith\",\"value\":\"%s\"}"
+			,List_FieldName(listID),CurrentListCxt.startsWith);
 
     	numberFilters = numberFilters + 1;
 	}
+
+	// Do not apply contains filter to Song list or Genre List
+	// GetGenres does not allow a filter parameter in Frodo release
+	IF (LEN(CurrentListCxt.contains) && listID != MUSIC_SONG_LIST
+				&& (VersionID != 6 || listID != MUSIC_GENRE_LIST))
+	{
+        MAKESTRING(Filter$[numberFilters]
+			,"{\"field\":\"%s\",\"operator\":\"contains\",\"value\":\"%s\"}"
+			,List_FieldName(listID),CurrentListCxt.contains);
+
+    	numberFilters = numberFilters + 1;
+	}
+
 
 	IF (CurrentListCxt.albumID)
 	{		
@@ -4433,7 +4440,7 @@ FUNCTION List_Retrieve()
 	STRING Sort$[100];
 	STRING Params$[512];
 	STRING Method$[50];
-           
+      
 	// Output the current list ID
 	CurrentList = CurrentListCxt.listID;
 
@@ -4547,6 +4554,8 @@ FUNCTION List_Retrieve()
            	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"thumbnail\""
 				,"\"genre\"","\"style\"", Sort$);
+
+
 			Method$ = "AudioLibrary.GetArtists"; 
 
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETGENREARTISTS, Method$, Params$);
@@ -4768,6 +4777,7 @@ PUSH List_PageMinus
 	CurrentListCxt.end=CurrentListCxt.start+StepAmount;			
     List_Retrieve();
 }
+
 // Move to the next page in the list
 PUSH List_PagePlus
 {
@@ -4777,7 +4787,8 @@ PUSH List_PagePlus
 	List_Retrieve();
 }
 
-FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
+//FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
+FUNCTION List_Reset(INTEGER listID)
 {
 	INTEGER i;
 
@@ -4790,7 +4801,7 @@ FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
 	CurrentListCxt.start=0;                  	
 	CurrentListCxt.end=StepAmount;				
 	CurrentListCxt.startsWith="";
-	CurrentListCxt.sortMethod=SortMethod;
+	CurrentListCxt.contains = "";
 
 	FOR (i = 1 TO StepAmount)
 	{
@@ -4813,23 +4824,23 @@ PUSH List_Back
 
 PUSH List_Home
 {
-	List_Reset(HOME_LIST, "");
+	List_Reset(HOME_LIST);
 }
 PUSH List_Albums
 {
-	List_Reset(MUSIC_ALBUM_LIST, "label");
+	List_Reset(MUSIC_ALBUM_LIST);
 }
 PUSH List_Artists
 {
-	List_Reset(MUSIC_ARTIST_LIST, "label");	
+	List_Reset(MUSIC_ARTIST_LIST);	
 }
 PUSH List_Movies
 {
-    List_Reset(MOVIE_TITLE_LIST,"title");
+    List_Reset(MOVIE_TITLE_LIST);
 }
 PUSH List_TvShows
 {
-    List_Reset(TV_SHOW_LIST,"title");
+    List_Reset(TV_SHOW_LIST);
 }
 PUSH List_UnWatchedOnly
 {
@@ -4981,11 +4992,20 @@ PUSH SortDescending
 
 CHANGE SearchCriteria$
 {         
-	IF (LEN(SearchCriteria$))	
-		CurrentListCxt.startsWith= LEFT(RemoveByLength(LEN(SearchCriteria$),SearchCriteria$),20);		
+	IF (LEN(SearchCriteria$) = 1)
+	{	
+		CurrentListCxt.startsWith= SearchCriteria$;		
+	}
+	ELSE IF (LEN(SearchCriteria$) > 1)
+	{
+		CurrentListCxt.contains = LEFT(RemoveByLength(LEN(SearchCriteria$),SearchCriteria$),20);		
+	}
 	ELSE
-		CurrentListCxt.startsWith = "";		
-	
+	{
+		CurrentListCxt.startsWith = "";
+		CurrentListCxt.contains = "";
+	}
+
 	ListIndex=0;
 	CurrentListCxt.start=0;                  	     
 	CurrentListCxt.end=StepAmount;
@@ -5022,8 +5042,8 @@ CHANGE SelectedItem
 			CurrentListCxt.listID = TV_SEASON_LIST;				
 			CurrentListCxt.start=0;                  	
 			CurrentListCxt.end=StepAmount;				
-			CurrentListCxt.startsWith= "";
-			CurrentListCxt.sortMethod = "season";
+			CurrentListCxt.startsWith = "";
+			CurrentListCxt.contains = "";
 			CurrentListCxt.tvShowID = ListIDs[SelectedItem];			
 			List_Retrieve();
 			Break;
@@ -5043,7 +5063,7 @@ CHANGE SelectedItem
 				CurrentListCxt.start=0;      
 				CurrentListCxt.end=StepAmount;				
 				CurrentListCxt.startsWith= "";
-				CurrentListCxt.sortMethod = "episode";
+				CurrentListCxt.contains= "";
 				List_Retrieve();
 			}
 			Break;
@@ -5068,7 +5088,7 @@ CHANGE SelectedItem
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith= "";
-			CurrentListCxt.sortMethod = "track";
+			CurrentListCxt.contains= "";
 			List_Retrieve();
 			Break;
 		}
@@ -5080,9 +5100,9 @@ CHANGE SelectedItem
 			CurrentListCxt.artistID = ListIDs[SelectedItem];
 			CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST;	
 			CurrentListCxt.start=0;      
-			CurrentListCxt.end=StepAmount;				
-			CurrentListCxt.startsWith= "";
-			CurrentListCxt.sortMethod = "label";
+			CurrentListCxt.end=StepAmount;
+			CurrentListCxt.startsWith= "";				
+			CurrentListCxt.contains= "";
 			List_Retrieve();
 			Break;
 		}
@@ -5096,7 +5116,7 @@ CHANGE SelectedItem
 			CurrentListCxt.start=0;                  	
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith="";
-			CurrentListCxt.sortMethod = "label";
+			CurrentListCxt.contains= "";
 			List_Retrieve();			
          	Break;
 		}
@@ -5110,17 +5130,17 @@ CHANGE SelectedItem
 			{
 				CurrentListCxt.albumID = ListIDs[SelectedItem];
 				CurrentListCxt.artistID = 0;
-                CurrentListCxt.sortMethod = "track";
 			}
 			ELSE
 			{
 				CurrentListCxt.albumID = 0;
-				CurrentListCxt.sortMethod = "";
             } 
 			CurrentListCxt.listID = MUSIC_SONG_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
-			CurrentListCxt.startsWith= "";			
+			CurrentListCxt.startsWith= "";
+			CurrentListCxt.contains= "";
+			
 			List_Retrieve();
 			Break;
 		}
@@ -5139,8 +5159,8 @@ CHANGE SelectedItem
 			CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
-			CurrentListCxt.startsWith= "";			
-			CurrentListCxt.sortMethod = "label";
+			CurrentListCxt.startsWith = "";
+			CurrentListCxt.contains = "";
 			List_Retrieve();
 			Break;
 		}
@@ -5153,10 +5173,10 @@ CHANGE SelectedItem
 		{ 			
             CurrentList = ListIDs[SelectedItem];
 			IF (CurrentList = MOVIE_TITLE_LIST || CurrentList = TV_SHOW_LIST)
-				List_Reset(CurrentList,"title");
+				List_Reset(CurrentList);
 			ELSE IF (CurrentList = MUSIC_LIST)
 			{
-         		List_Reset(MUSIC_LIST,"");   	
+         		List_Reset(MUSIC_LIST);   	
 			}
 			ELSE IF (CurrentList = PICTURE_LIST)
 			{
@@ -5164,7 +5184,7 @@ CHANGE SelectedItem
 			}
 			ELSE IF (CurrentList = ADDON_LIST)
 			{
-            	List_Reset(ADDON_LIST,"");
+            	List_Reset(ADDON_LIST);
 			}
 			Break;
 		}
@@ -5177,7 +5197,7 @@ CHANGE SelectedItem
 			CurrentListCxt.start=0;                  	
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith="";
-			CurrentListCxt.sortMethod="label";				
+			CurrentListCxt.contains= "";
 			List_Retrieve();
 
 			Break;
@@ -6279,6 +6299,7 @@ Function Main()
 	ListSortInfo[MUSIC_ARTIST_ALBUM_LIST].ValidFields = SORT_YEAR|SORT_ARTIST|SORT_ALBUM;
 	ListSortInfo[MUSIC_GENRE_LIST].ValidFields        = SORT_GENRE;
 	ListSortInfo[MUSIC_SONG_LIST].ValidFields = SORT_TITLE|SORT_YEAR|SORT_RATING|SORT_DURATION|SORT_PLAYCOUNT|SORT_NAME|SORT_ARTIST|SORT_ALBUM|SORT_TRACK;
+	
 	ListSortInfo[MOVIE_TITLE_LIST].DefaultField        = SORT_TITLE;
 	ListSortInfo[TV_SHOW_LIST].DefaultField            = SORT_TITLE;
 	ListSortInfo[TV_SEASON_LIST].DefaultField          = SORT_TITLE;
@@ -6311,7 +6332,7 @@ Function Main()
 	Stack[StackPosition].unWatched = OFF;
 	Stack[StackPosition].recentlyAdded = OFF;
 	Stack[StackPosition].startsWith = "";
-	Stack[StackPosition].sortMethod = "";
+	Stack[StackPosition].contains= "";
 	Stack[StackPosition].artistID = 0;
 	Stack[StackPosition].albumID = 0;
 	Stack[StackPosition].genreID = 0;

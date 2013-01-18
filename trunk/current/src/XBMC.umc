@@ -81,93 +81,87 @@ Cmn41=playing track/movie.\\Jump_Back_Small      - Move back 30s in currently||1
 Cmn42=playing track/movie.\\Jump_Fwd_Large       - Move forward 10% or||1
 Cmn43=10 minutes in currently playing track/movie.\\Jump_Back_Large||3
 Cmn44=||3- Move back 10% or 10 minutes in currently playing track/movie.
-Cmn45=\\\\Sort_Direction       - Press to toggle between ascending and||1
-Cmn46=desending sorting of the browse list\\\\Sort_List_By_xxxxx   - Press||1
-Cmn47=to sort current browse list by xxxx\\\\\\Seek_Time_Percentage# -
-Cmn48=||1Go to this percentage time played on the current track/movie. {{**{{0-
-Cmn49=100}}**}}\\Seek_Time_Seconds#    - Go to this exact point on the current||1
-Cmn50=track/movie. {{**{{0-65535}}**}}\\\\SendNotification$    - Make a popup message||1
-Cmn51=appear on the Xbmc Screen.\\LogMessage$          - Append message||1
-Cmn52=to Xbmc log file. Xbmc Log file is described at \\							http://wiki.
-Cmn53=xbmc.org/index.php?title=Log_file\\ \\WindowName$          - Activate||1
-Cmn54=this window by name. List of names is at \\	http://wiki.xbmc.org/index.
-Cmn55=php?title=Window_IDs  \\Window_xxxxx         - Pulse to activate||1
-Cmn56=the named window.\\\\\\\\ALL OUTPUTS\\-----------\\IsConnected||2
-Cmn57=||8- High while connection to Xbmc is active\\Loading||6
-Cmn58=||8- High if control system is receiving data from Xbmc. \\
-Cmn59=					 - NB: Other requests are suspended until loading finishes.
-Cmn60=\\LoadingAnimationIndex   - Cycles from 1-6 while Loading is High||1
-Cmn61=(Analog)\\\\STOP_FB              - High if we are not playing anything\\
-Cmn62=PLAY_FB              - High if media is playing\\PAUSE_FB||7
-Cmn63=||6- High if media is currently paused\\REWIND_FB||<
-Cmn64=- High if media is being rewound\\FASTFORWARD_FB       - High if||1
-Cmn65=media is being fast forwarded\\\\Nothing_Playing_FB      - High||1
-Cmn66=is no media type is playing\\Movie_Playing_FB        - High if Movie||1
-Cmn67=is currently playing\\Audio_Playing_FB        - High if audio is||1
-Cmn68=currently playing\\Series_Playing_FB       - High if a TV Show is||1
-Cmn69=currently Playing\\Pictures_Playing_FB     - High if we are only||1
-Cmn70=displaying pictures\\Other_Video_Playing_FB  - High if an unknow||1
-Cmn71=video type is playing\\\\Home_List_Page   - High when on the top||1
-Cmn72=level list\\Movie_Title_List_Page   - High when the list contains||1
-Cmn73=movies\\TV_Show_List_Page       - High when the list is TV Shows\\
-Cmn74=TV_Season_List_Page     - High when the list is Seasons for a selected||1
-Cmn75=Show\\TV_Episode_List_Page    - High when the list is Episode for||1
-Cmn76=a TV show Season\\Music_List_Page		    - High when the list is the||1
-Cmn77=top level Music list\\Music_Artist_List_Page  - High when the list||1
-Cmn78=is Music Artists\\Music_Album_List_Page   - High when the list is||1
-Cmn79=Albums for a selected Artist\\Music_Song_List_Page    - High when||1
-Cmn80=the list is Songs for a selected Artist and Album\\Music_Genre_List_Page||1
-Cmn81=||2- High when the list is Genres\\Picture_List_Page   - High when||1
-Cmn82=the list is Pictures (not implemented)\\Addon_List_Page   - High||1
-Cmn83=when the list is Addons (only partially implemented)\\Movie_Details_Page||1
-Cmn84=||5- High when we should display details of selected Movie item\\
-Cmn85=TV_Episode_Details_Page - High when we should display details of||1
-Cmn86=selected Episode\\Music_Details_Page      - High when we should||1
-Cmn87=display details of selected Music Track\\\\SEARCH_PAGE||:
-Cmn88=||3- High when the search page is required\\SMS_Search_Available	
-Cmn89=- High when user can use SMS keys to filter list\\RecentlyAdded_Available	
-Cmn90=- High when user can see RecentlyAdded items (Movies, Albums only)\\
-Cmn91=Unwatched_Available		- High when user can filter list by 'unwatched'\\
-Cmn92=\\Current_XXXXXXXX        - Details for the currently playing Media\\
-Cmn93=Next_XXXXXXXX           - Details for the next track in the playlist\\
-Cmn94=\\Position_in_Seconds		- Position in current track/movie, in seconds||1
-Cmn95={{**{{0-65535}}**}}\\Duration_in_Seconds		- Duration of current track/movie,||1
-Cmn96=in seconds {{**{{0-65535}}**}}\\Current_Percentage      - Shows distance through||1
-Cmn97=current track/movie. {{**{{0-100}}**}}\\Current_Percentage_Scaled - Shows||1
-Cmn98=distance through current track/movie. {{**{{0-65535}}**}}\\ScrollBarPercentage||1
-Cmn99=||4- Shows distance through browse list. {{**{{0-100}}**}}\\ScrollBarPercentageScaled||1
-Cmn100=- Shows distance through browse list. {{**{{0-65535}}**}}\\ScrollBarPercentageScaledAndFlip
-Cmn101=ped - Shows distance through browse list. {{**{{65535-0}}**}}\\\\List_Summary$||1
-Cmn102=||:- Shows position on current list. E.g. "50 - 55 of 205"\\
-Cmn103=Plot_of_Selected_Movie  - The plot of the selected movie/episode.
-Cmn104=||1Only activated on details screen. \\                          Appends||1
-Cmn105=text in chunks using "\xFE\x02" to avoid 255 character limitation||1
-Cmn106=\\                          on serial strings.\\RepeatStatus||4
-Cmn107=||8- String showing repeat status on current playlist. \\		
-Cmn108=-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or ''\\
-Cmn109=ShuffleStatus           - String showing shuffle status on current||1
-Cmn110=playlist. \\						-		Allowed values = 'Shuffle' or ''	\\Search_Text||1
-Cmn111=||<- Search criteria that we are matching on for the list\\
-Cmn112=\\List_Item_1-10_FB       - High for the item we have selected in||1
-Cmn113=the list\\\\\\Watched_1-10            - High if item has been watched||1
-Cmn114=already\\Movie/Episode/Name_1-10 - Movie or Episode Name or Addon||1
-Cmn115=name\\Year_1-10               - First Aired date or year movie/album||1
-Cmn116=was released\\Genre_1-10              - Genre\\UserRating_1-10||2
-Cmn117=||7- User Rating\\Runtime_1-10            - Length of the media||1
-Cmn118=formatted as "h:mm:ss"\\Director_1-10           - Movie/Tv Show||1
-Cmn119=Director\\Tagline_1-10            - Tagline for Movie\\Thumbnail_1-
-Cmn120=10          - URL for thumbnail\\Writer_1-10             - Writer\\
-Cmn121=Episode/Track_1-10      - Episode number for TV Shows or Track Number||1
-Cmn122=for Music\\Season/AlbumName_1-10   - Season Number for TV Shows||1
-Cmn123=or Album Name for Music\\Studio_1-10             - Studio\\MPAA_1-
-Cmn124=10               - MPAA or RIA rating\\Series/ArtistName_1-10  -
-Cmn125=||1Series Name for TV Shows or Artist Name for Music\\Fanart_1-10||1
-Cmn126=||<- URL for fanart\\Filename_1-10           - Filename\\
-Cmn127=Banner_1-10           	- Tv Show Banner uri\\\\Current_Sort_Field$||1
-Cmn128=||4- Field that the current browse list is sorted on.\\Current_Sort_Order$||1
-Cmn129=||4- The description of the sort direction.\\\\Sort_List_By_xxxx_Available_FB||1
-Cmn130=||1-  High is the field xxxx is available to be\\||A
-Cmn131=||Bsorted on for the current browse list.\\
+Cmn45=\\\\Seek_Time_Percentage# - Go to this percentage time played on||1
+Cmn46=the current track/movie. {{**{{0-100}}**}}\\Seek_Time_Seconds#    - Go to||1
+Cmn47=this exact point on the current track/movie. {{**{{0-65535}}**}}\\\\SendNotification$||1
+Cmn48=||3- Make a popup message appear on the Xbmc Screen.\\LogMessage$||1
+Cmn49=||9- Append message to Xbmc log file. Xbmc Log file is described||1
+Cmn50=at \\							http://wiki.xbmc.org/index.php?title=Log_file\\ \\WindowName$||1
+Cmn51=||9- Activate this window by name. List of names is at \\	
+Cmn52=http://wiki.xbmc.org/index.php?title=Window_IDs  \\Window_xxxxx||1
+Cmn53=||8- Pulse to activate the named window.\\\\UseAlbumArtist||1
+Cmn54=||6- HIGH to list Artists as ALBUM ARTIST.\\\\ALL OUTPUTS\\--
+Cmn55=---------\\IsConnected          - High while connection to Xbmc||1
+Cmn56=is active\\Loading              - High if control system is receiving||1
+Cmn57=data from Xbmc. \\					 - NB: Other requests are suspended until||1
+Cmn58=loading finishes.\\LoadingAnimationIndex   - Cycles from 1-6 while||1
+Cmn59=Loading is High (Analog)\\\\STOP_FB              - High if we are||1
+Cmn60=not playing anything\\PLAY_FB              - High if media is playing\\
+Cmn61=PAUSE_FB             - High if media is currently paused\\REWIND_FB||1
+Cmn62=||;- High if media is being rewound\\FASTFORWARD_FB||5
+Cmn63=||2- High if media is being fast forwarded\\\\Nothing_Playing_FB||1
+Cmn64=||5- High is no media type is playing\\Movie_Playing_FB||7
+Cmn65=||1- High if Movie is currently playing\\Audio_Playing_FB        -
+Cmn66=||1High if audio is currently playing\\Series_Playing_FB       - High||1
+Cmn67=if a TV Show is currently Playing\\Pictures_Playing_FB     - High||1
+Cmn68=if we are only displaying pictures\\Other_Video_Playing_FB  - High||1
+Cmn69=if an unknow video type is playing\\\\Home_List_Page   - High when||1
+Cmn70=on the top level list\\Movie_Title_List_Page   - High when the list||1
+Cmn71=contains movies\\TV_Show_List_Page       - High when the list is||1
+Cmn72=TV Shows\\TV_Season_List_Page     - High when the list is Seasons||1
+Cmn73=for a selected Show\\TV_Episode_List_Page    - High when the list||1
+Cmn74=is Episode for a TV show Season\\Music_List_Page		    - High when||1
+Cmn75=the list is the top level Music list\\Music_Artist_List_Page  -||1
+Cmn76=High when the list is Music Artists\\Music_Album_List_Page   - High||1
+Cmn77=when the list is Albums for a selected Artist\\Music_Song_List_Page||1
+Cmn78=||3- High when the list is Songs for a selected Artist and Album\\
+Cmn79=Music_Genre_List_Page   - High when the list is Genres\\Picture_List_Page||1
+Cmn80=||2- High when the list is Pictures (not implemented)\\Addon_List_Page||1
+Cmn81=||2- High when the list is Addons (only partially implemented)\\Movie_Details_Page
+Cmn82=||6- High when we should display details of selected Movie item\\
+Cmn83=TV_Episode_Details_Page - High when we should display details of||1
+Cmn84=selected Episode\\Music_Details_Page      - High when we should||1
+Cmn85=display details of selected Music Track\\\\SEARCH_PAGE||:
+Cmn86=||3- High when the search page is required\\SMS_Search_Available	
+Cmn87=- High when user can use SMS keys to filter list\\RecentlyAdded_Available	
+Cmn88=- High when user can see RecentlyAdded items (Movies, Albums only)\\
+Cmn89=Unwatched_Available		- High when user can filter list by 'unwatched'\\
+Cmn90=\\Current_XXXXXXXX        - Details for the currently playing Media\\
+Cmn91=Next_XXXXXXXX           - Details for the next track in the playlist\\
+Cmn92=\\Position_in_Seconds		- Position in current track/movie, in seconds||1
+Cmn93={{**{{0-65535}}**}}\\Duration_in_Seconds		- Duration of current track/movie,||1
+Cmn94=in seconds {{**{{0-65535}}**}}\\Current_Percentage      - Shows distance through||1
+Cmn95=current track/movie. {{**{{0-100}}**}}\\Current_Percentage_Scaled - Shows||1
+Cmn96=distance through current track/movie. {{**{{0-65535}}**}}\\ScrollBarPercentage||1
+Cmn97=||4- Shows distance through browse list. {{**{{0-100}}**}}\\ScrollBarPercentageScaled||1
+Cmn98=- Shows distance through browse list. {{**{{0-65535}}**}}\\ScrollBarPercentageScaledAndFlip
+Cmn99=ped - Shows distance through browse list. {{**{{65535-0}}**}}\\\\List_Summary$||1
+Cmn100=||:- Shows position on current list. E.g. "50 - 55 of 205"\\
+Cmn101=Plot_of_Selected_Movie  - The plot of the selected movie/episode.
+Cmn102=||1Only activated on details screen. \\                          Appends||1
+Cmn103=text in chunks using "\xFE\x02" to avoid 255 character limitation||1
+Cmn104=\\                          on serial strings.\\RepeatStatus||4
+Cmn105=||8- String showing repeat status on current playlist. \\		
+Cmn106=-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or ''\\
+Cmn107=ShuffleStatus           - String showing shuffle status on current||1
+Cmn108=playlist. \\						-		Allowed values = 'Shuffle' or ''	\\Search_Text||1
+Cmn109=||<- Search criteria that we are matching on for the list\\
+Cmn110=\\List_Item_1-10_FB       - High for the item we have selected in||1
+Cmn111=the list\\\\\\Watched_1-10            - High if item has been watched||1
+Cmn112=already\\Movie/Episode/Name_1-10 - Movie or Episode Name or Addon||1
+Cmn113=name\\Year_1-10               - First Aired date or year movie/album||1
+Cmn114=was released\\Genre_1-10              - Genre\\UserRating_1-10||2
+Cmn115=||7- User Rating\\Runtime_1-10            - Length of the media||1
+Cmn116=formatted as "h:mm:ss"\\Director_1-10           - Movie/Tv Show||1
+Cmn117=Director\\Tagline_1-10            - Tagline for Movie\\Thumbnail_1-
+Cmn118=10          - URL for thumbnail\\Writer_1-10             - Writer\\
+Cmn119=Episode/Track_1-10      - Episode number for TV Shows or Track Number||1
+Cmn120=for Music\\Season/AlbumName_1-10   - Season Number for TV Shows||1
+Cmn121=or Album Name for Music\\Studio_1-10             - Studio\\MPAA_1-
+Cmn122=10               - MPAA or RIA rating\\Series/ArtistName_1-10  -
+Cmn123=||1Series Name for TV Shows or Artist Name for Music\\Fanart_1-10||1
+Cmn124=||<- URL for fanart\\Filename_1-10           - Filename\\
+Cmn125=Banner_1-10           	- Tv Show Banner uri\\
 ]
 [
 ObjTp=Bk
@@ -185,11 +179,10 @@ Rx=280
 Ry=220
 Xm=-1
 Ym=-1
-SH=6
+SH=10
 Z=100
-P=7355
 Ht=1
-Hi=266
+Hi=5
 ]
 [
 ObjTp=Bw
@@ -200,10 +193,68 @@ Rx=280
 Ry=220
 Xm=-1
 Ym=-1
-SH=10
+SH=90
 Z=100
 Ht=1
-Hi=3
+Hi=2
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=12
+Z=100
+Ht=4
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=6
+Z=100
+P=3535
+Ht=1
+Hi=154
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=16
+Z=100
+Ht=1
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=59
+Z=100
+P=620
+Ht=1
+Hi=43
 ]
 [
 ObjTp=Bw
@@ -302,21 +353,6 @@ SH=18
 Z=100
 Ht=1
 Hi=2
-]
-[
-ObjTp=Bw
-H=1
-Lx=20
-Ly=20
-Rx=280
-Ry=220
-Xm=-1
-Ym=-1
-SH=59
-Z=100
-P=710
-Ht=4
-Hi=37
 ]
 [
 ObjTp=Bw
@@ -510,34 +546,6 @@ Ry=220
 Xm=-1
 Ym=-1
 SH=13
-Z=100
-Ht=4
-Hi=1
-]
-[
-ObjTp=Bw
-H=1
-Lx=20
-Ly=20
-Rx=280
-Ry=220
-Xm=-1
-Ym=-1
-SH=12
-Z=100
-Ht=4
-Hi=1
-]
-[
-ObjTp=Bw
-H=1
-Lx=20
-Ly=20
-Rx=280
-Ry=220
-Xm=-1
-Ym=-1
-SH=16
 Z=100
 Ht=4
 Hi=1
@@ -1585,7 +1593,7 @@ OutputCue93=[List_Summary$]
 OutputCue94=[Plot_of_Selected_Movie$]
 OutputCue95=[RepeatStatus$]
 OutputCue96=[ShuffleStatus$]
-OutputCue97=[Filter_StartsWith$]
+OutputCue97=[Filter$]
 OutputCue98=[~UNUSED~]
 OutputCue99=[~UNUSED~]
 OutputCue100=List_Item_1_FB
@@ -2651,12 +2659,13 @@ Nm=Make String Permanent
 ObjVer=1
 PrH=4
 CF=2
-n1I=4
-mI=4
+n1I=5
+mI=5
 I1=28
 I2=5
 I3=347
 I4=118
+I5=10
 mP=1
 P1=255d
 ]
@@ -2669,12 +2678,13 @@ ObjVer=1
 PrH=4
 CF=2
 Cmn1=Keyboard\\
-mC=5
+mC=6
 C1=16
 C2=12
 C3=20
 C4=21
 C5=24
+C6=90
 ]
 [
 ObjTp=Sm
@@ -4879,6 +4889,23 @@ O1=560
 ]
 [
 ObjTp=Sm
+H=90
+SmC=46
+Nm=Analog Buffer
+ObjVer=1
+PrH=11
+CF=2
+n1I=2
+n1O=1
+mI=2
+I1=520
+I2=10
+mO=1
+tO=1
+O1=28
+]
+[
+ObjTp=Sm
 H=91
 SmC=38
 Nm=Analog Equate
@@ -5212,7 +5239,7 @@ Nm=Connect
 [
 ObjTp=Sg
 H=10
-Nm=XBMC_Search_Text
+Nm=XBMC_Search_Text$
 SgTp=4
 ]
 [
@@ -5311,7 +5338,7 @@ SgTp=4
 [
 ObjTp=Sg
 H=28
-Nm=[Filter_StartsWith$]
+Nm=[Filter$]
 SgTp=4
 ]
 [
