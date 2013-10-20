@@ -266,7 +266,10 @@ STRING_OUTPUT   _SKIP_,
 				NextAlbum$,					// Metadata about next item on playlist
 				NextTrackNumber$,			// Metadata about next item on playlist
 				PlayingSpeed$,              // Speed of current audio/video playback (1x, 2x, 4x etc.)  
+				_SKIP_,
+				ListHeader$,				// Header for the current list
 				_SKIP_;
+
 ANALOG_OUTPUT   Runtime[10];				// Number of seconds for each track/movie
 STRING_OUTPUT	Title$[10],
 				Year$[10],
@@ -321,7 +324,8 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 
 DIGITAL_INPUT _SKIP_,RunAllTests;		// Run all unit tests. Only works in DEBUG
 
-STRING_INPUT _SKIP_,SearchCriteria$[100];	// Filter String
+STRING_INPUT _SKIP_,SearchCriteria$[100],
+			 TextForList$[100];	// Filter String
 
 ANALOG_INPUT 	_SKIP_,PlayItem,			// Begin playing this listitem 
 				SelectedItem,				// We have selected this listitem
@@ -1052,6 +1056,7 @@ FUNCTION Init()
 STRUCTURE ListContext 			// Information used to Retrieve a Browse List
 {
 	INTEGER listID; 			// ID of the list e.g. MOVIE_TITLE_LIST, TV_SHOW_LIST
+	STRING listHeader[255];		// Headed Title
 	INTEGER start;				// Limits.start for database search
 	INTEGER end;				// Limits.end for database search
 	INTEGER unWatched;			// HIGH = show unwatched movies/tv shows only
@@ -1074,6 +1079,7 @@ FUNCTION ListContext_Push()
 	IF (StackPosition>5) StackPosition = 5;
 	#IF_DEFINED DEBUG PRINT("ListContext_Push: StackPosition %d", StackPosition); #ENDIF
 	Stack[StackPosition].listID = CurrentListCxt.listID;
+	Stack[StackPosition].listHeader = CurrentListCxt.listHeader;
 	Stack[StackPosition].start = CurrentListCxt.start;
 	Stack[StackPosition].end = CurrentListCxt.end;
 	Stack[StackPosition].unWatched = CurrentListCxt.unWatched;
@@ -1091,6 +1097,7 @@ FUNCTION ListContext_Pop()
 {
 	#IF_DEFINED DEBUG PRINT("ListContext_Pop: StackPosition %d", StackPosition); #ENDIF
 	CurrentListCxt.listID = Stack[StackPosition].listID;
+	CurrentListCxt.listHeader = Stack[StackPosition].listHeader;
 	CurrentListCxt.start = Stack[StackPosition].start;
 	CurrentListCxt.end = Stack[StackPosition].end;
 	CurrentListCxt.unWatched = Stack[StackPosition].unWatched;
@@ -1102,6 +1109,9 @@ FUNCTION ListContext_Pop()
 	CurrentListCxt.genreID = Stack[StackPosition].genreID;
 	CurrentListCxt.tvShowID = Stack[StackPosition].tvShowID;
 	CurrentListCxt.tvSeasonID = Stack[StackPosition].tvSeasonID;
+
+	ListHeader$ = CurrentListCxt.listHeader;
+
 	IF (StackPosition)
 		StackPosition = StackPosition - 1;
 	#IF_DEFINED DEBUG PRINT("ListContext_Pop: New StackPosition %d", StackPosition); #ENDIF
@@ -4824,22 +4834,27 @@ PUSH List_Back
 
 PUSH List_Home
 {
+	CurrentListCxt.listHeader = "HOME";
 	List_Reset(HOME_LIST);
 }
 PUSH List_Albums
 {
+	CurrentListCxt.listHeader = "MUSIC ALBUMS";
 	List_Reset(MUSIC_ALBUM_LIST);
 }
 PUSH List_Artists
 {
+	CurrentListCxt.listHeader = "MUSIC ARTISTS";
 	List_Reset(MUSIC_ARTIST_LIST);	
 }
 PUSH List_Movies
 {
+	CurrentListCxt.listHeader = "MOVIES";
     List_Reset(MOVIE_TITLE_LIST);
 }
 PUSH List_TvShows
 {
+	CurrentListCxt.listHeader = "TVSHOWS";
     List_Reset(TV_SHOW_LIST);
 }
 PUSH List_UnWatchedOnly
@@ -4912,7 +4927,14 @@ PUSH ContextMenu
 {
     CALL SendJsonCommand (REQUESTID_INPUT_CONTEXTMENU, 
 								"Input.ContextMenu", "");
-} 
+}
+
+CHANGE TextForList$
+{
+	CurrentListCxt.listHeader = CurrentListCxt.listHeader + " / " + TextForList$;
+	ListHeader$ = CurrentListCxt.ListHeader;
+}
+ 
 CHANGE Seek_Percentage
 {
 	STRING Params$[100];
@@ -6327,6 +6349,7 @@ Function Main()
     
 	// Set current browse list parameters
 	Stack[StackPosition].listID = HOME_LIST;
+	Stack[StackPosition].listHeader = "HOME";
 	Stack[StackPosition].start = 0;
 	Stack[StackPosition].end = StepAmount;
 	Stack[StackPosition].unWatched = OFF;
