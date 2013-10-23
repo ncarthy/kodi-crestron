@@ -1698,6 +1698,7 @@ FUNCTION InitOutputArrays(INTEGER start)
 		Banner$[i] = "";
 		PlotDescription$[i] = "";
 		Filename$[i] = "";
+		ListIDs[i] = 0;
 	}
 		
 }
@@ -4835,27 +4836,32 @@ PUSH List_Back
 PUSH List_Home
 {
 	CurrentListCxt.listHeader = "HOME";
+	ListHeader$ = CurrentListCxt.listHeader;
 	List_Reset(HOME_LIST);
 }
 PUSH List_Albums
 {
 	CurrentListCxt.listHeader = "MUSIC ALBUMS";
+	ListHeader$ = CurrentListCxt.listHeader;
 	List_Reset(MUSIC_ALBUM_LIST);
 }
 PUSH List_Artists
 {
 	CurrentListCxt.listHeader = "MUSIC ARTISTS";
+	ListHeader$ = CurrentListCxt.listHeader;
 	List_Reset(MUSIC_ARTIST_LIST);	
 }
 PUSH List_Movies
 {
 	CurrentListCxt.listHeader = "MOVIES";
+	ListHeader$ = CurrentListCxt.listHeader;
     List_Reset(MOVIE_TITLE_LIST);
 }
 PUSH List_TvShows
 {
 	CurrentListCxt.listHeader = "TVSHOWS";
-    List_Reset(TV_SHOW_LIST);
+	ListHeader$ = CurrentListCxt.listHeader;
+	List_Reset(TV_SHOW_LIST);
 }
 PUSH List_UnWatchedOnly
 {
@@ -5048,13 +5054,19 @@ CHANGE PlayItem
 CHANGE SelectedItem
 {	
 	#IF_DEFINED DEBUG Print("SelectedItem: CurrentList %d", CurrentList); #ENDIF
+	     
+	// Return if we pressed on a blank line
+	IF (CurrentListCxt.start + SelectedItem > ListTotal)
+		RETURN;
+
 	CSWITCH (CurrentList)
 	{
 		CASE (MOVIE_TITLE_LIST) : 
 		{
 			ListContext_Push();	// Store previous context in stack				
 			CurrentList = MOVIE_DETAILS;
-			Movie_GetDetails(ListIDs[SelectedItem]);        				
+			Movie_GetDetails(ListIDs[SelectedItem]);
+        				
 			Break;
 		}
 		CASE (TV_SHOW_LIST) 	: 
@@ -5068,36 +5080,34 @@ CHANGE SelectedItem
 			CurrentListCxt.contains = "";
 			CurrentListCxt.tvShowID = ListIDs[SelectedItem];			
 			List_Retrieve();
+
 			Break;
 		}
 		CASE (TV_SEASON_LIST) 	: 
 		{
-			IF (ListIDs[SelectedItem])
-			{
-				ListContext_Push();	// Store previous context in stack		        
-				IF (ListIDs[SelectedItem] = SPECIAL_SEASON)
-					CurrentListCxt.tvSeasonID = 0;
-				else				
-					CurrentListCxt.tvSeasonID = ListIDs[SelectedItem];
+			ListContext_Push();	// Store previous context in stack		        
+		
+			IF (ListIDs[SelectedItem] = SPECIAL_SEASON)
+				CurrentListCxt.tvSeasonID = 0;
+			else				
+				CurrentListCxt.tvSeasonID = ListIDs[SelectedItem];
 
-				ListIndex=0;
-				CurrentListCxt.listID = TV_EPISODE_LIST;	
-				CurrentListCxt.start=0;      
-				CurrentListCxt.end=StepAmount;				
-				CurrentListCxt.startsWith= "";
-				CurrentListCxt.contains= "";
-				List_Retrieve();
-			}
+			ListIndex=0;
+			CurrentListCxt.listID = TV_EPISODE_LIST;	
+			CurrentListCxt.start=0;      
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith= "";
+			CurrentListCxt.contains= "";
+			List_Retrieve();
+
 			Break;
 		}
 		CASE (TV_EPISODE_LIST)  : 
 		{ 
-			IF (ListIDs[SelectedItem])
-			{
-				ListContext_Push();
-				Episode_GetDetails(ListIDs[SelectedItem]);
-				CurrentList = TVSHOW_DETAILS;
-			}
+			ListContext_Push();
+			Episode_GetDetails(ListIDs[SelectedItem]);
+			CurrentList = TVSHOW_DETAILS;
+			
 			Break;
 		}
 		CASE (MUSIC_ALBUM_LIST) : 
@@ -5112,6 +5122,7 @@ CHANGE SelectedItem
 			CurrentListCxt.startsWith= "";
 			CurrentListCxt.contains= "";
 			List_Retrieve();
+
 			Break;
 		}
 		CASE (MUSIC_ARTIST_LIST) : 
@@ -5126,6 +5137,7 @@ CHANGE SelectedItem
 			CurrentListCxt.startsWith= "";				
 			CurrentListCxt.contains= "";
 			List_Retrieve();
+
 			Break;
 		}
 		CASE (MUSIC_GENRE_LIST) :
@@ -5140,6 +5152,7 @@ CHANGE SelectedItem
 			CurrentListCxt.startsWith="";
 			CurrentListCxt.contains= "";
 			List_Retrieve();			
+
          	Break;
 		}
 		CASE (MUSIC_ARTIST_ALBUM_LIST) : 
@@ -5148,22 +5161,15 @@ CHANGE SelectedItem
 
 			// If albumID = 0 then 'All songs' has been selected
 			// So keep the reference to artistID. 
-			IF (ListIDs[SelectedItem])
-			{
-				CurrentListCxt.albumID = ListIDs[SelectedItem];
-				CurrentListCxt.artistID = 0;
-			}
-			ELSE
-			{
-				CurrentListCxt.albumID = 0;
-            } 
+			CurrentListCxt.albumID = ListIDs[SelectedItem];
+			CurrentListCxt.artistID = 0;
 			CurrentListCxt.listID = MUSIC_SONG_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith= "";
 			CurrentListCxt.contains= "";
-			
 			List_Retrieve();
+
 			Break;
 		}
 		CASE (MUSIC_GENRE_ARTIST_LIST) : 
@@ -5172,18 +5178,15 @@ CHANGE SelectedItem
 
 			// If artistID = 0 then 'All artists' has been selected
 			// So keep the reference to genreID. 
-			IF (ListIDs[SelectedItem])
-			{
-				CurrentListCxt.artistID = ListIDs[SelectedItem];
-				CurrentListCxt.genreID = 0;
-			}
- 
+			CurrentListCxt.artistID = ListIDs[SelectedItem];
+			CurrentListCxt.genreID = 0;
 			CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith = "";
 			CurrentListCxt.contains = "";
 			List_Retrieve();
+
 			Break;
 		}
 		CASE (MUSIC_SONG_LIST)  : 
@@ -5208,6 +5211,7 @@ CHANGE SelectedItem
 			{
             	List_Reset(ADDON_LIST);
 			}
+
 			Break;
 		}
 		CASE (MUSIC_LIST)  : 
