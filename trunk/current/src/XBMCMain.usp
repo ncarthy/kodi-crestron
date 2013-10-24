@@ -3129,7 +3129,7 @@ FUNCTION Process_Artist(INTEGER requestId)
 			Year$[1] = "";
 			ListIDs[1] = 0;
             Watched[1] = OFF;
-			ListIndex = 2;//Next iitem will be #2
+			ListIndex = 2;//Next iitem will be #2 	
 		}
 		ELSE
 			ListIndex = ListIndex+1; 
@@ -3304,6 +3304,7 @@ FUNCTION Process_Album(INTEGER requestId)
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
 		// Add the 'All Songs' option for Artists/Albums
+               
 		IF (requestId = REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS && ListIndex = 0)
 		{	
 			SeasonOrAlbumName$[1] = "All Songs";
@@ -3316,7 +3317,7 @@ FUNCTION Process_Album(INTEGER requestId)
 			ListIndex = 2;
 		}
 		ELSE
-			ListIndex = ListIndex+1; 
+			ListIndex = ListIndex + 1;
         
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
@@ -3497,7 +3498,6 @@ FUNCTION Process_Limits()
 		{
 			ListTotal = GetInteger();
 		}
-
 	}	
     
 	// Send to signals
@@ -3507,7 +3507,7 @@ FUNCTION Process_Limits()
 	ELSE
 		MAKESTRING(List_Summary$, "%d to %d of %d", 
 				CurrentListCxt.start+1, CurrentListCxt.end, ListTotal);
-
+    
 	IF (CurrentListCxt.end = ListTotal)
 		ScrollBarPercentage# = 100;
 	ELSE
@@ -3541,7 +3541,7 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 	 
 		IF (name$ = "limits")
 		{
-	     	Process_Limits();
+			Process_Limits();
 		}
 		ELSE
 		{
@@ -3612,7 +3612,7 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 			IF (requestId = REQUESTID_AUDIOLIBRARY_GETARTISTALBUMS || 
 					requestId = REQUESTID_AUDIOLIBRARY_GETGENREARTISTS)
 				numberOfListItems = numberOfListItems + 1;
-        
+
 			IF (StepAmount - numberOfListItems > 0)
 				InitOutputArrays(numberOfListItems+1);
 		}
@@ -3623,7 +3623,6 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 	{
     	InitOutputArrays(1);
 	}
-
 }
    
 /*
@@ -4068,9 +4067,7 @@ FUNCTION ProcessNotification(STRING method$)
 			{
 		    	PollForMetadata();
 			}
-
 		}
-		
 	}
 	ELSE
 	{
@@ -4565,11 +4562,10 @@ FUNCTION List_Retrieve()
            	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s]%s }"
 				,Filter$, Limits$, "\"thumbnail\""
 				,"\"genre\"","\"style\"", Sort$);
-
-
 			Method$ = "AudioLibrary.GetArtists"; 
 
 			SendJsonCommand (REQUESTID_AUDIOLIBRARY_GETGENREARTISTS, Method$, Params$);
+			
 			BREAK;
 		}
 		CASE(MUSIC_ARTIST_ALBUM_LIST):
@@ -4601,6 +4597,7 @@ FUNCTION List_Retrieve()
 			Method$ = "Addons.GetAddons"; 
 
 			SendJsonCommand (REQUESTID_GETADDONS, Method$, Params$);
+
 			BREAK;
 		}
         CASE (HOME_LIST):
@@ -4766,7 +4763,8 @@ RELEASE Connect
 PUSH List_TopPage
 {
 	ListIndex=0;					// The index of the current object within the list
-	CurrentListCxt.start=0;                  	
+	CurrentListCxt.start=0;
+	
 	CurrentListCxt.end=StepAmount;				
     List_Retrieve();
 }
@@ -4785,7 +4783,8 @@ PUSH List_PageMinus
 {
 	ListIndex=0;				
 	CurrentListCxt.start=MAX(0,CurrentListCxt.start-StepAmount);
-	CurrentListCxt.end=CurrentListCxt.start+StepAmount;			
+	CurrentListCxt.end=CurrentListCxt.start+StepAmount;
+		
     List_Retrieve();
 }
 
@@ -5161,8 +5160,14 @@ CHANGE SelectedItem
 
 			// If albumID = 0 then 'All songs' has been selected
 			// So keep the reference to artistID. 
-			CurrentListCxt.albumID = ListIDs[SelectedItem];
-			CurrentListCxt.artistID = 0;
+            IF (ListIDs[SelectedItem])
+			{
+				CurrentListCxt.albumID = ListIDs[SelectedItem];
+				CurrentListCxt.artistID = 0;
+            }
+			ELSE {
+				CurrentListCxt.albumID = 0;
+            }
 			CurrentListCxt.listID = MUSIC_SONG_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
@@ -5178,8 +5183,11 @@ CHANGE SelectedItem
 
 			// If artistID = 0 then 'All artists' has been selected
 			// So keep the reference to genreID. 
-			CurrentListCxt.artistID = ListIDs[SelectedItem];
-			CurrentListCxt.genreID = 0;
+			IF (ListIDs[SelectedItem]) {
+				CurrentListCxt.artistID = ListIDs[SelectedItem];
+				CurrentListCxt.genreID = 0;
+			}
+	
 			CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
