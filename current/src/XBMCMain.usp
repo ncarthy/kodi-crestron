@@ -92,7 +92,7 @@ Comments:
 
 /*****    DEFINE NEW CONSTANTS    *******/
 #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
-#DEFINE_CONSTANT MAX_FILENAME_LENGTH 250 
+#DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 20000		// Socket buffer size
 #DEFINE_CONSTANT STORED_STRING_SIZE 1000  // Size of each string in the temporary string store
@@ -2324,7 +2324,7 @@ FUNCTION Process_GetItem(INTEGER requestId)
 			}
 			ELSE IF (name$ = "file")
 			{
-				CurrentFilename$ = GetString();
+				CurrentFilename$ = LEFT(GetString(),MAX_FILENAME_LENGTH);
 			}
 			ELSE IF (name$ = "mpaa")
 			{
@@ -2761,7 +2761,7 @@ FUNCTION Process_OnPlayItem()
 			// Advance to next token
 			Read();			
 
-			IF (name$ = "id" || name$ = "file")
+			IF (name$ = "id" || name$ = "file" || name$ = "title")
 			{		
             	//Do Nothing
 			}
@@ -4068,6 +4068,11 @@ FUNCTION ProcessNotification(STRING method$)
 		    	PollForMetadata();
 			}
 		}
+	}
+	ELSE IF (method$ = "System.OnQuit" || method$ = "System.OnSleep")
+	{
+		// Reset the flags that govern socket processing
+		ResetSocket();
 	}
 	ELSE
 	{
