@@ -98,6 +98,13 @@ Comments:
 #DEFINE_CONSTANT STORED_STRING_SIZE 1000  // Size of each string in the temporary string store
 #DEFINE_CONSTANT STORED_STRING_RET_SIZE 10000 // The maximum size of strings that can be outputted from the store
 
+/* 
+ *  The length of time to wait before resetting the Loading flag, in 100ths of a second.
+ *  Currently set to 5 minutes but may need to be longer for RPi
+ */
+#DEFINE_CONSTANT LOADING_WAIT_TIME 30000 
+
+
 //Useful characters that we'll need in parsing metadata
 #DEFINE_CONSTANT CR 0x0D		 	// Carriage return
 #DEFINE_CONSTANT LF 0x0A		 	// Linefeed
@@ -1143,6 +1150,9 @@ Function SendToSocket(STRING Command$)
 	{
 		Delay(2);
 	}
+	// The user might have disconnected while processor was in the delay loop
+	IF (IsConnected = OFF) RETURN;
+
 	// Set the lock before doing anything else
 	SocketLock = ON;
 
@@ -1153,11 +1163,20 @@ Function SendToSocket(STRING Command$)
 	// Send out the command in chunks
 	WHILE (LEN(Command$))
 	{
+		// This flag will be reset when 
+		//  i) a reply is received from Xbmc, or 
+		//  ii) the LOADING_WAIT_TIME period has expired
 		Loading = ON;
-
+		WAIT (LOADING_WAIT_TIME,CancelLoadingFlag)
+		{
+			#IF_DEFINED DEBUG PRINT("%s","Loading flag cancelled by WAIT command."); #ENDIF
+			Loading = OFF;
+		}
+         
+		// Send the data
 		IF (LEN(Command$)>250)
 		{
-			// Send to soucket in chunks
+			// Send to socket in chunks
 			SocketSend(XBMC, REMOVEBYLENGTH(250, Command$));
 		}
 		ELSE
@@ -1260,6 +1279,8 @@ FUNCTION ResetSocket()
 {
 	Init();
 	ReceiveLock = OFF;
+	CANCELWAIT(CancelLoadingFlag);
+	#IF_DEFINED DEBUG PRINT("%s","Loading flag cancelled normally."); #ENDIF
 	Loading = OFF;	
 	SocketLock = OFF;
 }
@@ -4074,6 +4095,10 @@ FUNCTION ProcessNotification(STRING method$)
 		// Reset the flags that govern socket processing
 		ResetSocket();
 	}
+	ELSE IF (method$ = "VideoLibrary.OnUpdate")
+	{
+		// VideoLibrary.OnUpdate is received when a Resume position is recorded.
+	}
 	ELSE
 	{
      	// Do Nothing
@@ -4255,7 +4280,8 @@ STRING_FUNCTION ProcessResponse(STRING fromBuffer$, BYREF INTEGER numberBytes)
 	}
     ELSE
 	{
-		//Reset initial values & exit
+		// Complete message received.
+		// Reset initial values & exit
 		ResetSocket();
 		numberBytes=0;		
 		RETURN ("");
@@ -4423,12 +4449,14 @@ STRING_FUNCTION ReturnFieldString(INTEGER SortField)
 		CASE (SORT_ALBUM):     { RETURN ("album");          }
 		CASE (SORT_TRACK):     { RETURN ("track");          }
 		CASE (SORT_GENRE):     { RETURN ("genre");          }
+        DEFAULT : 			   { RETURN ("");				} // add a default value
 	}
 }
 
 STRING_FUNCTION GenerateSortString(INTEGER ListType)
 {
 	STRING sortDirection$[10];
+	STRING sortField$[30];
     STRING Sort$[255];
 
 	IF (ListSortInfo[ListType].SortDescending = 1)
@@ -4436,12 +4464,26 @@ STRING_FUNCTION GenerateSortString(INTEGER ListType)
     ELSE
 		sortDirection$="ascending";
  
-	IF (!(ListSortInfo[ListType].SortField & ListSortInfo[ListType].SortField))
-		ListSortInfo[ListType].SortField = ListSortInfo[ListType].DefaultField;
+	IF (!(ListSortInfo[ListType].SortField & ListSortInfo[ListType].ValidFields))
+		ListSortInfo[ListType].SortField = ListSortInfo[ListType].DefaultField;                                
+     
+	// Transfer into local variable
+    sortField$ = ReturnFieldString(ListSortInfo[ListType].SortField);
 
+	IF (LEN(sortField$) = 0)
+	{
+		// If the Sort string is invalid (zero length) then use the default field
+		// Invalid values can happen on 1st run of system due to un-initialised non-volatile variables
+    	ListSortInfo[ListType].SortField = ListSortInfo[ListType].DefaultField;
+	    sortField$ = ReturnFieldString(ListSortInfo[ListType].SortField);
+
+		// If even the default field doesn't work then return an empty string
+		IF (LEN(sortField$) = 0) RETURN ("");
+	}
+     
+	// Ignorearticle is set to true so that the JumpSMS keys function correctly.
    	MAKESTRING(Sort$,",\"sort\":{\"method\":\"%s\",\"order\":\"%s\",\"ignorearticle\":true}"
-				, ReturnFieldString(ListSortInfo[ListType].SortField) 
-                , sortDirection$);
+				, sortField$, sortDirection$);
 
 	RETURN (Sort$);
 }
