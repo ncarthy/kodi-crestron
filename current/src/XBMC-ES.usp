@@ -311,7 +311,11 @@ FUNCTION Send(INTEGER PacketType)
 	IF (Return_Value < 0)
 	{
 		IF (Connect = 0)
-			PRINT ("Not connected to Xbmc at %s. Socket Error number is %d", XBMC_IPAddr$, Return_Value);
+		{
+			PRINT ("Not connected to Xbmc at %s. Socket Error number is %d.", XBMC_IPAddr$, Return_Value);
+			PRINT ("%s","Check that your firewall allows inbound traffic on ports 80,8080,9090,9777 on Xbmc machine.");
+			PRINT ("%s","Also check everything is enabled in Settings>Services>Remote Control on XBMC.");
+		}
 		ELSE
 		{			
 			PRINT ("Error in XBMC-ES. Connect: %d", Connect);
