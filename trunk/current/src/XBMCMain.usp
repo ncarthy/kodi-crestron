@@ -100,9 +100,9 @@ Comments:
 
 /* 
  *  The length of time to wait before resetting the Loading flag, in 100ths of a second.
- *  Currently set to 5 minutes but may need to be longer for RPi
+ *  Currently set to 1 minute but may need to be longer for RPi
  */
-#DEFINE_CONSTANT LOADING_WAIT_TIME 30000 
+#DEFINE_CONSTANT LOADING_WAIT_TIME 6000 
 
 
 //Useful characters that we'll need in parsing metadata
@@ -369,7 +369,7 @@ STRING_PARAMETER XBMC_TcpPort$[5];	 //the port that the XBMC server lives on
 #END_PARAMETER_PROPERTIES
 #BEGIN_PARAMETER_PROPERTIES XBMC_TcpPort$
    propDefaultValue = "";   
-   propShortDescription = "The port that the XBMC JSON TCP server is listening on. (NOT the httpp server) (usu 9090)";
+   propShortDescription = "The port that the XBMC JSON TCP server is listening on. (NOT the http server) (usu 9090)";
 #END_PARAMETER_PROPERTIES
 
 /*******************************************************************************************
@@ -2875,11 +2875,13 @@ INTEGER_FUNCTION Process_OnAdd()
 		}
 
 	} 	
-
+     
+	//Returns 1 if the Notification is for audio/video, 0 if for pictures
 	IF (playlistid = 0 || playlistid = 1)
 		RETURN (1); 	
 	ELSE
-		RETURN (0);}
+		RETURN (0);
+}
 
 /*
 	Process a notification received form the xbmc player
@@ -3521,8 +3523,14 @@ FUNCTION Process_Limits()
 		}
 	}	
     
-	// Send to signals
+	// Add an extra item for the "All Songs" entry
+	IF (CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST)
+	{
+		ListTotal = ListTotal+1;
+     	// TODO: Start/End of list still wrong 
+    }    
 
+	// Send to signals
 	IF (ListTotal = 0)
 		List_Summary$ = "No items found.";
 	ELSE
@@ -4101,22 +4109,19 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE
 	{
-     	// Do Nothing
-
-		//Some of the events that are ignored:
-
-		//AudioLibrary.OnAdd & VideoLibrary.OnAdd
-		//AudioLibrary.OnUpdate & VideoLibrary.OnUpdate 
-		// Note: VideoLibrary.OnUpdate is also received when a Resume position is recorded.
-        //AudioLibrary.OnRemove & VideoLibrary.OnRemove
-		//AudioLibrary.OnScanStarted & VideoLibrary.OnScanStarted
-		//AudioLibrary.OnScanFinished & VideoLibrary.OnScanFinished
-		//System.OnSleep & System.OnQuit
-		//System.OnWake
-
-		GenerateUserError("Unknow Message: %s", method$);
-		trace("Unknow Message: %s", method$);
-
+		//Some of the events that are ignored
+        IF (method$ = "AudioLibrary.OnAdd" || method$ = "VideoLibrary.OnAdd"
+				|| method$ = "AudioLibrary.OnUpdate" || method$ = "AudioLibrary.OnRemove"
+				|| method$ = "AudioLibrary.OnScanStarted" || method$ = "VideoLibrary.OnScanStarted"
+				|| method$ = "AudioLibrary.OnScanFinished" || method$ = "VideoLibrary.OnScanFinished")
+    	{
+         	     	// Do Nothing
+		}
+		ELSE
+		{
+			GenerateUserError("Unknown Message: %s", method$);
+			Trace("Unknow Message: %s", method$);
+		}
 	}
 }
 
@@ -5103,8 +5108,12 @@ CHANGE SelectedItem
 	     
 	// Return if we pressed on a blank line
 	IF (CurrentListCxt.start + SelectedItem > ListTotal)
+	{
+		#IF_DEFINED DEBUG Print("%s","SelectedItem: Exited due to blank line."); #ENDIF
+		#IF_DEFINED DEBUG Print("CurrentListCxt.start %d, SelectedItem %d, ListTotal %d",CurrentListCxt.start, SelectedItem, ListTotal); #ENDIF
 		RETURN;
-
+    }
+	
 	CSWITCH (CurrentList)
 	{
 		CASE (MOVIE_TITLE_LIST) : 
@@ -5150,10 +5159,12 @@ CHANGE SelectedItem
 		}
 		CASE (TV_EPISODE_LIST)  : 
 		{ 
-			ListContext_Push();
-			Episode_GetDetails(ListIDs[SelectedItem]);
-			CurrentList = TVSHOW_DETAILS;
-			
+			IF (ListIDs[SelectedItem])
+			{
+				ListContext_Push();
+				Episode_GetDetails(ListIDs[SelectedItem]);
+				CurrentList = TVSHOW_DETAILS;
+			}
 			Break;
 		}
 		CASE (MUSIC_ALBUM_LIST) : 
@@ -5203,25 +5214,27 @@ CHANGE SelectedItem
 		}
 		CASE (MUSIC_ARTIST_ALBUM_LIST) : 
 		{ 	        
+			#IF_DEFINED DEBUG Print("%s","SelectedItem: In MUSIC_ARTIST_ALBUM_LIST."); #ENDIF
             ListContext_Push();	// Store previous context in stack
 
 			// If albumID = 0 then 'All songs' has been selected
 			// So keep the reference to artistID. 
-            IF (ListIDs[SelectedItem])
+			IF (ListIDs[SelectedItem])
 			{
 				CurrentListCxt.albumID = ListIDs[SelectedItem];
 				CurrentListCxt.artistID = 0;
-            }
-			ELSE {
+			}
+			ELSE
+			{
 				CurrentListCxt.albumID = 0;
-            }
+            } 
 			CurrentListCxt.listID = MUSIC_SONG_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith= "";
 			CurrentListCxt.contains= "";
+			
 			List_Retrieve();
-
 			Break;
 		}
 		CASE (MUSIC_GENRE_ARTIST_LIST) : 
@@ -5230,18 +5243,18 @@ CHANGE SelectedItem
 
 			// If artistID = 0 then 'All artists' has been selected
 			// So keep the reference to genreID. 
-			IF (ListIDs[SelectedItem]) {
+			IF (ListIDs[SelectedItem])
+			{
 				CurrentListCxt.artistID = ListIDs[SelectedItem];
 				CurrentListCxt.genreID = 0;
 			}
-	
+ 
 			CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST;
 			CurrentListCxt.start=0;      
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith = "";
 			CurrentListCxt.contains = "";
 			List_Retrieve();
-
 			Break;
 		}
 		CASE (MUSIC_SONG_LIST)  : 
@@ -5266,7 +5279,6 @@ CHANGE SelectedItem
 			{
             	List_Reset(ADDON_LIST);
 			}
-
 			Break;
 		}
 		CASE (MUSIC_LIST)  : 
