@@ -19,14 +19,14 @@ S1Nd=2
 SLNd=3
 PrNm=xbmc-test.smw
 CmVr=3.01
-DbVr=41.01.005.00
-DvcDbVr=51.07.005.00
+DbVr=42.00.004.00
+DvcDbVr=52.05.003.00
 OpVr=AV2 4.007.0004
 PgmNm=Neil Carthy
 CltNm=XBMC Test Project
 JpNo=1
-SmVr=871
-DvVr=871
+SmVr=879
+DvVr=879
 TpN1=1
 TpN2=2
 TpN3=3
@@ -1321,6 +1321,35 @@ Sy1=0
 Mx1=0
 ]
 [
+ObjTp=Bw
+H=1
+Lx=0
+Ly=0
+Rx=1044
+Ry=492
+Xm=-1
+Ym=-1
+SH=98
+Z=100
+Ht=1
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=0
+Ly=492
+Rx=1044
+Ry=984
+Xm=-1
+Ym=-1
+SH=20
+Z=100
+P=145
+Ht=4
+Hi=11
+]
+[
 ObjTp=Et
 H=1
 DvH=574
@@ -2239,7 +2268,7 @@ O363=192
 mP=5
 P1=6d
 P2=xbmc-crestron
-P3=192.168.0.142
+P3=192.168.1.16
 P4=8080
 P5=9090
 ]
@@ -4730,7 +4759,7 @@ n1I=1
 n1O=1
 Cmn1=XBMC Not Stopped\\
 mI=1
-I1=9489
+I1=10799
 mO=1
 tO=1
 O1=246
