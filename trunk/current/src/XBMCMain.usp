@@ -100,9 +100,9 @@ Comments:
 
 /* 
  *  The length of time to wait before resetting the Loading flag, in 100ths of a second.
- *  Currently set to 1 minute but may need to be longer for RPi
+ *  Currently set to 30 seconds but may need to be longer for RPi
  */
-#DEFINE_CONSTANT LOADING_WAIT_TIME 6000 
+#DEFINE_CONSTANT LOADING_WAIT_TIME 3000 
 
 
 //Useful characters that we'll need in parsing metadata
@@ -2716,6 +2716,7 @@ SIGNED_INTEGER_FUNCTION Process_Player()
 			IF (name$ = "playerid")
 			{		
 				playerid = GetSignedInteger();
+				#IF_DEFINED DEBUG PRINT("Notification contains playerid %d", playerid); #ENDIF
 			}
 			ELSE IF (name$ = "speed")
 			{		
@@ -2922,6 +2923,7 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek()
 			ELSE IF (name$ = "player")
 			{		
             	playerid = Process_Player();
+				IF (playerid = 0 || playerid = 1) ActivePlayerID = playerid;
 			}
 			ELSE IF (name$ = "playlistid")
 			{		
@@ -2940,15 +2942,14 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek()
 
 		}
 	}
-               
-	IF (playerid = 0 || playerid = 1)
+    
+	// Check for slideshow           
+	IF (playerid = 2)
 	{
-		// Set the active player id and exit
-		ActivePlayerID = playerid;
-		RETURN (1); 	
+		RETURN (0); 	
 	}
 	ELSE
-		RETURN (0);
+		RETURN (1);
 }
             
 /*
@@ -4024,14 +4025,15 @@ FUNCTION ProcessNotification(STRING method$)
 		ScreensaverActive = OFF;		
 	}
 	ELSE IF (method$ = "Player.OnPlay")
-	{
-		IsPlaying = 1;
-		PauseFb = OFF;
-		StopFb = OFF;
-		PlayFb = ON;
-		
+	{		
+		// We only want to reset the feedback outputs for A/V
 		IF (Process_PlayerNotification(0))
-		{                                    		
+		{                                 
+			IsPlaying = 1;
+			PauseFb = OFF;
+			StopFb = OFF;
+			PlayFb = ON;
+   		
 			// Cancel any requests that are in the wait queue
 			CANCELALLWAIT();
 
@@ -4048,6 +4050,7 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE IF (method$ = "Player.OnPause")
 	{
+		// We only want to reset the feedback outputs for A/V
 		IF (Process_PlayerNotification(0))
 		{
 			StopFb = OFF;
@@ -4066,14 +4069,18 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE IF (method$ = "Player.OnStop")
 	{
-		Process_PlayerNotification(0);
+		// We only want to reset the feedback outputs 
+		// if the A/V has stopped. A slideshow stopping is
+		// ignored
+		IF (Process_PlayerNotification(0))
+		{
+			PauseFb = OFF;
+			PlayFb = OFF;
+			StopFb = ON;
+			IsPlaying = 0;	
 
-		PauseFb = OFF;
-		PlayFb = OFF;
-		StopFb = ON;
-		IsPlaying = 0;	
-
-		PollForMetadata();			
+			PollForMetadata();
+        }					
 	}
 	ELSE IF (method$ = "Player.OnSeek")
 	{
