@@ -2770,8 +2770,6 @@ FUNCTION Process_OnPlayItem()
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		ListIndex = ListIndex+1; 
-        
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
     	FOR (i = 1 TO numberOfProperties)
