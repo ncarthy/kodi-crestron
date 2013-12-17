@@ -1169,8 +1169,9 @@ Function SendToSocket(STRING Command$)
 		Loading = ON;
 		WAIT (LOADING_WAIT_TIME,CancelLoadingFlag)
 		{
-			#IF_DEFINED DEBUG PRINT("%s","Loading flag cancelled by WAIT command."); #ENDIF
+			#IF_DEFINED DEBUG PRINT("%s","WARNING: Loading flag cancelled by WAIT command."); #ENDIF
 			Loading = OFF;
+			SocketLock = OFF;
 		}
          
 		// Send the data
@@ -2904,8 +2905,6 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek()
 
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		ListIndex = ListIndex+1; 
-        
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
     	FOR (i = 1 TO numberOfProperties)
@@ -2971,8 +2970,6 @@ INTEGER_FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification)
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		ListIndex = ListIndex+1; 
-        
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
     	FOR (i = 1 TO numberOfProperties)
@@ -5327,13 +5324,15 @@ THREADSAFE SOCKETRECEIVE XBMC
     IF (length)
 	{
 		Xbmc$ = GATHERBYLENGTH(length,XBMC.SocketRxBuf);
-		//ClearBuffer(XBMC.SocketRxBuf);
+
+		#IF_DEFINED DEBUG PRINT("Received: %d bytes, %s",length,LEFT(Xbmc$,220)); #ENDIF
 	
     	// Prefix with any bytes leftover from previous pass
 		IF (LEN(Remainder$))
+		{
+			#IF_DEFINED DEBUG PRINT("Adding %d remainder bytes",LEN(Remainder$)); #ENDIF
 			MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
-
-		#IF_DEFINED DEBUG PRINT("Received: %d bytes, %s",length,LEFT(Xbmc$,200)); #ENDIF
+        }
 
 		// Process the characters, retain any unprocessed 
 		// characters in module-level variable Remainder$
