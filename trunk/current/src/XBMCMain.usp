@@ -94,15 +94,15 @@ Comments:
 #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
-#DEFINE_CONSTANT BUFFER_SIZE 20000		// Socket buffer size
+#DEFINE_CONSTANT BUFFER_SIZE 30000		// Socket buffer size
 #DEFINE_CONSTANT STORED_STRING_SIZE 1000  // Size of each string in the temporary string store
 #DEFINE_CONSTANT STORED_STRING_RET_SIZE 10000 // The maximum size of strings that can be outputted from the store
 
 /* 
  *  The length of time to wait before resetting the Loading flag, in 100ths of a second.
- *  Currently set to 30 seconds but may need to be longer for RPi
+ *  Currently set to 10 seconds but may need to be longer for RPi
  */
-#DEFINE_CONSTANT LOADING_WAIT_TIME 3000 
+#DEFINE_CONSTANT LOADING_WAIT_TIME 1000 
 
 
 //Useful characters that we'll need in parsing metadata
@@ -385,6 +385,7 @@ SIGNED_INTEGER ConnectionStatus;	// Status of XBMC socket, used to determine if
 INTEGER SocketLock;					// Locking flag that is set before any socket activity are submitted
 INTEGER ReceiveLock;				// Locking flag that is set when processing data from Xbmc
 STRING Remainder$[4000];   			// Store unprocessed bytes from 1st pass of ProcessResponse()
+INTEGER StopProcessingData;			// When set to 1 the SOCKETRECEIVE event stops all processing and exits.
 INTEGER VersionID;					// The JSON-RPC protocol version. 4 for Eden, 6 for Frodo
 INTEGER ActivePlayerID;				// The ID of the current active player. Zero for none.
 SIGNED_INTEGER PlaySpeed;			// Speed of current audio/video playback (1x, 2x, 4x etc.) Negative for rewind.
@@ -1134,6 +1135,58 @@ FUNCTION ListContext_Clear()
   Socket Functions
 *******************************************************************************************/
 /*
+	Break and Remake connection to Xbmc. This is used when loading data from Xbmc has failed
+	due to timeout. This code is repeated in DisconnectFromXbmc() and ConnectToXbmc() due to
+	limitations of SIMPL+.
+*/
+/*Function ReconnectToXbmc()
+{
+	INTEGER count;
+              
+	//Disconnect
+	count = 0;
+	IF ( ConnectionStatus <> 5 )
+	{
+		// close the connection
+	    ConnectionStatus = SocketDisconnectClient (XBMC);
+	
+		// wait for the connection to be established
+		while( ( ConnectionStatus <> 5 ) && ( count < 10 ) )
+		{
+			delay( 20 );
+			count = count + 1;
+		}
+    } 
+       
+	// Reset socket semaphores
+	ReceiveLock = OFF;
+	Loading = OFF;	
+	SocketLock = OFF;
+
+	// Pause for 1 second
+	#IF_DEFINED DEBUG PRINT("%s","Pause for 1 second."); #ENDIF
+	Delay(100);
+              
+	// Re-connect
+	count = 0;    
+	IF ( ConnectionStatus <> 2 )
+	{
+
+		// open the connection			// '1' = always attempt to reconnect.
+	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_TcpPort$), 1);
+	
+		// wait for the connection to be established
+		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
+		{
+			delay( 20 );
+			count = count + 1;
+		}
+    }    
+
+   
+}*/
+
+/*
 	Send a string to the XBMC Socket
 
 	No authentication
@@ -1172,6 +1225,7 @@ Function SendToSocket(STRING Command$)
 			#IF_DEFINED DEBUG PRINT("%s","WARNING: Loading flag cancelled by WAIT command."); #ENDIF
 			Loading = OFF;
 			SocketLock = OFF;
+			//ReconnectToXbmc();
 		}
          
 		// Send the data
@@ -1281,7 +1335,6 @@ FUNCTION ResetSocket()
 	Init();
 	ReceiveLock = OFF;
 	CANCELWAIT(CancelLoadingFlag);
-	#IF_DEFINED DEBUG PRINT("%s","Loading flag cancelled normally."); #ENDIF
 	Loading = OFF;	
 	SocketLock = OFF;
 }
@@ -2871,14 +2924,20 @@ INTEGER_FUNCTION Process_OnAdd()
 
 			Playlist[pos] = id;
 		}
-
 	} 	
      
 	//Returns 1 if the Notification is for audio/video, 0 if for pictures
 	IF (playlistid = 0 || playlistid = 1)
+	{
 		RETURN (1); 	
+	}
 	ELSE
+	{
+		// If we have a slide show then don't bother processing the OnAdd items
+		StopProcessingData = 1;
+
 		RETURN (0);
+	}
 }
 
 /*
@@ -4107,6 +4166,10 @@ FUNCTION ProcessNotification(STRING method$)
 	{
 		// VideoLibrary.OnUpdate is received when a Resume position is recorded.
 	}
+	ELSE IF (method$ = "Player.OnPropertyChanged")
+	{
+		// Typically received when party mode starts or stops
+	}
 	ELSE
 	{
 		//Some of the events that are ignored
@@ -4120,7 +4183,7 @@ FUNCTION ProcessNotification(STRING method$)
 		ELSE
 		{
 			GenerateUserError("Unknown Message: %s", method$);
-			Trace("Unknow Message: %s", method$);
+			Trace("Unknown Message: %s", method$);
 		}
 	}
 }
@@ -5309,7 +5372,8 @@ CHANGE SelectedItem
 	}
 }
 
-
+// According to the help file: With the THREADSAFE keyword the event is prevented
+// from retriggering until the entire code block in the event has executed.
 THREADSAFE SOCKETRECEIVE XBMC
 {
  	STRING Xbmc$[BUFFER_SIZE];	
@@ -5333,9 +5397,28 @@ THREADSAFE SOCKETRECEIVE XBMC
 		// Process the characters, retain any unprocessed 
 		// characters in module-level variable Remainder$
 		Remainder$ = ProcessResponse(Xbmc$, length);
-		WHILE (length)
+                    
+		// Reset the exit flag (module-level variable)
+		StopProcessingData = 0;
+
+		// Process any remaining data in the Xbmc$ buffer. Only proceed if StopProcessingData
+		// is zero. StopProcessingData is set if we receive an OnAdd notification due to a 
+		// photo slideshow starting.
+		WHILE (length && !StopProcessingData)
 		{
 			Remainder$ = ProcessResponse(RIGHT(Xbmc$,length), length);
+		}
+		
+		// If the exit flag is set (forcing an early exit from the processing loop) then un-set it
+		IF (StopProcessingData)
+		{
+			StopProcessingData = 0;
+            Remainder$ = "";
+
+			// Must do this to minimize chance of receiving corrupt or partial JSON messages
+			// Unfortunately there is the chance we drop a valid JSON response.
+			CLEARBUFFER(XBMC.SocketRxBuf); 
+			#IF_DEFINED DEBUG PRINT("%s","Warning: Socket buffer has been cleared."); #ENDIF
 		}
     }
 }
