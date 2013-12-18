@@ -94,7 +94,7 @@ Comments:
 #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
-#DEFINE_CONSTANT BUFFER_SIZE 30000		// Socket buffer size
+#DEFINE_CONSTANT BUFFER_SIZE 50000		// Socket buffer size
 #DEFINE_CONSTANT STORED_STRING_SIZE 1000  // Size of each string in the temporary string store
 #DEFINE_CONSTANT STORED_STRING_RET_SIZE 10000 // The maximum size of strings that can be outputted from the store
 
@@ -5414,11 +5414,7 @@ THREADSAFE SOCKETRECEIVE XBMC
 		{
 			StopProcessingData = 0;
             Remainder$ = "";
-
-			// Must do this to minimize chance of receiving corrupt or partial JSON messages
-			// Unfortunately there is the chance we drop a valid JSON response.
-			CLEARBUFFER(XBMC.SocketRxBuf); 
-			#IF_DEFINED DEBUG PRINT("%s","Warning: Socket buffer has been cleared."); #ENDIF
+			#IF_DEFINED DEBUG PRINT("%s","Warning: Processing of additional OnAdd messages skipped."); #ENDIF
 		}
     }
 }
