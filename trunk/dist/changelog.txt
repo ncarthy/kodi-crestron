@@ -1,5 +1,9 @@
 xbmc-crestron history
 
+1.04 19 Dec 2013
+* Add PartyMode button
+* Fix overflows caused by long playlists (like slideshows, All Songs)
+
 1.03-beta 16 Dec 2013
 * Improve Sorting and Searching in Browse list
 * Loading flag is now reset after 30seconds
