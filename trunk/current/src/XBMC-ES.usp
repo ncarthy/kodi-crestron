@@ -220,6 +220,8 @@ Comments:
 #DEFINE_CONSTANT ACTION_SHOW_OSD					161
 #DEFINE_CONSTANT ACTION_SHOW_ASPECT_RATIO			162
 
+#DEFINE_CONSTANT ACTION_PARTY_MODE					166
+
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
   (Uncomment and declare inputs and outputs as needed)
@@ -743,6 +745,7 @@ CHANGE Command
 		Case (ACTION_CONTEXT_MENU)			: { SendAction(ACTION_BUTTON, "contextmenu"); }
 		Case (ACTION_SHOW_OSD)				: { SendAction(ACTION_BUTTON, "osd"); }
 		Case (ACTION_SHOW_ASPECT_RATIO)		: { SendAction(ACTION_BUTTON, "aspectratio"); }
+		Case (ACTION_PARTY_MODE		)		: { SendAction(ACTION_EXECBUILTIN, "PlayerControl(PartyMode)"); }
 
 	}       
 }
