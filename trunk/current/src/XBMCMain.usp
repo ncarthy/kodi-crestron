@@ -5174,7 +5174,7 @@ CHANGE SelectedItem
 	{
 		#IF_DEFINED DEBUG Print("%s","SelectedItem: Exited due to blank line."); #ENDIF
 		#IF_DEFINED DEBUG Print("CurrentListCxt.start %d, SelectedItem %d, ListTotal %d",CurrentListCxt.start, SelectedItem, ListTotal); #ENDIF
-		RETURN;
+		TERMINATEEVENT;
     }
 	
 	CSWITCH (CurrentList)
