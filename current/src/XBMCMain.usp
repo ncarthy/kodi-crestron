@@ -148,6 +148,8 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_INPUT_CONTEXTMENU 			60
 #DEFINE_CONSTANT REQUESTID_GETADDONS 					70
 #DEFINE_CONSTANT REQUESTID_GETADDONDETAILS				71
+#DEFINE_CONSTANT REQUESTID_GETPICTURESOURCES            80
+#DEFINE_CONSTANT REQUESTID_GETPICTURES                  81
 #DEFINE_CONSTANT REQUESTID_VERSION						99
 #DEFINE_CONSTANT REQUESTID_PING							100
 
@@ -193,18 +195,18 @@ Comments:
 #DEFINE_CONSTANT SORT_YEAR			2
 #DEFINE_CONSTANT SORT_RATING		4
 #DEFINE_CONSTANT SORT_MPAARATING	8
-#DEFINE_CONSTANT SORT_DURATION		16
+#DEFINE_CONSTANT SORT_LABEL 		16
 #DEFINE_CONSTANT SORT_DATEADDED		32
 #DEFINE_CONSTANT SORT_PLAYCOUNT		64
 #DEFINE_CONSTANT SORT_EPISODES		128
 #DEFINE_CONSTANT SORT_PRODCODE		256
 #DEFINE_CONSTANT SORT_DATE			512
-#DEFINE_CONSTANT SORT_NAME			1024
+#DEFINE_CONSTANT SORT_SEASON		1024
 #DEFINE_CONSTANT SORT_EPISODE		2048
 #DEFINE_CONSTANT SORT_ARTIST		4096
 #DEFINE_CONSTANT SORT_ALBUM			8192
-#DEFINE_CONSTANT SORT_TRACK			16392
-#DEFINE_CONSTANT SORT_GENRE			32784
+#DEFINE_CONSTANT SORT_TRACK			16384
+#DEFINE_CONSTANT SORT_GENRE			32768
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -400,19 +402,20 @@ INTEGER ListIDs[10];				// A store of the IDs of objects in current list
 INTEGER ListIndex;					// The index of the current object within the list
 INTEGER ListTotal;					// Total number of items in list (limits.total)
 STRING AddonIDs[10][40];			// A store of AddonIDs
+STRING Labels[10][100];				// A store of sources and folder names for Picture lists
 
 STRING HomeListItems$[4][8];		// Labels for the Home List	
 STRING MusicListItems$[3][7];		// Labels for the Music List	
 
 STRUCTURE SortDetails
 {
-	INTEGER ValidFields;    // BitMap of Valid Sort Fields
-    INTEGER DefaultField;   // Default field
-	INTEGER SortField;      // Field we are currently sorted on
-	INTEGER SortDescending; // Sort ascending or Descending (High for descending)
+	INTEGER ValidFields;  // BitMap of Valid Sort Fields
+    INTEGER DefaultField; // Default field
+	INTEGER SortField;    // Field we are currently sorted on
+	INTEGER SortDescending;    // Sort ascending or Descending (High for descending)
 };
 
-NONVOLATILE SortDetails ListSortInfo[10]; // One for every List type. 
+NONVOLATILE SortDetails ListSortInfo[23]; // One for every List type. 
 										  // Nonvolatile so we heep SortField and SortDescending
 										  // between reboots.	
 
@@ -1076,6 +1079,7 @@ STRUCTURE ListContext 			// Information used to Retrieve a Browse List
 	INTEGER genreID;			// ID of genre, used in music lists
 	INTEGER tvShowID;			// ID of curent Tv Show in List view
 	INTEGER tvSeasonID;			// ID of current Tv Show Season in List view
+	STRING label[100];			// Label of folder, used in picture view  
 };
 ListContext Stack[5];	// Store of previous list contexts to allow 'Back' button
 ListContext CurrentListCxt;		// The current list
@@ -3265,7 +3269,7 @@ FUNCTION Process_Artist(INTEGER requestId)
 		}
 	}
 }
-
+ 
 
 FUNCTION Process_Addon()
 {
@@ -3329,6 +3333,121 @@ FUNCTION Process_Addon()
 		}
 	}
 }
+
+      
+/*
+   Process the array of sources returned from the first Pictures List
+*/
+FUNCTION Process_Source()
+{
+	STRING name$[15];
+	INTEGER numberOfProperties;
+	INTEGER i;
+                   
+	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
+	{
+		ListIndex = ListIndex+1; 
+        
+		numberOfProperties = Tokens[tokenIndex].size/2;
+
+    	FOR (i = 1 TO numberOfProperties)
+		{
+			Read();
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "file")
+			{
+				Labels[ListIndex] = GetString();		
+				Filename$[ListIndex] = Labels[ListIndex];
+			}
+			ELSE IF (name$ = "label")
+			{
+				Title$[ListIndex] = GetString();
+			}
+			ELSE
+			{
+				GenerateUserError("Process_Source: Unknown property: %s", name$);
+			}
+		}
+	}
+}
+
+/*
+   Process the array of files and directories from Files.GetDirectory call.
+   This is called from Addons or Pictures lists.
+
+   GetDirectory JSON api method does not take a Limits parameter (see
+   http://trac.xbmc.org/ticket/14777). This means we have to test position in
+   the list before assigning to outputs.	
+
+   When AssignToOutputs= then send the values to th eOutput signals
+*/
+FUNCTION Process_File(INTEGER AssignToOutputs)
+{
+	STRING name$[15];
+	STRING value$[MAX_SERIAL_STRING_LENGTH];
+	INTEGER numberOfProperties;
+	INTEGER i;
+  
+	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
+	{
+		IF (AssignToOutputs)
+			ListIndex = ListIndex+1; 
+        
+		numberOfProperties = Tokens[tokenIndex].size/2;
+
+    	FOR (i = 1 TO numberOfProperties)
+		{
+			Read();
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+           
+			IF (name$ = "file")
+			{
+				value$ = GetString();
+				IF (AssignToOutputs)
+				{
+					Labels[ListIndex] = value$;		
+					Filename$[ListIndex] = value$;
+				}
+			}
+			ELSE IF (name$ = "label")
+			{
+				value$ = GetString();
+				IF (AssignToOutputs)
+					Title$[ListIndex] = value$;
+			}
+			ELSE IF (name$ = "thumbnail")
+			{
+				value$ = EscapeThumbnailUri(GetString());
+				IF (AssignToOutputs)
+					Thumb$[ListIndex] = value$;
+			}
+			ELSE IF (name$ = "type")
+			{
+				value$ = GetString();
+				IF (AssignToOutputs)
+					Genre$[ListIndex] = value$;
+			}
+			ELSE IF (name$ = "filetype")
+			{
+				value$ = GetString();
+				IF (AssignToOutputs)
+					Tagline$[ListIndex] = value$;
+			}
+			ELSE
+			{
+				GenerateUserError("Process_File: Unknown property: %s", name$);
+			}
+		}
+	}
+}
+
 
 FUNCTION Process_Genre()
 {
@@ -3562,18 +3681,25 @@ FUNCTION Process_Limits()
 		name$ = GetString();
 
 		Read();
+
 		IF (name$ = "start")
 		{
-			CurrentListCxt.start = GetInteger();
+			// Picture_List comed from GetDirectory which does
+			// not take a Limits parameter so need special treatment
+			IF (CurrentListCxt.listID <> PICTURE_LIST)
+				CurrentListCxt.start = GetInteger();
 		}
 		ELSE IF (name$ = "end")
 		{
-			CurrentListCxt.end = GetInteger();
+			// Picture_List comed from GetDirectory which does
+			// not take a Limits parameter so need special treatment
+			IF (CurrentListCxt.listID <> PICTURE_LIST)
+				CurrentListCxt.end = GetInteger();
 		}
         ELSE IF (name$ = "total")
 		{
 			ListTotal = GetInteger();
-		}
+		}			
 	}	
     
 	// Add an extra item for the "All Songs" entry
@@ -3685,6 +3811,21 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 					CASE (ADDON_LIST):
 					{
 						Process_Addon();
+						BREAK;
+					}
+					CASE (PICTURE_LIST):
+					{
+						IF (requestId = REQUESTID_GETPICTURESOURCES)
+						{
+							Process_Source();
+						}
+						ELSE
+						{
+#IF_DEFINED DEBUG
+	PRINT ("i %d, CurrentListCxt.start %d, CurrentListCxt.end %d, numberOfListItems %d",i,CurrentListCxt.start,CurrentListCxt.end,numberOfListItems);
+#ENDIF 
+							Process_File(i >= CurrentListCxt.start && i <= CurrentListCxt.end);
+						}
 						BREAK;
 					}
 				}
@@ -3911,6 +4052,16 @@ FUNCTION ProcessResult(INTEGER requestId)
 		CASE (REQUESTID_GETADDONS) :
 		{
 			Process_List(ADDON_LIST,requestId);
+			BREAK;
+		}
+		CASE (REQUESTID_GETPICTURESOURCES) :
+		{
+			Process_List(PICTURE_LIST,requestId);
+			BREAK;
+		}
+		CASE (REQUESTID_GETPICTURES) :
+		{
+			Process_List(PICTURE_LIST,requestId);
 			BREAK;
 		}
     	CASE (REQUESTID_VERSION):
@@ -4495,7 +4646,12 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	}
 
 }
-
+                    
+/*
+  	Given a member of the Sortfield eunnumeration, return the sort field string.
+	
+    Valid sort fields strings given in the Xbmc source code: JSONUtils.h::ParseSorting
+*/
 STRING_FUNCTION ReturnFieldString(INTEGER SortField)
 {
 
@@ -4505,13 +4661,13 @@ STRING_FUNCTION ReturnFieldString(INTEGER SortField)
 		CASE (SORT_YEAR):	   { RETURN ("year");			}
 		CASE (SORT_RATING):    { RETURN ("rating");			}
 		CASE (SORT_MPAARATING):{ RETURN ("mpaa");			}
-		CASE (SORT_DURATION):  { RETURN ("duration");       }
+		CASE (SORT_LABEL):     { RETURN ("label");          }
 		CASE (SORT_DATEADDED): { RETURN ("dateadded");      }
 		CASE (SORT_PLAYCOUNT): { RETURN ("playcount");      }
-		CASE (SORT_EPISODES):  { RETURN ("episode");        }
+		CASE (SORT_EPISODES):  { RETURN ("totalepisodes");  }
 		CASE (SORT_PRODCODE):  { RETURN ("productioncode"); }
 		CASE (SORT_DATE):      { RETURN ("date");           }
-		CASE (SORT_NAME):      { RETURN ("name");           }
+		CASE (SORT_SEASON):    { RETURN ("season");         }
 		CASE (SORT_EPISODE):   { RETURN ("episode");        }
 		CASE (SORT_ARTIST):    { RETURN ("artist");         }
 		CASE (SORT_ALBUM):     { RETURN ("album");          }
@@ -4521,6 +4677,9 @@ STRING_FUNCTION ReturnFieldString(INTEGER SortField)
 	}
 }
 
+/*
+  	Given the list type (Movies, Albums etc.), return the sort string in JSON format.	
+*/
 STRING_FUNCTION GenerateSortString(INTEGER ListType)
 {
 	STRING sortDirection$[10];
@@ -4531,13 +4690,12 @@ STRING_FUNCTION GenerateSortString(INTEGER ListType)
         sortDirection$="descending";
     ELSE
 		sortDirection$="ascending";
- 
+
+	// ValidFields determined in Function Main()
 	IF (!(ListSortInfo[ListType].SortField & ListSortInfo[ListType].ValidFields))
 		ListSortInfo[ListType].SortField = ListSortInfo[ListType].DefaultField;                                
-     
-	// Transfer into local variable
-    sortField$ = ReturnFieldString(ListSortInfo[ListType].SortField);
-
+     	
+	sortField$ = ReturnFieldString(ListSortInfo[ListType].SortField);
 	IF (LEN(sortField$) = 0)
 	{
 		// If the Sort string is invalid (zero length) then use the default field
@@ -4563,7 +4721,7 @@ FUNCTION List_Retrieve()
 	STRING Sort$[100];
 	STRING Params$[512];
 	STRING Method$[50];
-      
+
 	// Output the current list ID
 	CurrentList = CurrentListCxt.listID;
 
@@ -4578,7 +4736,9 @@ FUNCTION List_Retrieve()
 	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d }"
 				,CurrentListCxt.start,CurrentListCxt.end);
 	
-	IF (CurrentListCxt.listID >= MOVIE_TITLE_LIST && CurrentListCxt.listID <= MUSIC_GENRE_ARTIST_LIST)
+	#IF_DEFINED DEBUG Print("CurrentListCxt.listID %d",CurrentListCxt.listID); #ENDIF
+	IF ((CurrentListCxt.listID >= MOVIE_TITLE_LIST && CurrentListCxt.listID <= MUSIC_GENRE_ARTIST_LIST)
+			|| CurrentListCxt.listID = PICTURE_LIST)
 	{
 			Sort$ = GenerateSortString(CurrentListCxt.listID);
             ValidSortFields = ListSortInfo[CurrentListCxt.listID].ValidFields;
@@ -4715,6 +4875,25 @@ FUNCTION List_Retrieve()
 
 			BREAK;
 		}
+		CASE(PICTURE_LIST):
+		{
+			#IF_DEFINED DEBUG Print("CurrentListCxt.label %s, SelectedItem %d, ListTotal %d",CurrentListCxt.label, SelectedItem, ListTotal); #ENDIF
+
+           	IF (CurrentListCxt.label = "") 
+            {
+				SendJsonCommand (REQUESTID_GETPICTURESOURCES, "Files.GetSources", "{\"media\":\"pictures\"}");
+            }
+			ELSE
+			{
+	           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"pictures\"%s }"
+					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+				Method$ = "Files.GetDirectory"; 
+
+                SendJsonCommand (REQUESTID_GETPICTURES, Method$, Params$);
+
+			}
+			BREAK;
+		}
         CASE (HOME_LIST):
 		{ 
 			InitOutputArrays(1);// Clear all lines starting with #1
@@ -4726,7 +4905,7 @@ FUNCTION List_Retrieve()
 			ListIDs[1] = MOVIE_TITLE_LIST;
 			ListIDs[2] = TV_SHOW_LIST;
 			ListIDs[3] = MUSIC_LIST;
-			ListIDs[4] = ADDON_LIST;
+			ListIDs[4] = PICTURE_LIST;
             ListTotal = 4;
 
 			MAKESTRING(List_Summary$, "%d to %d of %d", 
@@ -4830,6 +5009,11 @@ FUNCTION Play()
 				GenerateUserError("Play(): No Songs to Add");
 				RETURN; // Exit Event
 			}
+		}
+		CASE (PICTURE_LIST):
+		{
+        	GenerateUserError("%s","Play not implemented for pictures");
+			RETURN;
 		}
 		DEFAULT :
 		{
@@ -5336,7 +5520,7 @@ CHANGE SelectedItem
 			}
 			ELSE IF (CurrentList = PICTURE_LIST)
 			{
-            	GenerateUserError("Picture List not Implemented.");
+            	List_Reset(PICTURE_LIST);
 			}
 			ELSE IF (CurrentList = ADDON_LIST)
 			{
@@ -5363,6 +5547,20 @@ CHANGE SelectedItem
 			//AddonDetails = ON;
 			//Addon_GetDetails(AddonIDs[SelectedItem]);        				
 			GenerateUserError("Addon_GetDetails not implemented yet.");
+			Break;
+		}
+		CASE (PICTURE_LIST)  : 
+		{ 
+	        ListIndex=0;
+			ListContext_Push();	// Store previous context in stack				
+			CurrentListCxt.listID = PICTURE_LIST;				
+			CurrentListCxt.start=0;                  	
+			CurrentListCxt.end=StepAmount;				
+			CurrentListCxt.startsWith = "";
+			CurrentListCxt.contains = "";
+			CurrentListCxt.label = Labels[SelectedItem];			
+			List_Retrieve();
+
 			Break;
 		}
         DEFAULT: 
@@ -6456,23 +6654,28 @@ PUSH RunAllTests
 }
                
 
-///////////// Initialization script
+/* 	
+	Initialization script
+
+	Note: Any errors in this method are ignored silently by the processor leading to tricky to find bugs
+*/
 Function Main()
 {              
   
 	WaitForInitializationComplete();
 
 	// Setup sort flags
-	ListSortInfo[MOVIE_TITLE_LIST].ValidFields        = SORT_TITLE|SORT_YEAR|SORT_RATING|SORT_MPAARATING|SORT_DURATION|SORT_DATEADDED|SORT_PLAYCOUNT;
+	ListSortInfo[MOVIE_TITLE_LIST].ValidFields        = SORT_TITLE|SORT_YEAR|SORT_RATING|SORT_MPAARATING|SORT_LABEL|SORT_DATEADDED|SORT_PLAYCOUNT;
 	ListSortInfo[TV_SHOW_LIST].ValidFields            = SORT_TITLE|SORT_YEAR|SORT_EPISODES;
-	ListSortInfo[TV_SEASON_LIST].ValidFields          = SORT_TITLE;
+	ListSortInfo[TV_SEASON_LIST].ValidFields          = SORT_TITLE|SORT_SEASON;
 	ListSortInfo[TV_EPISODE_LIST].ValidFields         = SORT_RATING|SORT_MPAARATING|SORT_PLAYCOUNT|SORT_PRODCODE|SORT_DATE|SORT_EPISODE;
 	ListSortInfo[MUSIC_ARTIST_LIST].ValidFields       = SORT_ARTIST;
 	ListSortInfo[MUSIC_GENRE_ARTIST_LIST].ValidFields = SORT_ARTIST;
 	ListSortInfo[MUSIC_ALBUM_LIST].ValidFields        = SORT_YEAR|SORT_ARTIST|SORT_ALBUM;
 	ListSortInfo[MUSIC_ARTIST_ALBUM_LIST].ValidFields = SORT_YEAR|SORT_ARTIST|SORT_ALBUM;
 	ListSortInfo[MUSIC_GENRE_LIST].ValidFields        = SORT_GENRE;
-	ListSortInfo[MUSIC_SONG_LIST].ValidFields = SORT_TITLE|SORT_YEAR|SORT_RATING|SORT_DURATION|SORT_PLAYCOUNT|SORT_NAME|SORT_ARTIST|SORT_ALBUM|SORT_TRACK;
+	ListSortInfo[MUSIC_SONG_LIST].ValidFields = SORT_TITLE|SORT_YEAR|SORT_RATING|SORT_LABEL|SORT_PLAYCOUNT|SORT_SEASON|SORT_ARTIST|SORT_ALBUM|SORT_TRACK;
+	ListSortInfo[PICTURE_LIST].ValidFields            = SORT_LABEL;
 	
 	ListSortInfo[MOVIE_TITLE_LIST].DefaultField        = SORT_TITLE;
 	ListSortInfo[TV_SHOW_LIST].DefaultField            = SORT_TITLE;
@@ -6484,6 +6687,7 @@ Function Main()
 	ListSortInfo[MUSIC_ARTIST_ALBUM_LIST].DefaultField = SORT_ALBUM;
 	ListSortInfo[MUSIC_GENRE_LIST].DefaultField        = SORT_GENRE;
 	ListSortInfo[MUSIC_SONG_LIST].DefaultField         = SORT_TRACK;
+	ListSortInfo[PICTURE_LIST].DefaultField            = SORT_LABEL;
                        
 	// Init StoredStrings                  
 	Store.listIndex = 0;
@@ -6494,7 +6698,7 @@ Function Main()
 	HomeListItems$[0] = "Movies";
 	HomeListItems$[1] = "TV Shows";
 	HomeListItems$[2] = "Music";
-	HomeListItems$[3] = "Addons";
+	HomeListItems$[3] = "Pictures";
 	MusicListItems$[0] = "Artists";
 	MusicListItems$[1] = "Albums";
 	MusicListItems$[2] = "Genres";
@@ -6513,6 +6717,7 @@ Function Main()
 	Stack[StackPosition].genreID = 0;
 	Stack[StackPosition].tvShowID = 0;
 	Stack[StackPosition].tvSeasonID = 0;
+	Stack[StackPosition].label = "";
 	ListContext_Pop();
 	List_Retrieve();
 }
