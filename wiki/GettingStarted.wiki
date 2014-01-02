@@ -1,7 +1,7 @@
 #summary Full instructions to get this project working on your system.
 
 = Preliminaries =
-  * Download and install the Frodo (v12.0) version of Xbmc. You can obtain it from http://www.xbmc.org/download/ 
+  * Download and install the latest (currently 12.3) version of Xbmc. You can obtain it from http://www.xbmc.org/download/ 
   * LoadMediaOntoXbmc
   * Switch on Xbmc HTTP server and event server:
     * From the Xbmc main menu navigate to System > Services > Webserver
