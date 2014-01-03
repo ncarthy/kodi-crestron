@@ -148,6 +148,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_INPUT_CONTEXTMENU 			60
 #DEFINE_CONSTANT REQUESTID_GETADDONS 					70
 #DEFINE_CONSTANT REQUESTID_GETADDONDETAILS				71
+#DEFINE_CONSTANT REQUESTID_GETADDONITEMS				72
 #DEFINE_CONSTANT REQUESTID_GETPICTURESOURCES            80
 #DEFINE_CONSTANT REQUESTID_GETPICTURES                  81
 #DEFINE_CONSTANT REQUESTID_VERSION						99
@@ -181,6 +182,7 @@ Comments:
 #DEFINE_CONSTANT MUSIC_LIST		                     21
 #DEFINE_CONSTANT PICTURE_LIST	                     22
 #DEFINE_CONSTANT ADDON_LIST		                     23                                                        
+#DEFINE_CONSTANT ADDON_ITEMS_LIST                    24
 
 #DEFINE_CONSTANT SPECIAL_SEASON						 65535
 
@@ -401,7 +403,8 @@ DYNAMIC INTEGER Playlist[25];		// An array of the item IDs in the active playlis
 INTEGER ListIDs[10];				// A store of the IDs of objects in current list
 INTEGER ListIndex;					// The index of the current object within the list
 INTEGER ListTotal;					// Total number of items in list (limits.total)
-STRING AddonIDs[10][40];			// A store of AddonIDs
+INTEGER AddonParentListID;			// The ID of current list when Addons button pressed
+INTEGER IsFile[10];					// 1 = Item is a file, 0 = Item is a directory (Used in Pictures, Addons)
 STRING Labels[10][100];				// A store of sources and folder names for Picture lists
 
 STRING HomeListItems$[4][8];		// Labels for the Home List	
@@ -1103,6 +1106,8 @@ FUNCTION ListContext_Push()
 	Stack[StackPosition].genreID = CurrentListCxt.genreID;
 	Stack[StackPosition].tvShowID = CurrentListCxt.tvShowID;
 	Stack[StackPosition].tvSeasonID = CurrentListCxt.tvSeasonID;
+	Stack[StackPosition].label = CurrentListCxt.label;
+
 }
 
 FUNCTION ListContext_Pop()
@@ -1121,6 +1126,7 @@ FUNCTION ListContext_Pop()
 	CurrentListCxt.genreID = Stack[StackPosition].genreID;
 	CurrentListCxt.tvShowID = Stack[StackPosition].tvShowID;
 	CurrentListCxt.tvSeasonID = Stack[StackPosition].tvSeasonID;
+	CurrentListCxt.label = Stack[StackPosition].label;
 
 	ListHeader$ = CurrentListCxt.listHeader;
 
@@ -3270,7 +3276,7 @@ FUNCTION Process_Artist(INTEGER requestId)
 	}
 }
  
-
+/*
 FUNCTION Process_Addon()
 {
 	STRING name$[15];
@@ -3332,7 +3338,7 @@ FUNCTION Process_Addon()
 			}
 		}
 	}
-}
+}*/
 
       
 /*
@@ -3438,7 +3444,13 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
 			{
 				value$ = GetString();
 				IF (AssignToOutputs)
+				{
 					Tagline$[ListIndex] = value$;
+                 	IF (value$ = "file") 
+						IsFile[ListIndex] = 1;
+					ELSE
+						IsFile[ListIndex] = 0;				
+				}
 			}
 			ELSE
 			{
@@ -3808,12 +3820,9 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 						Process_Genre();
 						BREAK;
 					}
-					CASE (ADDON_LIST):
-					{
-						Process_Addon();
-						BREAK;
-					}
 					CASE (PICTURE_LIST):
+					CASE (ADDON_LIST):
+					CASE (ADDON_ITEMS_LIST):
 					{
 						IF (requestId = REQUESTID_GETPICTURESOURCES)
 						{
@@ -4052,6 +4061,11 @@ FUNCTION ProcessResult(INTEGER requestId)
 		CASE (REQUESTID_GETADDONS) :
 		{
 			Process_List(ADDON_LIST,requestId);
+			BREAK;
+		}
+		CASE (REQUESTID_GETADDONITEMS) :
+		{
+			Process_List(ADDON_ITEMS_LIST,requestId);
 			BREAK;
 		}
 		CASE (REQUESTID_GETPICTURESOURCES) :
@@ -4321,6 +4335,11 @@ FUNCTION ProcessNotification(STRING method$)
 	{
 		// Typically received when party mode starts or stops
 	}
+	ELSE IF (LEFT(LOWER(method$),6) = "other.")
+	{
+		// We have received a message from another client, sent via JSONRPC.NotifyAll
+		Trace("NotifyAll Message: %s", RIGHT(method$,LEN(method$)-FIND(".",method$)));
+	}
 	ELSE
 	{
 		//Some of the events that are ignored
@@ -4333,8 +4352,8 @@ FUNCTION ProcessNotification(STRING method$)
 		}
 		ELSE
 		{
-			GenerateUserError("Unknown Message: %s", method$);
-			Trace("Unknown Message: %s", method$);
+			GenerateUserError("Unknown Notification: %s", method$);
+			Trace("Unknown Notification: %s", method$);
 		}
 	}
 }
@@ -4866,14 +4885,72 @@ FUNCTION List_Retrieve()
 		}
 		CASE(ADDON_LIST):
 		{
-           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s,%s,%s,%s,%s,%s]%s }"
-				,Filter$, Limits$, "\"thumbnail\"", "\"enabled\"", "\"name\""
-				, "\"version\"", "\"summary\"", "\"author\"", Sort$);
-			Method$ = "Addons.GetAddons"; 
+			CSWITCH (AddonParentListID)
+			{
+				CASE (TV_SHOW_LIST) : {}
+				CASE (MOVIE_TITLE_LIST) : 
+				{ 
+		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"video\"%s }"
+					, "\"thumbnail\"", "addons://sources/video", Sort$);
+					break;  
+				}
+				CASE (MUSIC_LIST) : 
+				{ 
+		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"music\"%s }"
+					, "\"thumbnail\"", "addons://sources/audio", Sort$);
+					break; 
+				}
+				CASE (PICTURE_LIST) : 
+				{ 
+		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"pictures\"%s }"
+					, "\"thumbnail\"", "addons://sources/image", Sort$);
+					break; 
+				}
+				DEFAULT :
+				{
+         			Trace("List_Retrieve, Addons, Unknown ParentListID: %d", AddonParentListID);
+				}
+			}
+			Method$ = "Files.GetDirectory"; 
 
 			SendJsonCommand (REQUESTID_GETADDONS, Method$, Params$);
 
 			BREAK;
+		}
+		CASE (ADDON_ITEMS_LIST):
+		{				
+			CSWITCH (AddonParentListID)
+			{
+				CASE (TV_SHOW_LIST) : {}
+				CASE (MOVIE_TITLE_LIST) : 
+				{ 
+		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"video\"%s }"
+					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+					break;  
+				}
+				CASE (MUSIC_LIST) : 
+				{ 
+		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"music\"%s }"
+					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+					break; 
+				}
+				CASE (PICTURE_LIST) : 
+				{ 
+		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"pictures\"%s }"
+					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+					break; 
+				}
+				DEFAULT :
+				{
+         			Trace("List_Retrieve, Addons, Unknown ParentListID: %d", AddonParentListID);
+				}
+			}
+            Method$ = "Files.GetDirectory"; 
+
+			SendJsonCommand (REQUESTID_GETADDONITEMS, Method$, Params$);
+
+			BREAK;
+
 		}
 		CASE(PICTURE_LIST):
 		{
@@ -4946,7 +5023,7 @@ FUNCTION Play()
 	INTEGER PlayerID;
 	STRING ItemType$[20];
     STRING Id$[5];
-	STRING Params$[25];
+	STRING Params$[100];
 	STRING Item$[7];
 	STRING Playlist$[13];
 	STRING Position$[12];
@@ -5011,8 +5088,13 @@ FUNCTION Play()
 			}
 		}
 		CASE (PICTURE_LIST):
+		CASE (ADDON_LIST):
+		CASE (ADDON_ITEMS_LIST):
 		{
-        	GenerateUserError("%s","Play not implemented for pictures");
+        	MethodOpen$ = "Player.Open";
+			MAKESTRING (Params$,"{\"item\":{\"file\":\"%s\"} }"
+						,Labels[SelectedItem]);
+			SendJsonCommand (REQUESTID_PLAYER_OPEN, MethodOpen$, Params$);
 			RETURN;
 		}
 		DEFAULT :
@@ -5097,11 +5179,14 @@ PUSH List_PagePlus
 }
 
 //FUNCTION List_Reset(INTEGER listID, STRING SortMethod)
-FUNCTION List_Reset(INTEGER listID)
+FUNCTION List_Reset(INTEGER listID, INTEGER Push_Dont_Clear)
 {
 	INTEGER i;
-
-	ListContext_Clear();    
+                
+	IF (Push_Dont_Clear)
+		ListContext_Push();    
+	ELSE
+		ListContext_Clear();    
    
 	CurrentListCxt.listID = listID;
     CurrentListCxt.artistID = 0;
@@ -5111,6 +5196,7 @@ FUNCTION List_Reset(INTEGER listID)
 	CurrentListCxt.end=StepAmount;				
 	CurrentListCxt.startsWith="";
 	CurrentListCxt.contains = "";
+	CurrentListCxt.label = "";
 
 	FOR (i = 1 TO StepAmount)
 	{
@@ -5135,32 +5221,40 @@ PUSH List_Home
 {
 	CurrentListCxt.listHeader = "HOME";
 	ListHeader$ = CurrentListCxt.listHeader;
-	List_Reset(HOME_LIST);
+	List_Reset(HOME_LIST,0);
 }
 PUSH List_Albums
 {
 	CurrentListCxt.listHeader = "MUSIC ALBUMS";
 	ListHeader$ = CurrentListCxt.listHeader;
-	List_Reset(MUSIC_ALBUM_LIST);
+	List_Reset(MUSIC_ALBUM_LIST,0);
 }
 PUSH List_Artists
 {
 	CurrentListCxt.listHeader = "MUSIC ARTISTS";
 	ListHeader$ = CurrentListCxt.listHeader;
-	List_Reset(MUSIC_ARTIST_LIST);	
+	List_Reset(MUSIC_ARTIST_LIST,0);	
 }
 PUSH List_Movies
 {
 	CurrentListCxt.listHeader = "MOVIES";
 	ListHeader$ = CurrentListCxt.listHeader;
-    List_Reset(MOVIE_TITLE_LIST);
+    List_Reset(MOVIE_TITLE_LIST,0);
 }
 PUSH List_TvShows
 {
 	CurrentListCxt.listHeader = "TVSHOWS";
 	ListHeader$ = CurrentListCxt.listHeader;
-	List_Reset(TV_SHOW_LIST);
+	List_Reset(TV_SHOW_LIST,0);
 }
+PUSH List_Addons
+{
+	AddonParentListID = CurrentListCxt.listID;
+	CurrentListCxt.listHeader = CurrentListCxt.listHeader + " / ADDONS";
+	ListHeader$ = CurrentListCxt.listHeader;
+	List_Reset(ADDON_LIST,1);
+}
+
 PUSH List_UnWatchedOnly
 {
 	CurrentListCxt.unWatched = 1;
@@ -5513,18 +5607,14 @@ CHANGE SelectedItem
 		{ 			
             CurrentList = ListIDs[SelectedItem];
 			IF (CurrentList = MOVIE_TITLE_LIST || CurrentList = TV_SHOW_LIST)
-				List_Reset(CurrentList);
+				List_Reset(CurrentList,0);
 			ELSE IF (CurrentList = MUSIC_LIST)
 			{
-         		List_Reset(MUSIC_LIST);   	
+         		List_Reset(MUSIC_LIST,0);   	
 			}
 			ELSE IF (CurrentList = PICTURE_LIST)
 			{
-            	List_Reset(PICTURE_LIST);
-			}
-			ELSE IF (CurrentList = ADDON_LIST)
-			{
-            	List_Reset(ADDON_LIST);
+            	List_Reset(PICTURE_LIST,0);
 			}
 			Break;
 		}
@@ -5542,25 +5632,38 @@ CHANGE SelectedItem
 
 			Break;
 		}
+		CASE (ADDON_ITEMS_LIST)  :
 		CASE (ADDON_LIST)  : 
 		{ 
-			//AddonDetails = ON;
-			//Addon_GetDetails(AddonIDs[SelectedItem]);        				
-			GenerateUserError("Addon_GetDetails not implemented yet.");
+			IF (IsFile[SelectedItem]){
+				Play(); 
+			} ELSE {
+				ListContext_Push();	// Store previous context in stack
+				CurrentListCxt.listID = ADDON_ITEMS_LIST;
+				CurrentListCxt.start=0;                  	
+				CurrentListCxt.end=StepAmount;				
+				CurrentListCxt.startsWith="";
+				CurrentListCxt.contains= "";
+				CurrentListCxt.label = Labels[SelectedItem]; 
+				List_Retrieve();
+            }
 			Break;
 		}
 		CASE (PICTURE_LIST)  : 
 		{ 
-	        ListIndex=0;
-			ListContext_Push();	// Store previous context in stack				
-			CurrentListCxt.listID = PICTURE_LIST;				
-			CurrentListCxt.start=0;                  	
-			CurrentListCxt.end=StepAmount;				
-			CurrentListCxt.startsWith = "";
-			CurrentListCxt.contains = "";
-			CurrentListCxt.label = Labels[SelectedItem];			
-			List_Retrieve();
-
+			IF (IsFile[SelectedItem]){
+				Play();
+			} ELSE {
+		        ListIndex=0;
+				ListContext_Push();	// Store previous context in stack				
+				CurrentListCxt.listID = PICTURE_LIST;				
+				CurrentListCxt.start=0;                  	
+				CurrentListCxt.end=StepAmount;				
+				CurrentListCxt.startsWith = "";
+				CurrentListCxt.contains = "";
+				CurrentListCxt.label = Labels[SelectedItem];			
+				List_Retrieve();
+            }
 			Break;
 		}
         DEFAULT: 
