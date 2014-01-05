@@ -91,7 +91,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 50000		// Socket buffer size
@@ -133,8 +133,9 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_AUDIOLIBRARY_GETGENREARTISTS 32
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARAUDIO			40 
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARVIDEO			41 
-#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					42 
-#DEFINE_CONSTANT REQUESTID_PLAYER_OPEN					43
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARSLIDESHOW      42
+#DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					43 
+#DEFINE_CONSTANT REQUESTID_PLAYER_OPEN					44
 #DEFINE_CONSTANT REQUESTID_SKIPNEXT						50
 #DEFINE_CONSTANT REQUESTID_SKIPPREV						51
 #DEFINE_CONSTANT REQUESTID_SMALLSKIPFORWARD				52
@@ -149,6 +150,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_GETADDONS 					70
 #DEFINE_CONSTANT REQUESTID_GETADDONDETAILS				71
 #DEFINE_CONSTANT REQUESTID_GETADDONITEMS				72
+#DEFINE_CONSTANT REQUESTID_EXECUTEADDON					73
 #DEFINE_CONSTANT REQUESTID_GETPICTURESOURCES            80
 #DEFINE_CONSTANT REQUESTID_GETPICTURES                  81
 #DEFINE_CONSTANT REQUESTID_VERSION						99
@@ -405,7 +407,7 @@ INTEGER ListIndex;					// The index of the current object within the list
 INTEGER ListTotal;					// Total number of items in list (limits.total)
 INTEGER AddonParentListID;			// The ID of current list when Addons button pressed
 INTEGER IsFile[10];					// 1 = Item is a file, 0 = Item is a directory (Used in Pictures, Addons)
-STRING Labels[10][100];				// A store of sources and folder names for Picture lists
+STRING Labels[10][700];				// A store of sources and folder names for Picture lists
 
 STRING HomeListItems$[4][8];		// Labels for the Home List	
 STRING MusicListItems$[3][7];		// Labels for the Music List	
@@ -1311,7 +1313,7 @@ FUNCTION Episode_GetDetails(INTEGER episodeid)
 
 /*
 	Request more information about a movie...filling in details that
-	are not available either through "VideoLibrary.GetMovies".
+	are not available through "VideoLibrary.GetMovies".
 */
 FUNCTION Movie_GetDetails(INTEGER movieid)
 {
@@ -1324,7 +1326,10 @@ FUNCTION Movie_GetDetails(INTEGER movieid)
 	CALL SendJsonCommand (REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS
 						, "VideoLibrary.GetMovieDetails", Params$);
 }
-
+   
+/*
+	Request more information about an addon.
+*/
 FUNCTION Addon_GetDetails(STRING addonid)
 {
 	STRING Params$[150];
@@ -2342,15 +2347,17 @@ FUNCTION Process_PlayingType()
 	if (PlayingItemType$ = "episode")
 		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_SERIES;
     else if (PlayingItemType$ = "movie")
-		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_MOVIE;
-    else if (PlayingItemType$ = "unknown")
-		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_OTHERVIDEO;			
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_MOVIE;			
     else if (PlayingItemType$ = "musicvideo")
 		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_OTHERVIDEO;
     else if (PlayingItemType$ = "song")
 		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_AUDIO;
     else if (PlayingItemType$ = "picture")
 		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_PICTURES;
+    else if (PlayingItemType$ = "unknown")
+	{
+		// Do Not Update
+	}
 }
 
 FUNCTION Process_GetItem(INTEGER requestId)
@@ -3017,7 +3024,8 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek()
 }
             
 /*
-	Process a notificaiton recieved form the xbmc player
+	Process a notification recieved form the xbmc player. Called from
+	ProcessNotification().
 	 
 	IsPlaylistOnAddNotification: 1 when its a Playlist.OnAdd notification, 0 otherwise
 
@@ -3394,7 +3402,7 @@ FUNCTION Process_Source()
 FUNCTION Process_File(INTEGER AssignToOutputs)
 {
 	STRING name$[15];
-	STRING value$[MAX_SERIAL_STRING_LENGTH];
+	STRING value$[700];
 	INTEGER numberOfProperties;
 	INTEGER i;
   
@@ -3419,7 +3427,7 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
 				IF (AssignToOutputs)
 				{
 					Labels[ListIndex] = value$;		
-					Filename$[ListIndex] = value$;
+					Filename$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
 				}
 			}
 			ELSE IF (name$ = "label")
@@ -3432,7 +3440,7 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
 			{
 				value$ = EscapeThumbnailUri(GetString());
 				IF (AssignToOutputs)
-					Thumb$[ListIndex] = value$;
+					Thumb$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
 			}
 			ELSE IF (name$ = "type")
 			{
@@ -3675,6 +3683,8 @@ FUNCTION Process_Song(INTEGER requestId)
    
 /*
 * limits object is of the form: {"end":2,"start":0,"total":2}
+*
+* Certain lists (pictures, addons) need special treatment
 */
 FUNCTION Process_Limits()
 {
@@ -3698,14 +3708,16 @@ FUNCTION Process_Limits()
 		{
 			// Picture_List comed from GetDirectory which does
 			// not take a Limits parameter so need special treatment
-			IF (CurrentListCxt.listID <> PICTURE_LIST)
+			IF (CurrentListCxt.listID <> PICTURE_LIST && CurrentListCxt.listID <> ADDON_LIST
+					&& CurrentListCxt.listID <> ADDON_ITEMS_LIST)
 				CurrentListCxt.start = GetInteger();
 		}
 		ELSE IF (name$ = "end")
 		{
 			// Picture_List comed from GetDirectory which does
 			// not take a Limits parameter so need special treatment
-			IF (CurrentListCxt.listID <> PICTURE_LIST)
+			IF (CurrentListCxt.listID <> PICTURE_LIST && CurrentListCxt.listID <> ADDON_LIST
+					&& CurrentListCxt.listID <> ADDON_ITEMS_LIST)
 				CurrentListCxt.end = GetInteger();
 		}
         ELSE IF (name$ = "total")
@@ -3830,10 +3842,10 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 						}
 						ELSE
 						{
-#IF_DEFINED DEBUG
-	PRINT ("i %d, CurrentListCxt.start %d, CurrentListCxt.end %d, numberOfListItems %d",i,CurrentListCxt.start,CurrentListCxt.end,numberOfListItems);
-#ENDIF 
-							Process_File(i >= CurrentListCxt.start && i <= CurrentListCxt.end);
+ 							#IF_DEFINED DEBUG
+	PRINT ("Process_List i %d, Cxt.start %d, Cxt.end %d, ListID %d", i, CurrentListCxt.start, CurrentListCxt.end, CurrentListCxt.listID);
+							#ENDIF
+							Process_File(i > CurrentListCxt.start && i <= CurrentListCxt.end);
 						}
 						BREAK;
 					}
@@ -4068,6 +4080,10 @@ FUNCTION ProcessResult(INTEGER requestId)
 			Process_List(ADDON_ITEMS_LIST,requestId);
 			BREAK;
 		}
+		CASE (REQUESTID_EXECUTEADDON) :
+		{
+			BREAK; // Do Nothing
+		}
 		CASE (REQUESTID_GETPICTURESOURCES) :
 		{
 			Process_List(PICTURE_LIST,requestId);
@@ -4160,7 +4176,7 @@ STRING_FUNCTION Process_ErrorData()
 			}
 			ELSE
 			{
-				GenerateUserError("Process_PlayerNotification: Unknown property: %s", name$);
+				GenerateUserError("Process_ErrorData: Unknown property: %s", name$);
 			}
 		}
         MAKESTRING (return$,"Method: %s. Message: %s", method$, message$);
@@ -4924,20 +4940,23 @@ FUNCTION List_Retrieve()
 				CASE (TV_SHOW_LIST) : {}
 				CASE (MOVIE_TITLE_LIST) : 
 				{ 
-		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"video\"%s }"
-					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+		           	MAKESTRING (Params$, "{\"directory\":\"%s\",\"media\":\"video\"%s }"
+							, CurrentListCxt.label, Sort$);
 					break;  
 				}
 				CASE (MUSIC_LIST) : 
 				{ 
-		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"music\"%s }"
-					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+		           	MAKESTRING (Params$, "{\"directory\":\"%s\",\"media\":\"music\"%s }"
+							, CurrentListCxt.label, Sort$);
 					break; 
 				}
 				CASE (PICTURE_LIST) : 
 				{ 
-		           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"pictures\"%s }"
-					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+		           	//MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"pictures\"%s }"
+					//, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+		           	MAKESTRING (Params$, "{\"directory\":\"%s\",\"media\":\"pictures\"%s }"
+					, CurrentListCxt.label, Sort$);
+
 					break; 
 				}
 				DEFAULT :
@@ -4954,16 +4973,16 @@ FUNCTION List_Retrieve()
 		}
 		CASE(PICTURE_LIST):
 		{
-			#IF_DEFINED DEBUG Print("CurrentListCxt.label %s, SelectedItem %d, ListTotal %d",CurrentListCxt.label, SelectedItem, ListTotal); #ENDIF
-
-           	IF (CurrentListCxt.label = "") 
+			IF (CurrentListCxt.label = "") 
             {
 				SendJsonCommand (REQUESTID_GETPICTURESOURCES, "Files.GetSources", "{\"media\":\"pictures\"}");
             }
 			ELSE
 			{
-	           	MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"pictures\"%s }"
-					, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+	           	//MAKESTRING (Params$, "{\"properties\":[%s],\"directory\":\"%s\",\"media\":\"pictures\"%s }"
+				//	, "\"thumbnail\"", CurrentListCxt.label, Sort$);
+	           	MAKESTRING (Params$, "{\"directory\":\"%s\",\"media\":\"pictures\"%s }"
+					, CurrentListCxt.label, Sort$);
 				Method$ = "Files.GetDirectory"; 
 
                 SendJsonCommand (REQUESTID_GETPICTURES, Method$, Params$);
@@ -5019,26 +5038,45 @@ FUNCTION List_Retrieve()
 */   
 FUNCTION Play()
 {
-	STRING BatchCommand$[500];
+	STRING BatchCommand$[700];
 	INTEGER PlayerID;
 	STRING ItemType$[20];
     STRING Id$[5];
-	STRING Params$[100];
+	STRING Params$[25];
 	STRING Item$[7];
 	STRING Playlist$[13];
 	STRING Position$[12];
 	STRING MethodClear$[25];
 	STRING MethodAdd$[25];
 	STRING MethodOpen$[25];
+	STRING MethodExecute$[32];
+	STRING ClearCommand$[200];
 	INTEGER position;
-	INTEGER itemid;
-         
+	STRING itemid$[500];
+	STRING Options$[75];
+
+
 	position = 0;
+	Options$ = "";
+    Id$ = "\"id\":";
+	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
+	Item$ = "\"item\":";
+	Playlist$ = "\"playlistid\":";
+	Position$ = "\"position\":";
+	MethodClear$ = "\"method\":\"Playlist.Clear\"";
+	MethodAdd$ = "\"method\":\"Playlist.Add\"";
+	MethodOpen$ = "\"method\":\"Player.Open\"";
+	MethodExecute$ = "\"method\":\"Addons.ExecuteAddon\"";
+	ClearCommand$ = "";
     
 	IF (SelectedItem)
-		itemid = ListIDs[SelectedItem];
+		itemid$ = ItoA(ListIDs[SelectedItem]);
 	ELSE
-		itemid = ListIDs[PlayItem];
+		itemid$ = ItoA(ListIDs[PlayItem]);
+         
+#IF_DEFINED DEBUG
+	PRINT ("PLAY SelectedItem %d, PlayItem %d, CurrentList %d, itemid$ %s", SelectedItem, PlayItem, CurrentList, itemid$);
+#ENDIF
 
 	CSWITCH (CurrentList)
 	{
@@ -5067,17 +5105,17 @@ FUNCTION Play()
 				IF (CurrentListCxt.albumID)
 				{
        				ItemType$ = "albumid";
-					itemid = CurrentListCxt.albumID;
+					itemid$ = ItoA(CurrentListCxt.albumID);
 				}
 				ELSE IF (CurrentListCxt.artistID)
 				{
 					ItemType$ = "artistid";
-					itemid = CurrentListCxt.artistID;
+					itemid$ = ItoA(CurrentListCxt.artistID);
 				}
 				ELSE IF (CurrentListCxt.genreID)
 				{
 					ItemType$ = "genreid";
-					itemid = CurrentListCxt.genreID;
+					itemid$ = ItoA(CurrentListCxt.genreID);
 				}
 				BREAK;				
 			}
@@ -5088,14 +5126,56 @@ FUNCTION Play()
 			}
 		}
 		CASE (PICTURE_LIST):
+		{
+            PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
+			ItemType$ = "directory";
+			MAKESTRING(itemid$,"\"%s\"",CurrentListCxt.label);
+			Options$ = ",\"options\":{\"shuffled\":false,\"repeat\":\"all\",\"resume\":false}";
+            BREAK;
+		}
 		CASE (ADDON_LIST):
 		CASE (ADDON_ITEMS_LIST):
 		{
-        	MethodOpen$ = "Player.Open";
-			MAKESTRING (Params$,"{\"item\":{\"file\":\"%s\"} }"
-						,Labels[SelectedItem]);
-			SendJsonCommand (REQUESTID_PLAYER_OPEN, MethodOpen$, Params$);
-			RETURN;
+			// If script:// then use ExecuteAddon
+			IF (LEFT(Labels[SelectedItem],7) = "script:")
+			{
+				position = FIND("://",Labels[SelectedItem]);
+				itemid$ = RIGHT(Labels[SelectedItem],LEN(Labels[SelectedItem])-position-2);
+				MAKESTRING(BatchCommand$,"{%s%d,%s,%s{\"addonid\":\"%s\"} }"				
+					,Id$,REQUESTID_EXECUTEADDON,MethodExecute$,Params$,itemid$);
+				SendToSocket(BatchCommand$);
+				RETURN;
+			}
+			ELSE
+			{
+				PlayerID = XBMC_ACTIVEPLAYER_VIDEO; //default
+				CSWITCH (AddonParentListID)
+				{
+					CASE (TV_SHOW_LIST) : {}
+					CASE (MOVIE_TITLE_LIST) : 
+					{ 
+			           	PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+						MAKESTRING (ClearCommand$,"{%s%d,%s,%s{%s%d } },{%s%d,%s,%s{%s%d } },"
+							,Id$,REQUESTID_PLAYLIST_CLEARSLIDESHOW,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_SLIDESHOW
+							,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO);
+						break;  
+					}
+					CASE (MUSIC_LIST) : 
+					{ 
+			           	PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+						break; 
+					}
+					CASE (PICTURE_LIST) : 
+					{ 
+			           	PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
+						break; 
+					}
+				}
+
+				ItemType$ = "file";
+				MAKESTRING(itemid$,"\"%s\"",Labels[SelectedItem]);
+			}
+            BREAK;
 		}
 		DEFAULT :
 		{
@@ -5104,22 +5184,37 @@ FUNCTION Play()
 		}	
 	}
     
-    Id$ = "\"id\":";
-	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
-	Item$ = "\"item\":";
-	Playlist$ = "\"playlistid\":";
-	Position$ = "\"position\":";
-	MethodClear$ = "\"method\":\"Playlist.Clear\"";
-	MethodAdd$ = "\"method\":\"Playlist.Add\"";
-	MethodOpen$ = "\"method\":\"Player.Open\"";
-	
-	MAKESTRING(BatchCommand$,"[{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d,%s{\"%s\":%d }}},{%s%d,%s,%s{%s{%s%d,%s%d }}}]"
-					,Id$,REQUESTID_PLAYLIST_CLEARAUDIO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
-					,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO
-                    ,Id$,REQUESTID_PLAYLIST_ADD,MethodAdd$,Params$,Playlist$,PlayerID,Item$,ItemType$,itemid
-					,Id$,REQUESTID_PLAYER_OPEN,MethodOpen$,Params$,Item$,Playlist$,PlayerID,Position$,position
-					);
+	IF (CurrentList = PICTURE_LIST)
+	{
+		MAKESTRING (ClearCommand$,"{%s%d,%s,%s{%s%d } },"
+					,Id$,REQUESTID_PLAYLIST_CLEARSLIDESHOW,MethodClear$,Params$,Playlist$,PlayerID);
 
+	}
+	ELSE IF (CurrentList = ADDON_LIST || CurrentList = ADDON_ITEMS_LIST)
+	{
+		// Do Nothing
+	}
+	ELSE
+	{
+		MAKESTRING (ClearCommand$,"{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d } },"
+					,Id$,REQUESTID_PLAYLIST_CLEARAUDIO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
+					,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO);
+
+    }
+
+	MAKESTRING(BatchCommand$,"[%s {%s%d,%s,%s{%s%d,%s{\"%s\":%s }}},{%s%d,%s,%s{%s{%s%d,%s%d }%s}}]"
+					,ClearCommand$
+                    ,Id$,REQUESTID_PLAYLIST_ADD,MethodAdd$,Params$,Playlist$,PlayerID,Item$,ItemType$,itemid$
+					,Id$,REQUESTID_PLAYER_OPEN,MethodOpen$,Params$,Item$,Playlist$,PlayerID,Position$,position
+					,Options$);
+	#IF_DEFINED DEBUG
+	PRINT("BatchCommand: (%d bytes) %s",LEN(BatchCommand$),LEFT(BatchCommand$,230));
+	IF (LEN(BatchCommand$) > 460)
+		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,230));
+	ELSE IF (LEN(BatchCommand$) > 230)
+		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,LEN(BatchCommand$)-230));
+	#ENDIF
+	
 	SendToSocket(BatchCommand$);
 }
 
@@ -5172,6 +5267,10 @@ PUSH List_PageMinus
 // Move to the next page in the list
 PUSH List_PagePlus
 {
+ 							#IF_DEFINED DEBUG
+	PRINT ("Process_List ListTotal %d, Cxt.start %d, Cxt.end %d", ListTotal, CurrentListCxt.start, CurrentListCxt.end);
+							#ENDIF
+
 	ListIndex=0;					
 	CurrentListCxt.end=MIN(ListTotal,CurrentListCxt.end+StepAmount);	
 	CurrentListCxt.start=CurrentListCxt.end-StepAmount;
@@ -5201,6 +5300,7 @@ FUNCTION List_Reset(INTEGER listID, INTEGER Push_Dont_Clear)
 	FOR (i = 1 TO StepAmount)
 	{
 		Watched[i] = OFF;
+		IsFile[i] = OFF;
 	}					
 
 	List_Retrieve();
@@ -5686,12 +5786,17 @@ THREADSAFE SOCKETRECEIVE XBMC
 	{
 		Xbmc$ = GATHERBYLENGTH(length,XBMC.SocketRxBuf);
 
-		#IF_DEFINED DEBUG PRINT("Received: %d bytes, %s",length,LEFT(Xbmc$,220)); #ENDIF
+		#IF_DEFINED DEBUG PRINT("Received: %u bytes, %s",length,LEFT(Xbmc$,220));
+			IF (LEN(Xbmc$) > 440)
+				PRINT("Received: %s",RIGHT(Xbmc$,220));
+			ELSE IF (LEN(Xbmc$) > 220)
+				PRINT("Received: %s",RIGHT(Xbmc$,LEN(Xbmc$)-220));
+        #ENDIF
 	
     	// Prefix with any bytes leftover from previous pass
 		IF (LEN(Remainder$))
 		{
-			#IF_DEFINED DEBUG PRINT("Adding %d remainder bytes",LEN(Remainder$)); #ENDIF
+			#IF_DEFINED DEBUG PRINT("Adding %u remainder bytes",LEN(Remainder$)); #ENDIF
 			MAKESTRING(Xbmc$,"%s%s",Remainder$,Xbmc$);
         }
 
