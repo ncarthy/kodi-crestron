@@ -1,5 +1,10 @@
 xbmc-crestron history
 
+1.10 10 Jan 2014
+* Add Pictures Browsing for Slideshows
+* Move Addons to Button
+* Minor UI changes: Add Exit button to Sort page, TV Plot on separate subPage
+
 1.04 19 Dec 2013
 * Add PartyMode button
 * Fix overflows caused by long playlists (like slideshows, All Songs)
