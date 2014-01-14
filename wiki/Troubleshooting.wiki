@@ -35,6 +35,7 @@ If you have problems compiling any of the modules for the MC3 like "Getting Comp
 
   * Use "Recompile All" in the Build Menu, not F12. 
   * On Windows 7 I always run SIMPL+ as an administrator. (Right-click the icon and select "Run as administrator".
+  * If neither of these work try rebooting the PC
 
 
 === This version only works with the Frodo release ===
