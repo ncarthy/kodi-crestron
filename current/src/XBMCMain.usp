@@ -92,9 +92,10 @@ Comments:
 
 /*****    DEFINE NEW CONSTANTS    *******/
 //#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+//#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
-#DEFINE_CONSTANT BUFFER_SIZE 50000		// Socket buffer size
+#DEFINE_CONSTANT BUFFER_SIZE 32767		// Socket buffer size
 #DEFINE_CONSTANT STORED_STRING_SIZE 1000  // Size of each string in the temporary string store
 #DEFINE_CONSTANT STORED_STRING_RET_SIZE 10000 // The maximum size of strings that can be outputted from the store
 
@@ -153,6 +154,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_EXECUTEADDON					73
 #DEFINE_CONSTANT REQUESTID_GETPICTURESOURCES            80
 #DEFINE_CONSTANT REQUESTID_GETPICTURES                  81
+#DEFINE_CONSTANT REQUESTID_GETCHANNELS                  85
 #DEFINE_CONSTANT REQUESTID_VERSION						99
 #DEFINE_CONSTANT REQUESTID_PING							100
 
@@ -185,6 +187,7 @@ Comments:
 #DEFINE_CONSTANT PICTURE_LIST	                     22
 #DEFINE_CONSTANT ADDON_LIST		                     23                                                        
 #DEFINE_CONSTANT ADDON_ITEMS_LIST                    24
+#DEFINE_CONSTANT CHANNEL_LIST	                     25
 
 #DEFINE_CONSTANT SPECIAL_SEASON						 65535
 
@@ -232,7 +235,7 @@ DIGITAL_OUTPUT  IsConnected,
 				Watched[10];		    // HIGH when item has already been watched, i.e. when Playcount>0
 
 ANALOG_OUTPUT   _SKIP_,VersionID#,		// The version id of the JSON api. 4 = Eden, 6 = Frodo
-			    CurrentlyPlayingType,	// 1 = movie, 2 = audio, 3 = tv, 4= picture, 5 = other video
+			    CurrentlyPlayingType,	// 1 = movie, 2 = audio, 3 = tv episode, 4= picture, 5 = other video (e.g. Live TV)
 				CurrentList,			// The ID of the current list
 				Position_Seconds, 		// Position in track in seconds
 				Duration_Seconds, 		// Total length of track in seconds
@@ -409,7 +412,7 @@ INTEGER AddonParentListID;			// The ID of current list when Addons button presse
 INTEGER IsFile[10];					// 1 = Item is a file, 0 = Item is a directory (Used in Pictures, Addons)
 STRING Labels[10][700];				// A store of sources and folder names for Picture lists
 
-STRING HomeListItems$[4][8];		// Labels for the Home List	
+STRING HomeListItems$[5][8];		// Labels for the Home List	
 STRING MusicListItems$[3][7];		// Labels for the Music List	
 
 STRUCTURE SortDetails
@@ -1114,7 +1117,7 @@ FUNCTION ListContext_Push()
 
 FUNCTION ListContext_Pop()
 {
-	#IF_DEFINED DEBUG PRINT("ListContext_Pop: StackPosition %d", StackPosition); #ENDIF
+	//#IF_DEFINED DEBUG PRINT("ListContext_Pop: StackPosition %d", StackPosition); #ENDIF
 	CurrentListCxt.listID = Stack[StackPosition].listID;
 	CurrentListCxt.listHeader = Stack[StackPosition].listHeader;
 	CurrentListCxt.start = Stack[StackPosition].start;
@@ -1146,57 +1149,6 @@ FUNCTION ListContext_Clear()
 /*******************************************************************************************
   Socket Functions
 *******************************************************************************************/
-/*
-	Break and Remake connection to Xbmc. This is used when loading data from Xbmc has failed
-	due to timeout. This code is repeated in DisconnectFromXbmc() and ConnectToXbmc() due to
-	limitations of SIMPL+.
-*/
-/*Function ReconnectToXbmc()
-{
-	INTEGER count;
-              
-	//Disconnect
-	count = 0;
-	IF ( ConnectionStatus <> 5 )
-	{
-		// close the connection
-	    ConnectionStatus = SocketDisconnectClient (XBMC);
-	
-		// wait for the connection to be established
-		while( ( ConnectionStatus <> 5 ) && ( count < 10 ) )
-		{
-			delay( 20 );
-			count = count + 1;
-		}
-    } 
-       
-	// Reset socket semaphores
-	ReceiveLock = OFF;
-	Loading = OFF;	
-	SocketLock = OFF;
-
-	// Pause for 1 second
-	#IF_DEFINED DEBUG PRINT("%s","Pause for 1 second."); #ENDIF
-	Delay(100);
-              
-	// Re-connect
-	count = 0;    
-	IF ( ConnectionStatus <> 2 )
-	{
-
-		// open the connection			// '1' = always attempt to reconnect.
-	    ConnectionStatus = SocketConnectClient (XBMC, XBMC_IPAddr$, AtoI(XBMC_TcpPort$), 1);
-	
-		// wait for the connection to be established
-		while( ( ConnectionStatus <> 2 ) && ( count < 10 ) )
-		{
-			delay( 20 );
-			count = count + 1;
-		}
-    }    
-
-   
-}*/
 
 /*
 	Send a string to the XBMC Socket
@@ -2345,11 +2297,24 @@ FUNCTION Process_PlayingType()
     PlayingItemType$ = GetString();
 	
 	if (PlayingItemType$ = "episode")
+	{
+		// Set the required bit, uuset other video bits
 		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_SERIES;
+        CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_MOVIE);
+        CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_OTHERVIDEO);
+	}
     else if (PlayingItemType$ = "movie")
+	{
 		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_MOVIE;			
-    else if (PlayingItemType$ = "musicvideo")
-		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_OTHERVIDEO;
+        CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_SERIES);
+        CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_OTHERVIDEO);
+	}
+    else if ( (PlayingItemType$ = "musicvideo") || (PlayingItemType$ = "video") )
+	{
+		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_OTHERVIDEO;		
+        CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_SERIES);
+        CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_MOVIE);	
+	}
     else if (PlayingItemType$ = "song")
 		CurrentlyPlayingType = CurrentlyPlayingType | TYPE_AUDIO;
     else if (PlayingItemType$ = "picture")
@@ -3422,37 +3387,44 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
 			Read();			
            
 			IF (name$ = "file")
-			{
-				value$ = GetString();
+			{				
 				IF (AssignToOutputs)
 				{
+					value$ = GetString();
 					Labels[ListIndex] = value$;		
 					Filename$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
 				}
 			}
 			ELSE IF (name$ = "label")
 			{
-				value$ = GetString();
 				IF (AssignToOutputs)
+				{
+					value$ = GetString();
 					Title$[ListIndex] = value$;
+				}
 			}
 			ELSE IF (name$ = "thumbnail")
 			{
-				value$ = EscapeThumbnailUri(GetString());
 				IF (AssignToOutputs)
+				{
+					value$ = EscapeThumbnailUri(GetString());
 					Thumb$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
+				}
 			}
 			ELSE IF (name$ = "type")
-			{
-				value$ = GetString();
+			{				
 				IF (AssignToOutputs)
+				{
+					value$ = GetString();
 					Genre$[ListIndex] = value$;
+				}
 			}
 			ELSE IF (name$ = "filetype")
 			{
-				value$ = GetString();
+
 				IF (AssignToOutputs)
 				{
+					value$ = GetString();
 					Tagline$[ListIndex] = value$;
                  	IF (value$ = "file") 
 						IsFile[ListIndex] = 1;
@@ -3463,6 +3435,62 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
 			ELSE
 			{
 				GenerateUserError("Process_File: Unknown property: %s", name$);
+			}
+		}
+	}
+}
+
+FUNCTION Process_Channel(INTEGER AssignToOutputs)
+{
+	STRING name$[15];
+	INTEGER numberOfProperties;
+	INTEGER i;
+                   
+	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
+	{
+		IF (AssignToOutputs)
+			ListIndex = ListIndex+1; 
+        
+		numberOfProperties = Tokens[tokenIndex].size/2;
+
+    	FOR (i = 1 TO numberOfProperties)
+		{
+			Read();
+         	name$ = GetString();
+
+			// Advance to next token
+			Read();			
+
+			IF (name$ = "channelid")
+			{		
+				IF (AssignToOutputs)
+				{
+					ListIDs[ListIndex] = GetInteger();
+                 #IF_DEFINED DEBUG PRINT("channelid: %d, Listindex %d", ListIDs[ListIndex], ListIndex); #ENDIF
+				}
+			}
+			ELSE IF (name$ = "thumbnail")
+			{
+				IF (AssignToOutputs)
+					Thumb$[ListIndex] = EscapeThumbnailUri(GetString());
+			}
+			ELSE IF (name$ = "label")
+			{
+				IF (AssignToOutputs)
+					Title$[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "channel") { } // Do Nothing
+			ELSE IF (name$ = "hidden") { } // Do Nothing
+			ELSE IF (name$ = "locked") { } // Do Nothing
+			ELSE IF (name$ = "lastplayed")
+			{
+				IF (AssignToOutputs)
+					Year$[ListIndex] = GetString();
+			}
+			ELSE IF (name$ = "channeltype")  { } // Do Nothing
+			ELSE
+			{
+				GenerateUserError("Process_Channel: Unknown property: %s", name$);
 			}
 		}
 	}
@@ -3726,8 +3754,9 @@ FUNCTION Process_Limits()
 		}			
 	}	
     
-	// Add an extra item for the "All Songs" entry
-	IF (CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST)
+	// Add an extra item for the "All Songs", "All Artists" entries
+	IF (CurrentListCxt.listID = MUSIC_ARTIST_ALBUM_LIST || 
+			CurrentListCxt.listID = MUSIC_GENRE_ARTIST_LIST)
 	{
 		ListTotal = ListTotal+1;
      	// TODO: Start/End of list still wrong 
@@ -3832,6 +3861,12 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 						Process_Genre();
 						BREAK;
 					}
+					CASE (CHANNEL_LIST):
+					{
+						// Absence of Limits param in Frodo JSON-API requires us to test here
+						Process_Channel(i > CurrentListCxt.start && i <= CurrentListCxt.end);
+						BREAK;
+					}
 					CASE (PICTURE_LIST):
 					CASE (ADDON_LIST):
 					CASE (ADDON_ITEMS_LIST):
@@ -3842,9 +3877,7 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 						}
 						ELSE
 						{
- 							#IF_DEFINED DEBUG
-	PRINT ("Process_List i %d, Cxt.start %d, Cxt.end %d, ListID %d", i, CurrentListCxt.start, CurrentListCxt.end, CurrentListCxt.listID);
-							#ENDIF
+							// Absence of Limits param in Frodo JSON-API requires us to test here
 							Process_File(i > CurrentListCxt.start && i <= CurrentListCxt.end);
 						}
 						BREAK;
@@ -4094,6 +4127,12 @@ FUNCTION ProcessResult(INTEGER requestId)
 			Process_List(PICTURE_LIST,requestId);
 			BREAK;
 		}
+		CASE (REQUESTID_GETCHANNELS) :
+		{
+			Process_List(CHANNEL_LIST,requestId);
+			BREAK;
+		}
+
     	CASE (REQUESTID_VERSION):
 		{
 			Process_Version();
@@ -4596,7 +4635,8 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 	INTEGER numberFilters;
 
 	IF (listID = HOME_LIST || listID = MUSIC_LIST 
-			|| listID = PICTURE_LIST || listID = ADDON_LIST)
+			|| listID = PICTURE_LIST || listID = ADDON_LIST  
+			|| listID = CHANNEL_LIST)
 		RETURN ("");
 
     // Do not apply unwatched filter to Artist list or Genre list
@@ -4994,7 +5034,7 @@ FUNCTION List_Retrieve()
 		{ 
 			InitOutputArrays(1);// Clear all lines starting with #1
 
-        	FOR (ListIndex = 1 TO 4)
+        	FOR (ListIndex = 1 TO 5)
 			{
 				Title$[ListIndex] = HomeListItems$[ListIndex-1];
 			}
@@ -5002,7 +5042,8 @@ FUNCTION List_Retrieve()
 			ListIDs[2] = TV_SHOW_LIST;
 			ListIDs[3] = MUSIC_LIST;
 			ListIDs[4] = PICTURE_LIST;
-            ListTotal = 4;
+			ListIDs[5] = CHANNEL_LIST;
+            ListTotal = 5;
 
 			MAKESTRING(List_Summary$, "%d to %d of %d", 
 				1, ListTotal, ListTotal);
@@ -5026,6 +5067,16 @@ FUNCTION List_Retrieve()
 
 			BREAK;	
 		}
+		CASE(CHANNEL_LIST):
+		{
+           	MAKESTRING (Params$, "{%s%s,\"channelgroupid\":\"alltv\"%s }"
+				,Filter$, Limits$, Sort$);
+			Method$ = "PVR.GetChannels"; 
+
+			SendJsonCommand (REQUESTID_GETCHANNELS, Method$, Params$);
+			BREAK;
+		}
+
 		DEFAULT:
 		{
          	GenerateUserError("List_Retrieve: Unknown list: %d", CurrentList);
@@ -5034,9 +5085,273 @@ FUNCTION List_Retrieve()
 }
  
 /*
+ 	Get the ClearPlaylist command for the Play() function
+*/
+STRING_FUNCTION Play_ClearCommand()
+{
+	STRING ClearCommand$[200];
+	STRING Params$[25];
+	STRING Method$[25];
+	STRING Playlist$[13];
+
+    
+	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
+	Method$ = "\"method\":\"Playlist.Clear\"";
+    Playlist$ = "\"playlistid\":";
+      
+	CSWITCH (CurrentList)
+	{
+		CASE (MOVIE_TITLE_LIST):
+		CASE (MOVIE_DETAILS):
+		CASE (TV_EPISODE_LIST):
+		CASE (TVSHOW_DETAILS):  
+		CASE (MUSIC_ARTIST_ALBUM_LIST)  : 
+		CASE (MUSIC_SONG_LIST)  :  
+		CASE (CHANNEL_LIST)  :  
+		{
+			MAKESTRING (ClearCommand$,"{\"id\":%d,%s,%s{%s%d }},{\"id\":%d,%s,%s{%s%d } },"
+					,REQUESTID_PLAYLIST_CLEARAUDIO,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
+					,REQUESTID_PLAYLIST_CLEARVIDEO,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO);
+            BREAK;
+
+		}
+		CASE (PICTURE_LIST):
+		{
+            MAKESTRING (ClearCommand$,"{\"id\":%d,\"method\":\"Playlist.Clear\",%s{%s%d } },"
+					,REQUESTID_PLAYLIST_CLEARSLIDESHOW,"\"jsonrpc\":\"2.0\",\"params\":"
+					,Playlist$,XBMC_ACTIVEPLAYER_SLIDESHOW);
+            BREAK;
+		}
+		CASE (ADDON_LIST):
+		CASE (ADDON_ITEMS_LIST):
+        {
+			// If script:// Addon then don't clear the playlists
+			IF (LEFT(Labels[SelectedItem],7) = "script:") RETURN ("");
+
+			IF (AddonParentListID = TV_SHOW_LIST || AddonParentListID = MOVIE_TITLE_LIST)
+			{
+				MAKESTRING (ClearCommand$,"{\"id\":%d,%s,%s{%s%d } },{\"id\":%d,%s,%s{%s%d } },"
+					,REQUESTID_PLAYLIST_CLEARSLIDESHOW,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_SLIDESHOW
+					,REQUESTID_PLAYLIST_CLEARVIDEO,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO);
+			}
+            BREAK;
+		}        
+	}
+
+	RETURN (ClearCommand$);
+}
+
+/*
+ 	Get the Playlist Add command for the Play() function
+*/
+STRING_FUNCTION Play_AddCommand()
+{
+	STRING AddCommand$[200];
+	STRING Params$[25];
+	STRING Method$[25];
+	STRING ItemType$[20];
+	STRING itemid$[500];
+	INTEGER PlayerID;
+    
+	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
+	Method$ = "\"method\":\"Playlist.Add\"";
+
+	IF (SelectedItem)
+		itemid$ = ItoA(ListIDs[SelectedItem]);
+	ELSE
+		itemid$ = ItoA(ListIDs[PlayItem]);
+      
+	CSWITCH (CurrentList)
+	{
+		CASE (MOVIE_TITLE_LIST):
+		CASE (MOVIE_DETAILS):
+		{
+            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+			ItemType$ = "movieid";
+			BREAK;
+		}
+		CASE (TV_EPISODE_LIST):
+		CASE (TVSHOW_DETAILS):
+		{
+        	PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+			ItemType$ = "episodeid";
+            BREAK;
+		}  
+		CASE (MUSIC_ARTIST_ALBUM_LIST)  : 
+		CASE (MUSIC_SONG_LIST)  :  
+		{
+        	PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+			IF (CurrentListCxt.albumID || CurrentListCxt.artistID || CurrentListCxt.genreID)
+            {                   
+				IF (CurrentListCxt.albumID)
+				{
+       				ItemType$ = "albumid";
+					itemid$ = ItoA(CurrentListCxt.albumID);
+				}
+				ELSE IF (CurrentListCxt.artistID)
+				{
+					ItemType$ = "artistid";
+					itemid$ = ItoA(CurrentListCxt.artistID);
+				}
+				ELSE IF (CurrentListCxt.genreID)
+				{
+					ItemType$ = "genreid";
+					itemid$ = ItoA(CurrentListCxt.genreID);
+				}
+				BREAK;				
+			}
+			BREAK;
+		}
+		CASE (CHANNEL_LIST)  :  
+		{
+            RETURN ("");
+		}
+		CASE (PICTURE_LIST):
+		{
+			PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
+			ItemType$ = "directory";
+			MAKESTRING(itemid$,"\"%s\"",CurrentListCxt.label);
+            BREAK;
+		}
+		CASE (ADDON_LIST):
+		CASE (ADDON_ITEMS_LIST):
+        {
+			// If script:// Addon then don't create a playlist
+			IF (LEFT(Labels[SelectedItem],7) = "script:") RETURN ("");
+
+			ItemType$ = "file";
+			MAKESTRING(itemid$,"\"%s\"",Labels[SelectedItem]);
+                                                              
+			IF (AddonParentListID = MUSIC_LIST)
+	           	PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+			ELSE IF (AddonParentListID = PICTURE_LIST)
+				PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
+			ELSE
+				PlayerID = XBMC_ACTIVEPLAYER_VIDEO; // default
+
+            BREAK;
+		}        
+	}
+
+	MAKESTRING(AddCommand$,"{\"id\":%d,%s,%s{\"playlistid\":%d,\"item\":{\"%s\":%s }}},"
+                    ,REQUESTID_PLAYLIST_ADD,Method$,Params$,PlayerID,ItemType$,itemid$);
+
+
+	RETURN (AddCommand$);
+}
+
+
+/*
+ 	Get the Player.Open command for the Play() function
+*/
+STRING_FUNCTION Play_OpenCommand()
+{
+	STRING OpenCommand$[200];
+	STRING Params$[25];
+	STRING Method$[25];
+	STRING Options$[75];
+	INTEGER PlayerID;
+	INTEGER position;
+
+	position = 0;    
+	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
+	Method$ = "\"method\":\"Player.Open\"";
+	Options$ = ",\"options\":{\"shuffled\":false,\"repeat\":\"off\",\"resume\":false}";
+      
+	CSWITCH (CurrentList)
+	{
+		CASE (MOVIE_TITLE_LIST):
+		CASE (MOVIE_DETAILS):
+		CASE (TV_EPISODE_LIST):
+		CASE (TVSHOW_DETAILS):
+		{
+        	PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+            BREAK;
+		}  
+		CASE (MUSIC_ARTIST_ALBUM_LIST)  : 
+		CASE (MUSIC_SONG_LIST)  :  
+		{
+        	PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+			IF (CurrentListCxt.albumID || CurrentListCxt.artistID || CurrentListCxt.genreID)
+            {
+				position = CurrentListCxt.start+SelectedItem-1;                     
+			}
+			BREAK;
+		}
+		CASE (CHANNEL_LIST)  :  
+		{
+			#IF_DEFINED DEBUG PRINT("channelid: %d, SelectedItem %d", ListIDs[SelectedItem],SelectedItem); #ENDIF
+
+			MAKESTRING(OpenCommand$,"{\"id\":%d,%s,%s{\"item\":{\"channelid\":%d } } }"
+				,REQUESTID_PLAYER_OPEN,Method$,Params$,ListIDs[SelectedItem]);
+            RETURN (OpenCommand$);
+		}
+		CASE (PICTURE_LIST):
+		{
+			PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
+			Options$ = ",\"options\":{\"shuffled\":false,\"repeat\":\"all\",\"resume\":false}";
+            BREAK;
+		}
+		CASE (ADDON_LIST):
+		CASE (ADDON_ITEMS_LIST):
+        {
+			// If script:// then use ExecuteAddon
+			IF (LEFT(Labels[SelectedItem],7) = "script:")
+			{
+				position = FIND("://",Labels[SelectedItem]);
+				MAKESTRING(OpenCommand$,"{\"id\":%d,%s,%s{\"addonid\":\"%s\"} }"				
+					,REQUESTID_EXECUTEADDON,"\"method\":\"Addons.ExecuteAddon\"",Params$
+					,RIGHT(Labels[SelectedItem],LEN(Labels[SelectedItem])-position-2));
+				RETURN (OpenCommand$);
+			}
+			ELSE
+			{
+				IF (AddonParentListID = MUSIC_LIST)
+		           	PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
+				ELSE IF (AddonParentListID = PICTURE_LIST)
+					PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
+				ELSE
+					PlayerID = XBMC_ACTIVEPLAYER_VIDEO; // default
+            }
+            BREAK;
+		}        	
+	}
+
+	MAKESTRING(OpenCommand$,"{\"id\":%d,%s,%s{\"item\":{\"playlistid\":%d,\"position\":%d }%s}}"
+		,REQUESTID_PLAYER_OPEN,Method$,Params$,PlayerID,position
+		,Options$);
+
+	RETURN (OpenCommand$);
+}
+
+/*
  	Play the selected item
+
+	This typically inolves clearing the existing playlist, adding the new media item(s) to a playlist
+	and the opening that item. Multiple item adds will occur with albums for example.
 */   
 FUNCTION Play()
+{
+	STRING BatchCommand$[700];
+               
+	MAKESTRING(BatchCommand$,"[ %s %s %s ]"
+					,Play_ClearCommand(),Play_AddCommand(),Play_OpenCommand());
+
+	#IF_DEFINED DEBUG
+	PRINT("BatchCommand: (%d bytes) %s",LEN(BatchCommand$),LEFT(BatchCommand$,230));
+	IF (LEN(BatchCommand$) > 460)
+		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,230));
+	ELSE IF (LEN(BatchCommand$) > 230)
+		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,LEN(BatchCommand$)-230));
+	#ENDIF
+	
+	SendToSocket(BatchCommand$);
+
+}
+/*
+ 	Play the selected item
+*/   
+FUNCTION Play2()
 {
 	STRING BatchCommand$[700];
 	INTEGER PlayerID;
@@ -5176,6 +5491,12 @@ FUNCTION Play()
 				MAKESTRING(itemid$,"\"%s\"",Labels[SelectedItem]);
 			}
             BREAK;
+		}
+		CASE (CHANNEL_LIST):
+		{
+            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+			ItemType$ = "channelid";
+			BREAK;
 		}
 		DEFAULT :
 		{
@@ -5655,7 +5976,6 @@ CHANGE SelectedItem
 		}
 		CASE (MUSIC_ARTIST_ALBUM_LIST) : 
 		{ 	        
-			#IF_DEFINED DEBUG Print("%s","SelectedItem: In MUSIC_ARTIST_ALBUM_LIST."); #ENDIF
             ListContext_Push();	// Store previous context in stack
 
 			// If albumID = 0 then 'All songs' has been selected
@@ -5705,17 +6025,17 @@ CHANGE SelectedItem
 		}
 		CASE (HOME_LIST)  : 
 		{ 			
+			#IF_DEFINED LIVE_TV IF (SelectedItem > 5) Break; #ENDIF
+			#IF_NOT_DEFINED LIVE_TV IF (SelectedItem > 4) Break; #ENDIF
+
             CurrentList = ListIDs[SelectedItem];
 			IF (CurrentList = MOVIE_TITLE_LIST || CurrentList = TV_SHOW_LIST)
 				List_Reset(CurrentList,0);
-			ELSE IF (CurrentList = MUSIC_LIST)
+			ELSE
 			{
-         		List_Reset(MUSIC_LIST,0);   	
+         		List_Reset(CurrentList,0);   	
 			}
-			ELSE IF (CurrentList = PICTURE_LIST)
-			{
-            	List_Reset(PICTURE_LIST,0);
-			}
+
 			Break;
 		}
 		CASE (MUSIC_LIST)  : 
@@ -5755,8 +6075,12 @@ CHANGE SelectedItem
 				Play();
 			} ELSE {
 		        ListIndex=0;
-				ListContext_Push();	// Store previous context in stack				
-				CurrentListCxt.listID = PICTURE_LIST;				
+				ListContext_Push();	// Store previous context in stack	
+				// "Pictures Add-ons" has its own entry in sources list
+				IF (LEFT(Labels[SelectedItem],6) = "addons")			
+					CurrentListCxt.listID = ADDON_LIST;		
+				ELSE		
+					CurrentListCxt.listID = PICTURE_LIST;		
 				CurrentListCxt.start=0;                  	
 				CurrentListCxt.end=StepAmount;				
 				CurrentListCxt.startsWith = "";
@@ -5764,6 +6088,11 @@ CHANGE SelectedItem
 				CurrentListCxt.label = Labels[SelectedItem];			
 				List_Retrieve();
             }
+			Break;
+		}
+		CASE (CHANNEL_LIST)  : 
+		{ 
+			Play();
 			Break;
 		}
         DEFAULT: 
@@ -6907,6 +7236,9 @@ Function Main()
 	HomeListItems$[1] = "TV Shows";
 	HomeListItems$[2] = "Music";
 	HomeListItems$[3] = "Pictures";
+#IF_DEFINED LIVE_TV
+	HomeListItems$[4] = "Live TV";
+#ENDIF
 	MusicListItems$[0] = "Artists";
 	MusicListItems$[1] = "Albums";
 	MusicListItems$[2] = "Genres";
