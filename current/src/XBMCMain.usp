@@ -1708,7 +1708,10 @@ STRING_FUNCTION EscapeThumbnailUri(STRING uri$)
 	}		
 	
 	IF (LEN(return$) > 255)
+	{
+		#IF_DEFINED DEBUG Print("%s","Warning: Length of Thumbnail uri exceeds 255 characters. Returning empty string instead."); #ENDIF
 		RETURN ("");
+	}
 	ELSE
 		RETURN (return$);
 }
@@ -4804,13 +4807,15 @@ FUNCTION List_Retrieve()
 
 	// Set filter, limits and sorting objects
 	IF (CurrentListCxt.recentlyAdded)
-		Filter$ = "";
+	{
+		Filter$ = ""; // No filter paramater for "GetRecently..." methods in Frodo
+		#IF_DEFINED DEBUG Print("%s","Warning: No filter paramater for 'GetRecently...' methods in Xbmc v12."); #ENDIF
+	}
 	ELSE
 		Filter$ = List_Filter(CurrentListCxt.listID);
 	MAKESTRING(Limits$,"\"limits\":{\"start\":%d,\"end\":%d }"
 				,CurrentListCxt.start,CurrentListCxt.end);
 	
-	#IF_DEFINED DEBUG Print("CurrentListCxt.listID %d",CurrentListCxt.listID); #ENDIF
 	IF ((CurrentListCxt.listID >= MOVIE_TITLE_LIST && CurrentListCxt.listID <= MUSIC_GENRE_ARTIST_LIST)
 			|| CurrentListCxt.listID = PICTURE_LIST)
 	{
