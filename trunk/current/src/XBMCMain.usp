@@ -4675,7 +4675,6 @@ STRING_FUNCTION List_Filter(INTEGER listID)
     	numberFilters = numberFilters + 1;
 	}
 
-
 	IF (CurrentListCxt.albumID)
 	{		
 	    MAKESTRING(Filter$[numberFilters]
@@ -4697,7 +4696,7 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 			,"genreid",CurrentListCxt.genreID);
     	numberFilters = numberFilters + 1;    	
 	}
-
+    
 	IF (numberFilters = 1)
 	{
        	MAKESTRING(FilterFinal$,"\"filter\":%s,",Filter$[0]);
@@ -5940,6 +5939,8 @@ CHANGE SelectedItem
 			CurrentListCxt.end=StepAmount;				
 			CurrentListCxt.startsWith= "";
 			CurrentListCxt.contains= "";
+			CurrentListCxt.recentlyAdded = OFF;
+			CurrentListCxt.unWatched = OFF;
 			List_Retrieve();
 
 			Break;
@@ -5955,6 +5956,8 @@ CHANGE SelectedItem
 			CurrentListCxt.end=StepAmount;
 			CurrentListCxt.startsWith= "";				
 			CurrentListCxt.contains= "";
+			CurrentListCxt.recentlyAdded = OFF;
+			CurrentListCxt.unWatched = OFF;
 			List_Retrieve();
 
 			Break;
