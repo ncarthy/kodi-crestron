@@ -1,5 +1,13 @@
 xbmc-crestron history
 
+1.11 10 Feb 2014
+Bug Fixes:
+* Starting music no longer stops picture slide-shows. The slide-show goes back to the first picture though.
+* Unwatched and SMS buttons not visible when 'RecentlyAdded' selected. 
+* Was showing incorrect song list for RecentlyAdded albums 
+* Genres with only one artist were not working correctly
+* Switching from Movie to TV Show without stopping video resulted in corrupted Now Playing Page
+
 1.10 10 Jan 2014
 * Add Pictures Browsing for Slideshows
 * Move Addons to Button
