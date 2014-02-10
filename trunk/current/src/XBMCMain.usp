@@ -2799,7 +2799,7 @@ SIGNED_INTEGER_FUNCTION Process_Player()
 }
 
    
-FUNCTION Process_OnPlayItem()
+FUNCTION Process_OnPlayItem(INTEGER IsOnStopNotification)
 {
 
 	STRING name$[15];
@@ -2823,8 +2823,8 @@ FUNCTION Process_OnPlayItem()
             	//Do Nothing
 			}
 			ELSE IF (name$ = "type")
-			{		
-            	Process_PlayingType();
+			{
+				IF( !IsOnStopNotification ) Process_PlayingType();
 			}
 			ELSE
 			{
@@ -2932,7 +2932,7 @@ INTEGER_FUNCTION Process_OnAdd()
 
 	Returns: 1 if the Notification is for audio/video, 0 if for pictures
 */
-INTEGER_FUNCTION Process_OnPlayPauseSeek()
+INTEGER_FUNCTION Process_OnPlayPauseSeek(INTEGER IsOnStopNotification)
 {
 
 	STRING name$[15];
@@ -2957,7 +2957,7 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek()
 
 			IF (name$ = "item")
 			{		
-            	Process_OnPlayItem();
+            	Process_OnPlayItem(IsOnStopNotification);
 			}
 			ELSE IF (name$ = "player")
 			{		
@@ -2999,7 +2999,8 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek()
 
 	Returns: 1 if the Notification is for audio/video, 0 if for pictures
 */
-INTEGER_FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification)
+INTEGER_FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification
+							, INTEGER IsOnStopNotification)
 {
 
 	STRING name$[15];
@@ -3026,7 +3027,7 @@ INTEGER_FUNCTION Process_PlayerNotification(INTEGER IsPlaylistOnAddNotification)
 				IF (IsPlaylistOnAddNotification)
                     return_value = Process_OnAdd();
 				ELSE
-					return_value = Process_OnPlayPauseSeek();
+					return_value = Process_OnPlayPauseSeek(IsOnStopNotification);
 			}
 			ELSE IF (name$ = "sender")
 			{		
@@ -3251,71 +3252,6 @@ FUNCTION Process_Artist(INTEGER requestId)
 		}
 	}
 }
- 
-/*
-FUNCTION Process_Addon()
-{
-	STRING name$[15];
-	INTEGER numberOfProperties;
-	INTEGER i;
-                   
-	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
-	{
-		ListIndex = ListIndex+1; 
-        
-		numberOfProperties = Tokens[tokenIndex].size/2;
-
-    	FOR (i = 1 TO numberOfProperties)
-		{
-			Read();
-         	name$ = GetString();
-
-			// Advance to next token
-			Read();			
-
-			IF (name$ = "addonid")
-			{		
-				AddonIDs[ListIndex] = GetString();
-			}
-			ELSE IF (name$ = "thumbnail")
-			{
-				Thumb$[ListIndex] = EscapeThumbnailUri(GetString());
-			}
-			ELSE IF (name$ = "name")
-			{
-				Title$[ListIndex] = GetString();
-			}
-			ELSE IF (name$ = "summary")
-			{
-				PlotDescription$[ListIndex] = GetString();
-			}
-			ELSE IF (name$ = "author")
-			{
-				SeriesOrArtistName$[ListIndex] = GetString();
-			}
-			ELSE IF (name$ = "version")
-			{
-				Year$[ListIndex] = GetString();
-			}
-			ELSE IF (name$ = "type")
-			{
-				Genre$[ListIndex] = GetString();
-			}
-			ELSE IF (name$ = "enabled")
-			{
-				IF(GetBool())
-					Watched[ListIndex] = ON;
-				ELSE
-					Watched[ListIndex] = OFF;
-			}
-			ELSE
-			{
-				GenerateUserError("Process_Addon: Unknown property: %s", name$);
-			}
-		}
-	}
-}*/
-
       
 /*
    Process the array of sources returned from the first Pictures List
@@ -4302,7 +4238,7 @@ FUNCTION ProcessNotification(STRING method$)
 	ELSE IF (method$ = "Player.OnPlay")
 	{		
 		// We only want to reset the feedback outputs for A/V
-		IF (Process_PlayerNotification(0))
+		IF (Process_PlayerNotification(0,0))
 		{                                 
 			IsPlaying = 1;
 			PauseFb = OFF;
@@ -4326,7 +4262,7 @@ FUNCTION ProcessNotification(STRING method$)
 	ELSE IF (method$ = "Player.OnPause")
 	{
 		// We only want to reset the feedback outputs for A/V
-		IF (Process_PlayerNotification(0))
+		IF (Process_PlayerNotification(0,0))
 		{
 			StopFb = OFF;
 			PlayFb = OFF;
@@ -4335,7 +4271,7 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE IF (method$ = "Player.OnSpeedChanged")
 	{
-		IF (Process_PlayerNotification(0))
+		IF (Process_PlayerNotification(0,0))
 		{
 			PauseFb = OFF;
 			StopFb = OFF;
@@ -4347,7 +4283,7 @@ FUNCTION ProcessNotification(STRING method$)
 		// We only want to reset the feedback outputs 
 		// if the A/V has stopped. A slideshow stopping is
 		// ignored
-		IF (Process_PlayerNotification(0))
+		IF (Process_PlayerNotification(0,1))
 		{
 			PauseFb = OFF;
 			PlayFb = OFF;
@@ -4359,15 +4295,15 @@ FUNCTION ProcessNotification(STRING method$)
 	}
 	ELSE IF (method$ = "Player.OnSeek")
 	{
-		Process_PlayerNotification(0);		
+		Process_PlayerNotification(0,0);		
 	}
 	ELSE IF (method$ = "Playlist.OnClear")
 	{
-		Process_PlayerNotification(0);
+		Process_PlayerNotification(0,0);
 	}
 	ELSE IF (method$ = "Playlist.OnAdd")
 	{
-		IF (Process_PlayerNotification(1))
+		IF (Process_PlayerNotification(1,0))
 		{                                    		
 			// Cancel any requests that are in the wait queue
 			CANCELALLWAIT();
@@ -5093,7 +5029,7 @@ FUNCTION List_Retrieve()
 */
 STRING_FUNCTION Play_ClearCommand()
 {
-	STRING ClearCommand$[200];
+	STRING ClearCommand$[250];
 	STRING Params$[25];
 	STRING Method$[25];
 	STRING Playlist$[13];
@@ -5109,9 +5045,17 @@ STRING_FUNCTION Play_ClearCommand()
 		CASE (MOVIE_DETAILS):
 		CASE (TV_EPISODE_LIST):
 		CASE (TVSHOW_DETAILS):  
+		CASE (CHANNEL_LIST)  :  
+		{
+			MAKESTRING (ClearCommand$,"{\"id\":%d,%s,%s{%s%d }},{\"id\":%d,%s,%s{%s%d } },{\"id\":%d,%s,%s{%s%d } },"
+					,REQUESTID_PLAYLIST_CLEARAUDIO,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
+					,REQUESTID_PLAYLIST_CLEARVIDEO,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO
+					,REQUESTID_PLAYLIST_CLEARSLIDESHOW,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_SLIDESHOW);
+            BREAK;
+
+		}
 		CASE (MUSIC_ARTIST_ALBUM_LIST)  : 
 		CASE (MUSIC_SONG_LIST)  :  
-		CASE (CHANNEL_LIST)  :  
 		{
 			MAKESTRING (ClearCommand$,"{\"id\":%d,%s,%s{%s%d }},{\"id\":%d,%s,%s{%s%d } },"
 					,REQUESTID_PLAYLIST_CLEARAUDIO,Method$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
@@ -5248,21 +5192,23 @@ STRING_FUNCTION Play_AddCommand()
 /*
  	Get the Player.Open command for the Play() function
 */
-STRING_FUNCTION Play_OpenCommand()
+STRING_FUNCTION Play_OpenCommand(INTEGER ListID)
 {
-	STRING OpenCommand$[200];
+	STRING OpenCommand$[400];
 	STRING Params$[25];
 	STRING Method$[25];
 	STRING Options$[75];
 	INTEGER PlayerID;
 	INTEGER position;
+	STRING ReopenSlideshowCommand$[200];
 
 	position = 0;    
 	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
 	Method$ = "\"method\":\"Player.Open\"";
 	Options$ = ",\"options\":{\"shuffled\":false,\"repeat\":\"off\",\"resume\":false}";
+	ReopenSlideshowCommand$ = "";
       
-	CSWITCH (CurrentList)
+	CSWITCH (ListID)
 	{
 		CASE (MOVIE_TITLE_LIST):
 		CASE (MOVIE_DETAILS):
@@ -5270,6 +5216,13 @@ STRING_FUNCTION Play_OpenCommand()
 		CASE (TVSHOW_DETAILS):
 		{
         	PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
+
+			IF (CurrentlyPlayingType & TYPE_PICTURES)
+			{
+				// If a slideshow is playing then it will stop when we start the TVShow/Movie etc. and
+				// we need to manually unset the 'Slideshow playing' bit in CurrentlyPlayingType	
+				CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_PICTURES);			
+			}
             BREAK;
 		}  
 		CASE (MUSIC_ARTIST_ALBUM_LIST)  : 
@@ -5280,6 +5233,13 @@ STRING_FUNCTION Play_OpenCommand()
             {
 				position = CurrentListCxt.start+SelectedItem-1;                     
 			}
+			// If a slideshow is playing it will stop and we need to manually re-start it.
+			IF (CurrentlyPlayingType & TYPE_PICTURES)
+			{
+            	MAKESTRING(ReopenSlideshowCommand$,",{\"id\":%d,%s,%s{\"item\":{\"playlistid\":%d,\"position\":%d }%s} }"
+					,REQUESTID_PLAYER_OPEN+100,Method$,Params$,XBMC_ACTIVEPLAYER_SLIDESHOW,position
+					,",\"options\":{\"shuffled\":false,\"repeat\":\"all\",\"resume\":false}");
+			}
 			BREAK;
 		}
 		CASE (CHANNEL_LIST)  :  
@@ -5288,6 +5248,15 @@ STRING_FUNCTION Play_OpenCommand()
 
 			MAKESTRING(OpenCommand$,"{\"id\":%d,%s,%s{\"item\":{\"channelid\":%d } } }"
 				,REQUESTID_PLAYER_OPEN,Method$,Params$,ListIDs[SelectedItem]);
+
+			IF (CurrentlyPlayingType & TYPE_PICTURES)
+			{
+				// If a slideshow is playing then it will stop but the Now_Playing flag 
+				// won't update so we need to unset the 'Slideshow playing' bit in CurrentlyPlayingType	
+				CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_PICTURES);			
+			}
+            BREAK;
+
             RETURN (OpenCommand$);
 		}
 		CASE (PICTURE_LIST):
@@ -5320,10 +5289,10 @@ STRING_FUNCTION Play_OpenCommand()
             BREAK;
 		}        	
 	}
-
-	MAKESTRING(OpenCommand$,"{\"id\":%d,%s,%s{\"item\":{\"playlistid\":%d,\"position\":%d }%s}}"
+    
+	MAKESTRING(OpenCommand$,"{\"id\":%d,%s,%s{\"item\":{\"playlistid\":%d,\"position\":%d }%s}} %s "
 		,REQUESTID_PLAYER_OPEN,Method$,Params$,PlayerID,position
-		,Options$);
+		,Options$, ReopenSlideshowCommand$);
 
 	RETURN (OpenCommand$);
 }
@@ -5336,10 +5305,10 @@ STRING_FUNCTION Play_OpenCommand()
 */   
 FUNCTION Play()
 {
-	STRING BatchCommand$[700];
+	STRING BatchCommand$[850];
                
 	MAKESTRING(BatchCommand$,"[ %s %s %s ]"
-					,Play_ClearCommand(),Play_AddCommand(),Play_OpenCommand());
+					,Play_ClearCommand(),Play_AddCommand(),Play_OpenCommand(CurrentList));
 
 	#IF_DEFINED DEBUG
 	PRINT("BatchCommand: (%d bytes) %s",LEN(BatchCommand$),LEFT(BatchCommand$,230));
@@ -5351,196 +5320,6 @@ FUNCTION Play()
 	
 	SendToSocket(BatchCommand$);
 
-}
-/*
- 	Play the selected item
-*/   
-FUNCTION Play2()
-{
-	STRING BatchCommand$[700];
-	INTEGER PlayerID;
-	STRING ItemType$[20];
-    STRING Id$[5];
-	STRING Params$[25];
-	STRING Item$[7];
-	STRING Playlist$[13];
-	STRING Position$[12];
-	STRING MethodClear$[25];
-	STRING MethodAdd$[25];
-	STRING MethodOpen$[25];
-	STRING MethodExecute$[32];
-	STRING ClearCommand$[200];
-	INTEGER position;
-	STRING itemid$[500];
-	STRING Options$[75];
-
-
-	position = 0;
-	Options$ = "";
-    Id$ = "\"id\":";
-	Params$ = "\"jsonrpc\":\"2.0\",\"params\":";
-	Item$ = "\"item\":";
-	Playlist$ = "\"playlistid\":";
-	Position$ = "\"position\":";
-	MethodClear$ = "\"method\":\"Playlist.Clear\"";
-	MethodAdd$ = "\"method\":\"Playlist.Add\"";
-	MethodOpen$ = "\"method\":\"Player.Open\"";
-	MethodExecute$ = "\"method\":\"Addons.ExecuteAddon\"";
-	ClearCommand$ = "";
-    
-	IF (SelectedItem)
-		itemid$ = ItoA(ListIDs[SelectedItem]);
-	ELSE
-		itemid$ = ItoA(ListIDs[PlayItem]);
-         
-#IF_DEFINED DEBUG
-	PRINT ("PLAY SelectedItem %d, PlayItem %d, CurrentList %d, itemid$ %s", SelectedItem, PlayItem, CurrentList, itemid$);
-#ENDIF
-
-	CSWITCH (CurrentList)
-	{
-		CASE (MOVIE_TITLE_LIST):
-		CASE (MOVIE_DETAILS):
-		{
-            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
-			ItemType$ = "movieid";
-			BREAK;
-		}
-		CASE (TV_EPISODE_LIST):
-		CASE (TVSHOW_DETAILS): 
-		{
-            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
-			ItemType$ = "episodeid";
-			BREAK;
-		}
-		CASE (MUSIC_ARTIST_ALBUM_LIST)  : 
-		CASE (MUSIC_SONG_LIST)  : 
-		{          			
-            PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
-            
-			IF (CurrentListCxt.albumID || CurrentListCxt.artistID || CurrentListCxt.genreID)
-            {
-				position = CurrentListCxt.start+SelectedItem-1;                     
-				IF (CurrentListCxt.albumID)
-				{
-       				ItemType$ = "albumid";
-					itemid$ = ItoA(CurrentListCxt.albumID);
-				}
-				ELSE IF (CurrentListCxt.artistID)
-				{
-					ItemType$ = "artistid";
-					itemid$ = ItoA(CurrentListCxt.artistID);
-				}
-				ELSE IF (CurrentListCxt.genreID)
-				{
-					ItemType$ = "genreid";
-					itemid$ = ItoA(CurrentListCxt.genreID);
-				}
-				BREAK;				
-			}
-			ELSE
-			{
-				GenerateUserError("Play(): No Songs to Add");
-				RETURN; // Exit Event
-			}
-		}
-		CASE (PICTURE_LIST):
-		{
-            PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
-			ItemType$ = "directory";
-			MAKESTRING(itemid$,"\"%s\"",CurrentListCxt.label);
-			Options$ = ",\"options\":{\"shuffled\":false,\"repeat\":\"all\",\"resume\":false}";
-            BREAK;
-		}
-		CASE (ADDON_LIST):
-		CASE (ADDON_ITEMS_LIST):
-		{
-			// If script:// then use ExecuteAddon
-			IF (LEFT(Labels[SelectedItem],7) = "script:")
-			{
-				position = FIND("://",Labels[SelectedItem]);
-				itemid$ = RIGHT(Labels[SelectedItem],LEN(Labels[SelectedItem])-position-2);
-				MAKESTRING(BatchCommand$,"{%s%d,%s,%s{\"addonid\":\"%s\"} }"				
-					,Id$,REQUESTID_EXECUTEADDON,MethodExecute$,Params$,itemid$);
-				SendToSocket(BatchCommand$);
-				RETURN;
-			}
-			ELSE
-			{
-				PlayerID = XBMC_ACTIVEPLAYER_VIDEO; //default
-				CSWITCH (AddonParentListID)
-				{
-					CASE (TV_SHOW_LIST) : {}
-					CASE (MOVIE_TITLE_LIST) : 
-					{ 
-			           	PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
-						MAKESTRING (ClearCommand$,"{%s%d,%s,%s{%s%d } },{%s%d,%s,%s{%s%d } },"
-							,Id$,REQUESTID_PLAYLIST_CLEARSLIDESHOW,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_SLIDESHOW
-							,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO);
-						break;  
-					}
-					CASE (MUSIC_LIST) : 
-					{ 
-			           	PlayerID = XBMC_ACTIVEPLAYER_AUDIO;
-						break; 
-					}
-					CASE (PICTURE_LIST) : 
-					{ 
-			           	PlayerID = XBMC_ACTIVEPLAYER_SLIDESHOW;
-						break; 
-					}
-				}
-
-				ItemType$ = "file";
-				MAKESTRING(itemid$,"\"%s\"",Labels[SelectedItem]);
-			}
-            BREAK;
-		}
-		CASE (CHANNEL_LIST):
-		{
-            PlayerID = XBMC_ACTIVEPLAYER_VIDEO;
-			ItemType$ = "channelid";
-			BREAK;
-		}
-		DEFAULT :
-		{
-        	GenerateUserError("Play: Unknown list: %d", CurrentList);
-			RETURN;
-		}	
-	}
-    
-	IF (CurrentList = PICTURE_LIST)
-	{
-		MAKESTRING (ClearCommand$,"{%s%d,%s,%s{%s%d } },"
-					,Id$,REQUESTID_PLAYLIST_CLEARSLIDESHOW,MethodClear$,Params$,Playlist$,PlayerID);
-
-	}
-	ELSE IF (CurrentList = ADDON_LIST || CurrentList = ADDON_ITEMS_LIST)
-	{
-		// Do Nothing
-	}
-	ELSE
-	{
-		MAKESTRING (ClearCommand$,"{%s%d,%s,%s{%s%d }},{%s%d,%s,%s{%s%d } },"
-					,Id$,REQUESTID_PLAYLIST_CLEARAUDIO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_AUDIO
-					,Id$,REQUESTID_PLAYLIST_CLEARVIDEO,MethodClear$,Params$,Playlist$,XBMC_ACTIVEPLAYER_VIDEO);
-
-    }
-
-	MAKESTRING(BatchCommand$,"[%s {%s%d,%s,%s{%s%d,%s{\"%s\":%s }}},{%s%d,%s,%s{%s{%s%d,%s%d }%s}}]"
-					,ClearCommand$
-                    ,Id$,REQUESTID_PLAYLIST_ADD,MethodAdd$,Params$,Playlist$,PlayerID,Item$,ItemType$,itemid$
-					,Id$,REQUESTID_PLAYER_OPEN,MethodOpen$,Params$,Item$,Playlist$,PlayerID,Position$,position
-					,Options$);
-	#IF_DEFINED DEBUG
-	PRINT("BatchCommand: (%d bytes) %s",LEN(BatchCommand$),LEFT(BatchCommand$,230));
-	IF (LEN(BatchCommand$) > 460)
-		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,230));
-	ELSE IF (LEN(BatchCommand$) > 230)
-		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,LEN(BatchCommand$)-230));
-	#ENDIF
-	
-	SendToSocket(BatchCommand$);
 }
 
 /*******************************************************************************************
