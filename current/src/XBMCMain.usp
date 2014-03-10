@@ -152,6 +152,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_GETADDONDETAILS				71
 #DEFINE_CONSTANT REQUESTID_GETADDONITEMS				72
 #DEFINE_CONSTANT REQUESTID_EXECUTEADDON					73
+#DEFINE_CONSTANT REQUESTID_QUEUE						74
 #DEFINE_CONSTANT REQUESTID_GETPICTURESOURCES            80
 #DEFINE_CONSTANT REQUESTID_GETPICTURES                  81
 #DEFINE_CONSTANT REQUESTID_GETCHANNELS                  85
@@ -334,11 +335,12 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 				JumpBack_Sm, 
 				JumpFwd_Lg, 
 				JumpBack_Lg,
-				_SKIP_,UpdateMovies, 
+				_SKIP_,
+				UpdateMovies, 
 				UpdateMusic,
 				ContextMenu;
 
-DIGITAL_INPUT _SKIP_,RunAllTests;		// Run all unit tests. Only works in DEBUG
+DIGITAL_INPUT _SKIP_,QueueMovie;		// Send Queue Command (Used for Cinema Experience addon)
 
 STRING_INPUT _SKIP_,SearchCriteria$[100],
 			 TextForList$[100];	// Filter String
@@ -5514,7 +5516,11 @@ PUSH JumpBack_Lg
 {
 	CALL SendStringSeekCommand (REQUESTID_LARGESKIPBACKWARD, "bigbackward");
 }    
-
+PUSH QueueMovie
+{
+ 	CALL SendJsonCommand (REQUESTID_QUEUE, "Input.ExecuteAction", 
+			"{\"action\":\"queue\"} ");
+}
 PUSH UpdateMovies
 {
 	CALL SendJsonCommand (REQUESTID_VIDEOLIBRARY_SCAN, 
@@ -5945,13 +5951,7 @@ CHANGE UnitTestNumber#
 {
 	// Unit Test functionality remove in r193
 
-}
-
-PUSH RunAllTests
-{
-	// Unit Test functionality remove in r193
-}
-               
+}               
 
 /* 	
 	Initialization script
