@@ -102,7 +102,7 @@
   InputSigType39=Digital
   InputCue40=[~UNUSED~]
   InputSigType40=Digital
-  InputCue41=RunAllTests
+  InputCue41=QueueMovie
   InputSigType41=Digital
   OutputCue1=IsConnected
   OutputSigType1=Digital
