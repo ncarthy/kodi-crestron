@@ -221,6 +221,7 @@ Comments:
 #DEFINE_CONSTANT ACTION_SHOW_ASPECT_RATIO			162
 
 #DEFINE_CONSTANT ACTION_PARTY_MODE					166
+#DEFINE_CONSTANT ACTION_CLOSE_DIALOGS				167
 
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
@@ -746,6 +747,7 @@ CHANGE Command
 		Case (ACTION_SHOW_OSD)				: { SendAction(ACTION_BUTTON, "osd"); }
 		Case (ACTION_SHOW_ASPECT_RATIO)		: { SendAction(ACTION_BUTTON, "aspectratio"); }
 		Case (ACTION_PARTY_MODE		)		: { SendAction(ACTION_EXECBUILTIN, "PlayerControl(PartyMode)"); }
+		Case (ACTION_CLOSE_DIALOGS	)		: { SendAction(ACTION_EXECBUILTIN, "Dialog.Close(all,true)"); }
 
 	}       
 }
