@@ -92,7 +92,7 @@ Comments:
 
 /*****    DEFINE NEW CONSTANTS    *******/
 #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
-#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
+//#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 32767		// Socket buffer size
