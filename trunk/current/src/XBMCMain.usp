@@ -92,7 +92,7 @@ Comments:
 
 /*****    DEFINE NEW CONSTANTS    *******/
 #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
-//#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
+#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 32767		// Socket buffer size
@@ -119,6 +119,7 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_PLAYER_GETITEM				2
 #DEFINE_CONSTANT REQUESTID_PLAYER_GETITEMEXTENDED		3
 #DEFINE_CONSTANT REQUESTID_PLAYER_GETPROPERTIES			4
+#DEFINE_CONSTANT REQUESTID_PLAYER_GETTIMEPROPERTIES		5
 #DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETMOVIES		20 
 #DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETMOVIEDETAILS	21
 #DEFINE_CONSTANT REQUESTID_VIDEOLIBRARY_GETTVSHOWS		22 
@@ -245,7 +246,8 @@ ANALOG_OUTPUT   _SKIP_,VersionID#,		// The version id of the JSON api. 4 = Eden,
 				NumberSubtitleStreams,	// Number of subtitle streams in movie/episode
 				RepeatStatus,			// 0 = 'off', 1 = 'all', 2 = 'one'
 				CurrentSortField,	    // Analog of the field that the current list is sorted by			
-                ValidSortFields;        // Bitmap of valid sort fields for current list
+                ValidSortFields,		// Bitmap of valid sort fields for current list
+				PlaySpeed#;        		// Speed of current audio/video playback (1x, 2x, 4x etc.). Always positive
                                                     
 STRING_OUTPUT   _SKIP_,
                 PlotSelected$,				// The plot of the Selected movie or TV showList_Summary$
@@ -327,7 +329,7 @@ DIGITAL_INPUT   _SKIP_,_SKIP_,
 				List_Artists,				// Show music artists list
 				List_Pictures,				// Show Pictures list
 				List_Addons,				// Show Addons list
-				_SKIP_,
+				List_LiveTvChannels,		// Show Live TV channels list
 				SortDescending,		 		// Sort list items in descending order if High / Ascending otherwise
 				PlayNext, 
 				PlayPrev,
@@ -348,9 +350,7 @@ STRING_INPUT _SKIP_,SearchCriteria$[100],
 ANALOG_INPUT 	_SKIP_,PlayItem,			// Begin playing this listitem 
 				SelectedItem,				// We have selected this listitem
 				Seek_Percentage, Seek_Time,	// Seek to this %age, time.
-				_SKIP_, Selected_Sort_Field,// Field to Sort the current list by
-				_SKIP_,UnitTestNumber#;		// Run the specified unit test. DEBUG only.
-
+				_SKIP_, Selected_Sort_Field;// Field to Sort the current list by
 
 
 ///////////////////////////// Parameters
@@ -397,7 +397,7 @@ INTEGER SocketLock;					// Locking flag that is set before any socket activity a
 INTEGER ReceiveLock;				// Locking flag that is set when processing data from Xbmc
 STRING Remainder$[4000];   			// Store unprocessed bytes from 1st pass of ProcessResponse()
 INTEGER StopProcessingData;			// When set to 1 the SOCKETRECEIVE event stops all processing and exits.
-INTEGER VersionID;					// The JSON-RPC protocol version. 4 for Eden, 6 for Frodo
+INTEGER VersionID;					// The JSON-RPC protocol version. 4 for Eden, 6 for Frodo/Gotham
 INTEGER ActivePlayerID;				// The ID of the current active player. Zero for none.
 SIGNED_INTEGER PlaySpeed;			// Speed of current audio/video playback (1x, 2x, 4x etc.) Negative for rewind.
 INTEGER IsPlaying;					// 1 = Something is playing, 0 = nothing is playing
@@ -1099,7 +1099,7 @@ FUNCTION ListContext_Push()
 {
 	StackPosition = StackPosition + 1;
 	IF (StackPosition>5) StackPosition = 5;
-	#IF_DEFINED DEBUG PRINT("ListContext_Push: StackPosition %d", StackPosition); #ENDIF
+	//#IF_DEFINED DEBUG PRINT("ListContext_Push: StackPosition %d", StackPosition); #ENDIF
 	Stack[StackPosition].listID = CurrentListCxt.listID;
 	Stack[StackPosition].listHeader = CurrentListCxt.listHeader;
 	Stack[StackPosition].start = CurrentListCxt.start;
@@ -1816,6 +1816,19 @@ FUNCTION Player_GetItemExtended(INTEGER id)
 	
 
 } 
+
+// Get information about the Player
+FUNCTION Player_GetTimeProperties()
+{
+	STRING Params$[500];
+
+    MAKESTRING(Params$,"{\"playerid\":%d,\"properties\":[%s]}"
+				,ActivePlayerID, "\"time\""	);
+
+	IF (IsPlaying)
+		SendJsonCommand(REQUESTID_PLAYER_GETTIMEPROPERTIES,"Player.GetProperties",Params$);
+} 
+
 
 // Get information about the Player
 FUNCTION Player_GetProperties()
@@ -2561,6 +2574,7 @@ FUNCTION Process_PlayerProperties()
 			ELSE IF (name$ = "speed" )
 			{
 				PlaySpeed = GetSignedInteger();
+				PlaySpeed# = ABS(PlaySpeed);
 				StopFb = OFF;
 				PlayFb = ON;
 				IF (PlaySpeed<0)
@@ -2725,7 +2739,7 @@ FUNCTION Process_Movie(INTEGER inList)
 /*
   	Information about the Player, usually provided by a notification.
 
-	Returns the playerid
+	Returns the playerid as a SIGNED INTEGER
 */
 SIGNED_INTEGER_FUNCTION Process_Player()
 {
@@ -2760,6 +2774,14 @@ SIGNED_INTEGER_FUNCTION Process_Player()
 			ELSE IF (name$ = "speed")
 			{		
 				playspeed_local = GetSignedInteger();
+
+				IF (playspeed_local = 1) 
+				{
+					WAIT (100)
+					{
+						Player_GetTimeProperties();	
+					}
+                }
 			}
 			ELSE IF (name$ = "seekoffset")
 			{
@@ -2795,6 +2817,7 @@ SIGNED_INTEGER_FUNCTION Process_Player()
 		}
 		
         MAKESTRING(PlayingSpeed$,"%dx",playspeed_local);
+		PlaySpeed# = ABS(PlaySpeed);
 	}
 
 	RETURN (playerid);
@@ -2928,7 +2951,7 @@ INTEGER_FUNCTION Process_OnAdd()
 }
 
 /*
-	Process a notification received form the xbmc player
+	Process a notification received from the xbmc player
 	 
 	IsPlaylistOnAddNotification: 1 when its a Playlist.OnAdd notification, 0 otherwise
 
@@ -2994,7 +3017,7 @@ INTEGER_FUNCTION Process_OnPlayPauseSeek(INTEGER IsOnStopNotification)
 }
             
 /*
-	Process a notification recieved form the xbmc player. Called from
+	Process a notification received from the xbmc player. Called from
 	ProcessNotification().
 	 
 	IsPlaylistOnAddNotification: 1 when its a Playlist.OnAdd notification, 0 otherwise
@@ -3305,7 +3328,7 @@ FUNCTION Process_Source()
 
    When AssignToOutputs= then send the values to th eOutput signals
 */
-FUNCTION Process_File(INTEGER AssignToOutputs)
+FUNCTION Process_File()
 {
 	STRING name$[15];
 	STRING value$[700];
@@ -3314,8 +3337,7 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
   
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		IF (AssignToOutputs)
-			ListIndex = ListIndex+1; 
+		ListIndex = ListIndex+1; 
         
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
@@ -3329,49 +3351,33 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
            
 			IF (name$ = "file")
 			{				
-				IF (AssignToOutputs)
-				{
-					value$ = GetString();
-					Labels[ListIndex] = value$;		
-					Filename$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
-				}
+				value$ = GetString();
+				Labels[ListIndex] = value$;		
+				Filename$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
 			}
 			ELSE IF (name$ = "label")
 			{
-				IF (AssignToOutputs)
-				{
-					value$ = GetString();
-					Title$[ListIndex] = value$;
-				}
+				value$ = GetString();
+				Title$[ListIndex] = value$;
 			}
 			ELSE IF (name$ = "thumbnail")
 			{
-				IF (AssignToOutputs)
-				{
-					value$ = EscapeThumbnailUri(GetString());
-					Thumb$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
-				}
+				value$ = EscapeThumbnailUri(GetString());
+				Thumb$[ListIndex] = LEFT(value$,MAX_SERIAL_STRING_LENGTH);
 			}
 			ELSE IF (name$ = "type")
 			{				
-				IF (AssignToOutputs)
-				{
-					value$ = GetString();
-					Genre$[ListIndex] = value$;
-				}
+				value$ = GetString();
+				Genre$[ListIndex] = value$;
 			}
 			ELSE IF (name$ = "filetype")
 			{
-
-				IF (AssignToOutputs)
-				{
-					value$ = GetString();
-					Tagline$[ListIndex] = value$;
-                 	IF (value$ = "file") 
-						IsFile[ListIndex] = 1;
-					ELSE
-						IsFile[ListIndex] = 0;				
-				}
+				value$ = GetString();
+				Tagline$[ListIndex] = value$;
+                	IF (value$ = "file") 
+					IsFile[ListIndex] = 1;
+				ELSE
+					IsFile[ListIndex] = 0;				
 			}
 			ELSE
 			{
@@ -3381,7 +3387,7 @@ FUNCTION Process_File(INTEGER AssignToOutputs)
 	}
 }
 
-FUNCTION Process_Channel(INTEGER AssignToOutputs)
+FUNCTION Process_Channel()
 {
 	STRING name$[15];
 	INTEGER numberOfProperties;
@@ -3389,8 +3395,7 @@ FUNCTION Process_Channel(INTEGER AssignToOutputs)
                    
 	IF (Tokens[tokenIndex].type = JSMN_OBJECT)
 	{
-		IF (AssignToOutputs)
-			ListIndex = ListIndex+1; 
+		ListIndex = ListIndex+1; 
         
 		numberOfProperties = Tokens[tokenIndex].size/2;
 
@@ -3404,29 +3409,23 @@ FUNCTION Process_Channel(INTEGER AssignToOutputs)
 
 			IF (name$ = "channelid")
 			{		
-				IF (AssignToOutputs)
-				{
-					ListIDs[ListIndex] = GetInteger();
-                 #IF_DEFINED DEBUG PRINT("channelid: %d, Listindex %d", ListIDs[ListIndex], ListIndex); #ENDIF
-				}
+				ListIDs[ListIndex] = GetInteger();
+                #IF_DEFINED DEBUG PRINT("channelid: %d, Listindex %d", ListIDs[ListIndex], ListIndex); #ENDIF
 			}
 			ELSE IF (name$ = "thumbnail")
 			{
-				IF (AssignToOutputs)
-					Thumb$[ListIndex] = EscapeThumbnailUri(GetString());
+				Thumb$[ListIndex] = EscapeThumbnailUri(GetString());
 			}
 			ELSE IF (name$ = "label")
 			{
-				IF (AssignToOutputs)
-					Title$[ListIndex] = GetString();
+				Title$[ListIndex] = GetString();
 			}
 			ELSE IF (name$ = "channel") { } // Do Nothing
 			ELSE IF (name$ = "hidden") { } // Do Nothing
 			ELSE IF (name$ = "locked") { } // Do Nothing
 			ELSE IF (name$ = "lastplayed")
 			{
-				IF (AssignToOutputs)
-					Year$[ListIndex] = GetString();
+				Year$[ListIndex] = GetString();
 			}
 			ELSE IF (name$ = "channeltype")  { } // Do Nothing
 			ELSE
@@ -3804,8 +3803,7 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 					}
 					CASE (CHANNEL_LIST):
 					{
-						// Absence of Limits param in Frodo JSON-API requires us to test here
-						Process_Channel(i > CurrentListCxt.start && i <= CurrentListCxt.end);
+						Process_Channel();
 						BREAK;
 					}
 					CASE (PICTURE_LIST):
@@ -3818,8 +3816,7 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 						}
 						ELSE
 						{
-							// Absence of Limits param in Frodo JSON-API requires us to test here
-							Process_File(i > CurrentListCxt.start && i <= CurrentListCxt.end);
+							Process_File();
 						}
 						BREAK;
 					}
@@ -3847,8 +3844,12 @@ FUNCTION Process_List(INTEGER listType, INTEGER requestId)
 *	Determine the JSON API version ID from the Xbmc response
 *
 *	Result object looks like this: 
-*	   Frodo: {"version":{"major":6,"minor":0,"patch":0}}
+*	   Gotham: {"version":{"major":6,"minor":14,"patch":3}}
+*	   Frodo: {"version":{"major":6,"minor":0,"patch":3}}
 *	   Eden:  {"version":4}
+* 
+*   In the source code the version number is set in
+*		xbmc/interfaces/json-rpc/ServiceDescription.h
 */
 FUNCTION Process_Version()
 {	
@@ -3925,6 +3926,11 @@ FUNCTION ProcessResult(INTEGER requestId)
         	BREAK;
 		}
 		CASE (REQUESTID_PLAYER_GETPROPERTIES):
+		{
+			Process_PlayerProperties();
+        	BREAK;
+		}
+		CASE (REQUESTID_PLAYER_GETTIMEPROPERTIES):
 		{
 			Process_PlayerProperties();
         	BREAK;
@@ -5011,8 +5017,8 @@ FUNCTION List_Retrieve()
 		}
 		CASE(CHANNEL_LIST):
 		{
-           	MAKESTRING (Params$, "{%s%s,\"channelgroupid\":\"alltv\"%s }"
-				,Filter$, Limits$, Sort$);
+           	MAKESTRING (Params$, "{%s%s,\"properties\":[%s],\"channelgroupid\":\"alltv\"%s }"
+				,Filter$, Limits$, "\"thumbnail\"", Sort$);
 			Method$ = "PVR.GetChannels"; 
 
 			SendJsonCommand (REQUESTID_GETCHANNELS, Method$, Params$);
@@ -5246,7 +5252,7 @@ STRING_FUNCTION Play_OpenCommand(INTEGER ListID)
 		}
 		CASE (CHANNEL_LIST)  :  
 		{
-			#IF_DEFINED DEBUG PRINT("channelid: %d, SelectedItem %d", ListIDs[SelectedItem],SelectedItem); #ENDIF
+			#IF_DEFINED DEBUG PRINT("Play_OpenCommand channelid: %d, SelectedItem %d", ListIDs[SelectedItem],SelectedItem); #ENDIF
 
 			MAKESTRING(OpenCommand$,"{\"id\":%d,%s,%s{\"item\":{\"channelid\":%d } } }"
 				,REQUESTID_PLAYER_OPEN,Method$,Params$,ListIDs[SelectedItem]);
@@ -5257,8 +5263,6 @@ STRING_FUNCTION Play_OpenCommand(INTEGER ListID)
 				// won't update so we need to unset the 'Slideshow playing' bit in CurrentlyPlayingType	
 				CurrentlyPlayingType = CurrentlyPlayingType & (0xFFFF - TYPE_PICTURES);			
 			}
-            BREAK;
-
             RETURN (OpenCommand$);
 		}
 		CASE (PICTURE_LIST):
@@ -5460,6 +5464,13 @@ PUSH List_Addons
 	ListHeader$ = CurrentListCxt.listHeader;
 	List_Reset(ADDON_LIST,1);
 }
+PUSH List_LiveTvChannels
+{
+	CurrentListCxt.listHeader = "LIVE TV";
+	ListHeader$ = CurrentListCxt.listHeader;
+	List_Reset(CHANNEL_LIST,0);
+}
+
 
 PUSH List_UnWatchedOnly
 {
@@ -5946,12 +5957,7 @@ THREADSAFE SOCKETRECEIVE XBMC
 		}
     }
 }
-
-CHANGE UnitTestNumber#
-{
-	// Unit Test functionality remove in r193
-
-}               
+              
 
 /* 	
 	Initialization script
