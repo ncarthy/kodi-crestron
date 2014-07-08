@@ -92,7 +92,7 @@ Comments:
 
 /*****    DEFINE NEW CONSTANTS    *******/
 #DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
-//#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
+#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 32767		// Socket buffer size
@@ -314,7 +314,8 @@ DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
 /* Browse functionality */
 DIGITAL_INPUT   _SKIP_,_SKIP_,
 				Poll,						// Poll Xbmc for metadata about currently playing track
-				_SKIP_,_SKIP_,
+				Poll_Time_Only,				// Poll Xbmc for now playing current time
+				_SKIP_,
 				List_RecentItems,			// When HIGH only show recently added Movies/Albums
 				List_UnWatchedOnly,			// When HIGH only show unwatched Movies/TvShows
 				List_TopPage,				// Go to 1st page
@@ -5496,6 +5497,10 @@ RELEASE List_RecentItems
 PUSH Poll
 {
 	PollForMetadata();
+}
+PUSH Poll_Time_Only
+{
+	Player_GetTimeProperties();
 }
 PUSH PlayNext
 {
