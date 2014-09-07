@@ -629,7 +629,7 @@
   Expand2=expand_separately
   OffsetOutputs=7
   ProgramTree=Logic
-  SymbolTree=41
+  SymbolTree=32
   Hint=Use the XBMC JSON-RPC interface to Browse/Control XBMC.
   PdfHelp=
   HelpID= 
