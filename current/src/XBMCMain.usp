@@ -1177,7 +1177,7 @@ Function SendToSocket(STRING Command$)
 	SocketLock = ON;
 
 	#IF_DEFINED DEBUG
-		PRINT("SendToSocket: %s" ,LEFT(Command$,200));
+		PRINT("SendToSocket: %s" ,LEFT(Command$,245));
 	#ENDIF
 
 	// Send out the command in chunks
@@ -4348,6 +4348,7 @@ FUNCTION ProcessNotification(STRING method$)
 		//Some of the events that are ignored
         IF (method$ = "AudioLibrary.OnAdd" || method$ = "VideoLibrary.OnAdd"
 				|| method$ = "AudioLibrary.OnUpdate" || method$ = "AudioLibrary.OnRemove"
+				|| method$ = "VideoLibrary.OnUpdate" || method$ = "VideoLibrary.OnRemove"
 				|| method$ = "AudioLibrary.OnScanStarted" || method$ = "VideoLibrary.OnScanStarted"
 				|| method$ = "AudioLibrary.OnScanFinished" || method$ = "VideoLibrary.OnScanFinished")
     	{
