@@ -4350,13 +4350,14 @@ FUNCTION ProcessNotification(STRING method$)
 				|| method$ = "AudioLibrary.OnUpdate" || method$ = "AudioLibrary.OnRemove"
 				|| method$ = "VideoLibrary.OnUpdate" || method$ = "VideoLibrary.OnRemove"
 				|| method$ = "AudioLibrary.OnScanStarted" || method$ = "VideoLibrary.OnScanStarted"
-				|| method$ = "AudioLibrary.OnScanFinished" || method$ = "VideoLibrary.OnScanFinished")
+				|| method$ = "AudioLibrary.OnScanFinished" || method$ = "VideoLibrary.OnScanFinished"
+				|| method$ = "Application.OnVolumeChanged" )
     	{
          	     	// Do Nothing
 		}
 		ELSE
 		{
-			GenerateUserError("Unknown Notification: %s", method$);
+			GenerateUserNotice("Unknown Notification: %s", method$);
 			Trace("Unknown Notification: %s", method$);
 		}
 	}
