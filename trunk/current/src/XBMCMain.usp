@@ -91,7 +91,7 @@ Comments:
 #OUTPUT_SHIFT 7			// Shift the outputs down 7 lines on the SIMPL window
 
 /*****    DEFINE NEW CONSTANTS    *******/
-#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
+//#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
 #DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
@@ -2720,6 +2720,7 @@ FUNCTION Process_Movie(INTEGER inList)
             ELSE IF (name$ = "duration" || name$ = "runtime")
 			{
 				Runtime[ListIndex] = GetInteger();
+				#IF_DEFINED DEBUG PRINT("Duration %d", Runtime[ListIndex]); #ENDIF
 			}
 			ELSE IF (name$ = "plot" || name$ = "plotoutline")
 			{
