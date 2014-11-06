@@ -1587,6 +1587,11 @@ INTEGER_FUNCTION ConvertUtf8ToAscii(INTEGER highByte, INTEGER lowByte)
     Bits[5] = BIT(S, 2, 2);
     Bits[6] = BIT(S, 2, 1);
     Bits[7] = BIT(S, 2, 0);
+
+	// Limitation!
+	// This function only works for the additonal characters from \xA0 - \xFF
+	// However 2 byte utf8 characters can be up to \x7FF i.e. we are only 
+	// covering about 100 out of some 1800 characters for 2 byte utf8 strings
      
 	// Convert to decimal      
 	PowerOfTwo = 128;
@@ -1598,6 +1603,11 @@ INTEGER_FUNCTION ConvertUtf8ToAscii(INTEGER highByte, INTEGER lowByte)
 
 		PowerOfTwo = PowerOfTwo / 2; 			
 	}
+                 
+	#IF_DEFINED DEBUG
+		PRINT("ConvertUtf8ToAscii: Hi %d, Lo %d, Character %c (%d in decimal)" 
+					,highByte, lowByte, Dec, Dec );
+	#ENDIF
 
 	RETURN (Dec);
 }
@@ -1747,6 +1757,7 @@ FUNCTION InitOutputArrays(INTEGER start)
 		PlotDescription$[i] = "";
 		Filename$[i] = "";
 		ListIDs[i] = 0;
+		Runtime[i] = 0;
 	}
 		
 }
@@ -2105,6 +2116,10 @@ FUNCTION Process_VideoStream(INTEGER Skip)
 				sWidth = GetString();
 	           	CurrentVideoWidth$ = sWidth;	
 			}	
+			ELSE IF (name$ = "stereomode")
+			{
+				// Do Nothing;	
+			}
 			ELSE
 			{
 				GenerateUserError("Process_VideoStream: Unknown property: %s", name$);
@@ -2638,6 +2653,7 @@ FUNCTION Process_Movie(INTEGER inList)
 {
 	INTEGER ArraySize;
 	STRING name$[15];
+	STRING utf8_encoded$[100];
 	INTEGER numberOfProperties;
 	INTEGER i;
                    
@@ -2707,11 +2723,13 @@ FUNCTION Process_Movie(INTEGER inList)
 			}
 			ELSE IF (name$ = "director")
 			{
-                 Director$[ListIndex] = GetStringArray();
+				utf8_encoded$ = GetStringArray();
+				Director$[ListIndex] = ReplaceUtf8(utf8_encoded$);
 			}
 			ELSE IF (name$ = "writer")
 			{
-                 Writer$[ListIndex] = GetStringArray();
+				utf8_encoded$ = GetStringArray();
+                Writer$[ListIndex] = ReplaceUtf8(utf8_encoded$);
 			}
 			ELSE IF (name$ = "studio")
 			{
@@ -2720,7 +2738,6 @@ FUNCTION Process_Movie(INTEGER inList)
             ELSE IF (name$ = "duration" || name$ = "runtime")
 			{
 				Runtime[ListIndex] = GetInteger();
-				#IF_DEFINED DEBUG PRINT("Duration %d", Runtime[ListIndex]); #ENDIF
 			}
 			ELSE IF (name$ = "plot" || name$ = "plotoutline")
 			{
@@ -4603,7 +4620,7 @@ STRING_FUNCTION List_Filter(INTEGER listID)
 		numberFilters = 0;
     
 	// Do not apply startswith filter to Song list or Genre List
-	// GetGenres does not allow a filter parameter in Frodo release
+	// GetGenres does not allow a filter parameter in Frodo/Gotham releases
 	IF (LEN(CurrentListCxt.startsWith) && listID != MUSIC_SONG_LIST
 				&& (VersionID != 6 || listID != MUSIC_GENRE_LIST))
 	{
