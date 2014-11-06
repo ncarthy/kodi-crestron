@@ -315,14 +315,13 @@ FUNCTION Send(INTEGER PacketType)
 	{
 		IF (Connect = 0)
 		{
-			PRINT ("Not connected to Xbmc at %s. Socket Error number is %d.", XBMC_IPAddr$, Return_Value);
-			PRINT ("%s","Check that your firewall allows inbound traffic on ports 80,8080,9090,9777 on Xbmc machine.");
-			PRINT ("%s","Also check everything is enabled in Settings>Services>Remote Control on XBMC.");
+          
 		}
 		ELSE
 		{			
-			PRINT ("Error in XBMC-ES. Connect: %d", Connect);
-			GenerateUserError("Xbmc Eventserver error. IP Address: %s, ErrorNum: %d.", XBMC_IPAddr$, Return_Value);
+			PRINT ("Not connected to Xbmc at %s. Socket Error number is %d.", XBMC_IPAddr$, Return_Value);
+			PRINT ("%s","Check that your firewall allows inbound traffic on ports 80,8080,9090,9777 on Xbmc machine.");
+			PRINT ("%s","Also check everything is enabled in Settings>Services>Remote Control on XBMC.");
 		}
 	}
 
@@ -673,7 +672,7 @@ CHANGE Command
 		Case (BTN_HASH)						: { ProcessButton("hash"); }
 		Case (BTN_CLEAR)					: { ProcessButton("clear"); }
 		Case (BTN_ENTER)					: { ProcessButton("enter"); }
-		Case (BTN_XBOX)						: { ProcessButton("xbox"); }
+		Case (BTN_XBOX)						: { SendAction(ACTION_EXECBUILTIN, "PlayMedia(C:/Users/Erwan/Videos/video1.mp4)"); }
 		
 		Case (ACTN_REBOOT)					: { SendAction(ACTION_EXECBUILTIN, "Reboot"	); }
 		Case (ACTN_SHUTDOWN)				: { SendAction(ACTION_EXECBUILTIN, "ShutDown"	); }
