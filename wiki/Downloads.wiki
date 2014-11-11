@@ -1,14 +1,14 @@
-#summary One-sentence summary of this page.
 #labels Featured
+#Available Downloads
 
-= Introduction =
+= Note =
 
-Add your content here.
+These download files are not hosted by Google Code. (This is due to a Google Code [http://google-opensource.blogspot.co.uk/2013/05/a-change-to-google-code-download-service.html policy change].)
+
+You can download the files below but I recommend that you use a Subversion client to download the latest version of the source code directly. (I use [http://tortoisesvn.net/ TortoiseSVN]) 
 
 
-= Details =
+= Files=
 
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+Downloads
+  * [http://dl.bintray.com/neil-carthy42/generic/#xbmc-crestron_1.11.zip 1.11]
