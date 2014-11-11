@@ -1,6 +1,4 @@
 #labels Featured
-#Available Downloads
-
 = Note =
 
 These download files are not hosted by Google Code. (This is due to a Google Code [http://google-opensource.blogspot.co.uk/2013/05/a-change-to-google-code-download-service.html policy change].)
