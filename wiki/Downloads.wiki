@@ -1,4 +1,4 @@
-#summary Download the zip archives of the source code
+#summary Download zip archives of the source code
 #labels Featured
 
 = Note =
