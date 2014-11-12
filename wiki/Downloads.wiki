@@ -5,7 +5,7 @@
 
   * These download files are not hosted by Google Code. (This is due to a Google Code [http://google-opensource.blogspot.co.uk/2013/05/a-change-to-google-code-download-service.html policy change].)
 
-  * For the latest version use a Subversion client to download the source code directly from https://code.google.com/p/xbmc-crestron/source/checkout. (I use [http://tortoisesvn.net/ TortoiseSVN]) 
+  * For the latest version use a Subversion client to download the source code directly from [https://code.google.com/p/xbmc-crestron/source/checkout the source page]. (I use [http://tortoisesvn.net/ TortoiseSVN]) 
 
 
 = Files=
