@@ -1,5 +1,12 @@
 xbmc-crestron history
 
+1.12 12 Nov 2014
+Bug Fixes:
+* Ignore input signals while data loading
+* Update media playing time correctly when FFD/REW or Next/Previous operations performed 
+* Eliminate incorrect error warning that was printed to console by XBMC-ES.usp 
+* Movie Details page not being updated
+
 1.11 10 Feb 2014
 Bug Fixes:
 * Starting music no longer stops picture slide-shows. The slide-show goes back to the first picture though.
