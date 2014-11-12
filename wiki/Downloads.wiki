@@ -1,4 +1,6 @@
+#summary Download the zip archives of the source code
 #labels Featured
+
 = Note =
 
   * These download files are not hosted by Google Code. (This is due to a Google Code [http://google-opensource.blogspot.co.uk/2013/05/a-change-to-google-code-download-service.html policy change].)
@@ -8,4 +10,5 @@
 
 = Files=
 
-  * [http://dl.bintray.com/neil-carthy42/generic/#xbmc-crestron_1.11.zip 1.11]
+  * Nov/2014 [http://dl.bintray.com/neil-carthy42/generic/xbmc-crestron_1.12.zip 1.12]
+  * Feb/2014 [http://dl.bintray.com/neil-carthy42/generic/#xbmc-crestron_1.11.zip 1.11]
