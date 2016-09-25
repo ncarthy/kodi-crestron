@@ -1,3 +1,5 @@
+**  This project has been superceded by a new module: Kodi Media Player. Download it from [http://shandonsoft.co.uk](http://shandonsoft.co.uk)
+
 ## WELCOME
 This project hosts SIMPL and SIMPL+ modules that can be used to control [Kodi](http://kodi.tv/) from a Crestron system. The modules use the Kodi [JSON-RPC api](http://wiki.kodi.tv/index.php?title=JSON-RPC_API).
 
