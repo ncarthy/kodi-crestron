@@ -1,4 +1,4 @@
-**This project has been superceded by a new module: Kodi Media Player. Download it from [http://shandonsoft.co.uk](http://shandonsoft.co.uk) ** 
+**This project has been superceded by a new module: Kodi Media Player. Download it from [http://shandonsoft.co.uk](http://shandonsoft.co.uk)**
 This module is free , Kodi Media Player is paid for.
 
 ## WELCOME
