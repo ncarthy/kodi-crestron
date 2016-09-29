@@ -4,7 +4,7 @@ Version=1
 [
 ObjTp=FSgntr
 Sgntr=UserMacro
-RelVrs=4.02.53
+RelVrs=4.05.03
 IntStrVrs=2
 MinSMWVrs=3.00.00
 MinTIOVrs=0
@@ -16,14 +16,15 @@ S0Nd=1
 S1Nd=2
 SLNd=3
 PrNm=XBMC.umc
-DbVr=47.05.002.01
-DvcDbVr=59.07.001.00
-PgmNm=Andrew Drummond
+DbVr=58.05.002.00
+DvcDbVr=78.05.001.00
+PgmNm=Neil Carthy
+DlrNm=Shandon Software Limited
 CltNm=XBMC V2
-Incl=362,378,380,405,407,408,409,478,522,537,554,586,590,611,624,767,830,883,1032,1062,1079,1134,1157,1199,1220,1222,1299,1348,1439,1472,1473,1499,1746,1803,1975,2229,2354,2514,2523,2532,3427,3454,3567,3601,1766,2574,2651,2817,2886,2938,2947,3181,3197,3233,3710,3735,3736,
+Incl=362,378,380,405,407,408,409,478,522,537,554,586,590,611,624,767,830,883,1032,1062,1079,1134,1157,1199,1220,1222,1299,1348,1439,1472,1473,1499,1746,1803,1975,2229,2354,2514,2523,2532,3708,3902,3912,3918,3925,1766,2574,2651,2817,2886,2938,2947,3181,3197,3233,3710,3735,3736,3816,3888,4176,4308,4476,4591,4769,5360,5388,
 McNm=XBMC
-SmVr=906
-DvVr=906
+SmVr=1010
+DvVr=1010
 TpN1=1
 TpN2=2
 TpN3=3
@@ -39,61 +40,61 @@ EnType=0
 ZeroOnIoOk=0
 Cmn1=PARAMETERS\\----------\\Item_Count              - Amount of item||1
 Cmn2=to display on the Touch Panel at a time. Value of 1-10d\\Name||3
-Cmn3=||A- Name to identify module to XBMC.\\Address||4
-Cmn4=||=- IP Address of the XBMC\\httpport                -
-Cmn5=||1Port # of the HTTP Server on XBMC. Usually 8080 or 80\\tcpport||1
-Cmn6=||@- Port # of the JSON Server on XBMC. Almost always||1
-Cmn7=9090\\\\DIGITAL INPUTS\\--------------\\\\ENABLE               -
-Cmn8=||1Set High and keep High to communicate with XBMC.\\BUTTON_xxx||3
-Cmn9=||8- Remote Control Functions\\ACTION_xxx           - XBMC||1
-Cmn10=Actions\\\\Repeat_Playlist      - Press once to repeat playlist,||1
-Cmn11=twice to repeat current item and \\					 - three times to clear.
-Cmn12=||1See RepeatStatus$ output.\\Shuffle_Playlist     - Toggle shuffle||1
-Cmn13=on or off. See ShuffleStatus$ Output.\\\\Movies_List          -||1
-Cmn14=Pulse to start working with Movie Items\\TVShow_List          -||1
-Cmn15=Pulse to start working with TVShow Items\\Albums_List          -
-Cmn16=||1Pulse to see a list of music albums on Xbmc\\Artists_List||6
-Cmn17=||3- Pulse to see a list of music artists on Xbmc\\Pictures_List||1
-Cmn18=||7- Pulse to see a list of songs on Xbmc. NOT CURRENTLY IMPLEMETED.
-Cmn19=\\Addons_List        - Pulse to see a list of Addons on Xbmc. NOT||1
-Cmn20=CURRENTLY IMPLEMETED.\\\\List_Unwatched_Only  - High to display||1
-Cmn21=recently added items. ONly works for Movies and Albums.\\List_Unwatched_Only||1
-Cmn22=||1- High to display items that have not yet been watched/listen to||1
-Cmn23=ONLY.\\\\List_Home		     - Pulse to go to the top level list\\List_Top_Page||1
-Cmn24=||7- Pulse to go to the start of the list\\List_Bottom_Page||1
-Cmn25=||4- Pulse to go to the end of the list\\List_Page_Up         -
-Cmn26=||1Pulse to display the next page of items\\List_Page_Down       -
-Cmn27=||1Pulse to display the previous page of items\\List_Back||9
-Cmn28=||3- For TV Shows and Music, back up to the previous layer.\\Exit_Details_Page||1
-Cmn29=||3- Pulse to exit movie details or TV show episode details layer\\
-Cmn30=\\Start_Selected       - Play the currently selected item\\\\List_Item_1-
-Cmn31=9        - Items 1-9 to be displayed\\\\Search               - Pulse||1
-Cmn32=to bring up the search screen\\search_key_xxxx      - Keyboard for||1
-Cmn33=the search popup\\\\Poll 	             - Poll for currently playing||1
-Cmn34=time,position and percentage. Normally not required\\					 - as||1
-Cmn35=all metadata is now driven by notificaitons received from Xbmc.\\
-Cmn36=\\Update_Movie_Library - Update Xbmc movie metadata library, looking||1
-Cmn37=for new content\\Update_Music_Library - Update Xbmc music metadata||1
-Cmn38=library, looking for new content\\\\Play_Next            - Skip||1
-Cmn39=to next item in Playlist\\Play_Prev            - Return to previous||1
-Cmn40=item in Playlist\\Jump_Fwd_Small       - Move forward 30s in currently||1
-Cmn41=playing track/movie.\\Jump_Back_Small      - Move back 30s in currently||1
-Cmn42=playing track/movie.\\Jump_Fwd_Large       - Move forward 10% or||1
-Cmn43=10 minutes in currently playing track/movie.\\Jump_Back_Large||3
-Cmn44=||3- Move back 10% or 10 minutes in currently playing track/movie.
-Cmn45=\\\\Seek_Time_Percentage# - Go to this percentage time played on||1
-Cmn46=the current track/movie. {{**{{0-100}}**}}\\Seek_Time_Seconds#    - Go to||1
-Cmn47=this exact point on the current track/movie. {{**{{0-65535}}**}}\\\\SendNotification$||1
-Cmn48=||3- Make a popup message appear on the Xbmc Screen.\\LogMessage$||1
-Cmn49=||9- Append message to Xbmc log file. Xbmc Log file is described||1
-Cmn50=at \\							http://wiki.xbmc.org/index.php?title=Log_file\\ \\WindowName$||1
-Cmn51=||9- Activate this window by name. List of names is at \\	
-Cmn52=http://wiki.xbmc.org/index.php?title=Window_IDs  \\Window_xxxxx||1
-Cmn53=||8- Pulse to activate the named window.\\\\UseAlbumArtist||1
-Cmn54=||6- HIGH to list Artists as ALBUM ARTIST.\\\\ALL OUTPUTS\\--
-Cmn55=---------\\IsConnected          - High while connection to Xbmc||1
+Cmn3=||A- Name to identify module to Kodi.\\Address||4
+Cmn4=||=- IP Address of the Kodi\\httpport                -
+Cmn5=||1Port # of the HTTP Server on Kodi. Usually 8080 or 80\\tcpport||1
+Cmn6=||@- Port # of the JSON Server on Kodi. Almost always||1
+Cmn7=9090\\esport			- Port # of the EventServer on Kodi. Almost always||1
+Cmn8=9777\\\\DIGITAL INPUTS\\--------------\\\\ENABLE               -
+Cmn9=||1Set High and keep High to communicate with Kodi.\\BUTTON_xxx||3
+Cmn10=||8- Remote Control Functions\\ACTION_xxx           - Kodi||1
+Cmn11=Actions\\\\Repeat_Playlist      - Press once to repeat playlist,||1
+Cmn12=twice to repeat current item and \\					 - three times to clear.
+Cmn13=||1See RepeatStatus$ output.\\Shuffle_Playlist     - Toggle shuffle||1
+Cmn14=on or off. See ShuffleStatus$ Output.\\\\Movies_List          -||1
+Cmn15=Pulse to start working with Movie Items\\TVShow_List          -||1
+Cmn16=Pulse to start working with TVShow Items\\Albums_List          -
+Cmn17=||1Pulse to see a list of music albums on Kodi\\Artists_List||6
+Cmn18=||3- Pulse to see a list of music artists on Kodi\\Pictures_List||1
+Cmn19=||7- Pulse to see a list of songs on Kodi. NOT CURRENTLY IMPLEMETED.
+Cmn20=\\Addons_List          - Pulse to see a list of Addons on Kodi.||1
+Cmn21=NOT CURRENTLY IMPLEMETED.\\\\List_Unwatched_Only  - High to display||1
+Cmn22=recently added items. ONly works for Movies and Albums.\\List_Unwatched_Only||1
+Cmn23=||1- High to display items that have not yet been watched/listen to||1
+Cmn24=ONLY.\\\\List_Home		     - Pulse to go to the top level list\\List_Top_Page||1
+Cmn25=||7- Pulse to go to the start of the list\\List_Bottom_Page||1
+Cmn26=||4- Pulse to go to the end of the list\\List_Page_Up         -
+Cmn27=||1Pulse to display the next page of items\\List_Page_Down       -
+Cmn28=||1Pulse to display the previous page of items\\List_Back||9
+Cmn29=||3- For TV Shows and Music, back up to the previous layer.\\Exit_Details_Page||1
+Cmn30=||3- Pulse to exit movie details or TV show episode details layer\\
+Cmn31=\\Start_Selected       - Play the currently selected item\\\\List_Item_1-
+Cmn32=9        - Items 1-9 to be displayed\\\\Search               - Pulse||1
+Cmn33=to bring up the search screen\\search_key_xxxx      - Keyboard for||1
+Cmn34=the search popup\\\\Poll 	             - Poll for currently playing||1
+Cmn35=time,position and percentage. Normally not required\\					 - as||1
+Cmn36=all metadata is now driven by notificaitons received from Kodi.\\
+Cmn37=\\Update_Movie_Library - Update Kodi movie metadata library, looking||1
+Cmn38=for new content\\Update_Music_Library - Update Kodi music metadata||1
+Cmn39=library, looking for new content\\\\Play_Next            - Skip||1
+Cmn40=to next item in Playlist\\Play_Prev            - Return to previous||1
+Cmn41=item in Playlist\\Jump_Fwd_Small       - Move forward 30s in currently||1
+Cmn42=playing track/movie.\\Jump_Back_Small      - Move back 30s in currently||1
+Cmn43=playing track/movie.\\Jump_Fwd_Large       - Move forward 10% or||1
+Cmn44=10 minutes in currently playing track/movie.\\Jump_Back_Large||3
+Cmn45=||3- Move back 10% or 10 minutes in currently playing track/movie.
+Cmn46=\\\\Seek_Time_Percentage# - Go to this percentage time played on||1
+Cmn47=the current track/movie. {{**{{0-100}}**}}\\Seek_Time_Seconds#    - Go to||1
+Cmn48=this exact point on the current track/movie. {{**{{0-65535}}**}}\\\\SendNotification$||1
+Cmn49=||3- Make a popup message appear on the Kodi Screen.\\LogMessage$||1
+Cmn50=||9- Append message to Kodi log file. Kodi Log file is described||1
+Cmn51=at \\							http://wiki.Kodi.tv/index.php?title=Log_file\\ \\WindowName$||1
+Cmn52=||9- Activate this window by name. List of names is at \\	
+Cmn53=						http://wiki.Kodi.tv/index.php?title=Window_IDs  \\Window_xxxxx||1
+Cmn54=||8- Pulse to activate the named window.\\\\\\\\ALL OUTPUTS\\
+Cmn55=-----------\\IsConnected          - High while connection to Kodi||1
 Cmn56=is active\\Loading              - High if control system is receiving||1
-Cmn57=data from Xbmc. \\					 - NB: Other requests are suspended until||1
+Cmn57=data from Kodi. \\					 - NB: Other requests are suspended until||1
 Cmn58=loading finishes.\\LoadingAnimationIndex   - Cycles from 1-6 while||1
 Cmn59=Loading is High (Analog)\\\\STOP_FB              - High if we are||1
 Cmn60=not playing anything\\PLAY_FB              - High if media is playing\\
@@ -142,8 +143,8 @@ Cmn102=||1Only activated on details screen. \\                          Appends|
 Cmn103=text in chunks using "\xFE\x02" to avoid 255 character limitation||1
 Cmn104=\\                          on serial strings.\\RepeatStatus||4
 Cmn105=||8- String showing repeat status on current playlist. \\		
-Cmn106=-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or ''\\
-Cmn107=ShuffleStatus           - String showing shuffle status on current||1
+Cmn106=				-		Allowed values = 'Repeat', 'RepeatOne' or 'RepeatAll' or||1
+Cmn107=''\\ShuffleStatus           - String showing shuffle status on current||1
 Cmn108=playlist. \\						-		Allowed values = 'Shuffle' or ''	\\Search_Text||1
 Cmn109=||<- Search criteria that we are matching on for the list\\
 Cmn110=\\List_Item_1-10_FB       - High for the item we have selected in||1
@@ -168,7 +169,119 @@ ObjTp=Bk
 Nm1=\
 Sx1=0
 Sy1=0
-Mx1=0
+Mx1=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=20
+Ly=20
+Rx=280
+Ry=220
+Xm=-1
+Ym=-1
+SH=6
+Z=100
+Ht=3
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=422
+Ly=214
+Rx=844
+Ry=428
+Xm=-1
+Ym=-1
+SH=93
+Z=100
+Ht=4
+Hi=2
+]
+[
+ObjTp=Bw
+H=1
+Lx=0
+Ly=0
+Rx=422
+Ry=286
+Xm=-1
+Ym=-1
+SH=94
+Z=100
+Ht=1
+Hi=2
+]
+[
+ObjTp=Bw
+H=1
+Lx=422
+Ly=0
+Rx=844
+Ry=214
+Xm=-1
+Ym=-1
+SH=97
+Z=100
+Ht=1
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=422
+Ly=642
+Rx=844
+Ry=856
+Xm=-1
+Ym=-1
+SH=68
+Z=100
+Ht=4
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=0
+Ly=286
+Rx=422
+Ry=572
+Xm=-1
+Ym=-1
+SH=95
+Z=100
+Ht=1
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=0
+Ly=572
+Rx=422
+Ry=858
+Xm=-1
+Ym=-1
+SH=13
+Z=100
+Ht=1
+Hi=1
+]
+[
+ObjTp=Bw
+H=1
+Lx=422
+Ly=428
+Rx=844
+Ry=642
+Xm=-1
+Ym=-1
+SH=69
+Z=100
+Ht=4
+Hi=1
 ]
 [
 ObjTp=Symbol
@@ -191,7 +304,7 @@ FltTmp=1
 FpCS=0
 NumFixedInputs=288
 NumFixedOutputs=366
-NumFixedParams=5
+NumFixedParams=6
 MinVariableInputs=0
 MinVariableInputsList2=0
 MinVariableInputsList3=0
@@ -854,11 +967,12 @@ OutputSigType363=Serial
 OutputSigType364=Digital|Analog|Serial|String
 OutputSigType365=Digital
 OutputSigType366=Serial
-ParamSigType1=Constant
+ParamSigType1=Time|Percent|Constant
 ParamSigType2=String
 ParamSigType3=String
 ParamSigType4=String
 ParamSigType5=String
+ParamSigType6=String
 InputCue1=Connect
 InputCue2=[~UNUSED~]
 InputCue3=BUTTON_STOP
@@ -1518,6 +1632,11 @@ ParamCue2=Name
 ParamCue3=Address
 ParamCue4=httpport
 ParamCue5=tcpport
+ParamCue6=esport
+MPp=6
+Pp1=3
+Pp5=2
+Pp6=1
 FileName=XBMC.umc
 EncodingType=0
 ZeroOnIoOk=0
@@ -2280,12 +2399,17 @@ O363=844
 O364=133
 O365=699
 O366=700
-mP=5
+mP=6
 P1=Item_Count
 P2=Name
 P3=Address
 P4=httpport
 P5=tcpport
+P6=esport
+MPp=6
+Pp1=3
+Pp5=2
+Pp6=1
 ]
 [
 ObjTp=Sm
@@ -2565,7 +2689,7 @@ O1=22
 O2=24
 mP=3
 P1=
-P2=9777d
+P2=#esport
 P3=#Address
 ]
 [
@@ -3263,7 +3387,7 @@ mO=1
 tO=1
 O1=131
 mP=1
-P1=20s
+P1=3s
 ]
 [
 ObjTp=Sm
@@ -3413,11 +3537,12 @@ ObjVer=1
 PrH=4
 CF=2
 Cmn1=Buttons and Actions\\
-mC=4
+mC=5
 C1=22
 C2=26
 C3=38
 C4=17
+C5=256
 ]
 [
 ObjTp=Sm
@@ -3687,6 +3812,7 @@ mI=51
 I8=9
 I11=277
 I12=695
+I13=832
 I14=383
 I15=298
 I16=703
@@ -4140,6 +4266,7 @@ PrH=57
 CF=2
 n1I=2
 n1O=1
+PropF=1
 Cmn1=Delay before checking version\\
 mI=2
 I1=114
@@ -4159,6 +4286,7 @@ PrH=57
 CF=2
 n1I=1
 n1O=1
+PropF=1
 mI=1
 I1=2
 mO=1
@@ -4724,6 +4852,7 @@ PrH=57
 CF=2
 n1I=3
 n1O=2
+PropF=1
 Cmn1=Version Compare\\
 mI=3
 I1=387
@@ -4743,6 +4872,7 @@ PrH=57
 CF=2
 n1I=2
 n1O=1
+PropF=1
 mI=2
 I1=386
 I2=388
@@ -8616,6 +8746,47 @@ I2=828
 mO=1
 tO=1
 O1=42
+]
+[
+ObjTp=Sm
+H=256
+SmC=156
+Nm=SUBSYSTEM
+ObjVer=1
+PrH=45
+CF=2
+Cmn1=Complete Stop\\
+mC=1
+C1=257
+]
+[
+ObjTp=Sm
+H=257
+SmC=155
+Nm=SMS MultipressV3.umc
+ObjVer=1
+PrH=256
+CF=2
+n1I=3
+n1O=11
+mI=3
+I1=135
+I3=2
+mO=11
+tO=11
+O3=253
+O4=253
+O5=253
+O6=253
+O8=253
+O9=832
+O10=253
+O11=253
+mP=3
+P1=0.5s
+P2=0.1s
+P3=4d
+Plb3=TRIPLE
 ]
 [
 ObjTp=Sg
@@ -13039,6 +13210,11 @@ Nm=SMS_GHI_Enable
 ]
 [
 ObjTp=Sg
+H=832
+Nm=Stop_All_Media
+]
+[
+ObjTp=Sg
 H=834
 Nm=JKL
 ]
@@ -13134,4 +13310,39 @@ Nm=WXYZ
 ObjTp=Sg
 H=864
 Nm=SMS_WXYZ_Enable
+]
+[
+ObjTp=Dp
+H=1
+Tp=1
+SD=Event Server port number. Normally 9777.
+HD=TRUE
+DV=9777
+NoS=FALSE
+EncFmt=0
+DVLF=1
+Sgn=0
+]
+[
+ObjTp=Dp
+H=2
+Tp=1
+HD=TRUE
+DV=9090
+NoS=FALSE
+EncFmt=0
+DVLF=1
+Sgn=0
+]
+[
+ObjTp=Dp
+H=3
+Tp=1
+HD=TRUE
+DV=6d
+NF=63
+DNF=1
+EncFmt=0
+DVLF=1
+Sgn=0
 ]

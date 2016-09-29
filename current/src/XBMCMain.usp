@@ -92,7 +92,7 @@ Comments:
 
 /*****    DEFINE NEW CONSTANTS    *******/
 //#DEFINE_CONSTANT DEBUG 1              // Uncomment this to see debug messages
-#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
+//#DEFINE_CONSTANT LIVE_TV 1            // Uncomment this to see Live TV as a browse option 
 #DEFINE_CONSTANT MAX_FILENAME_LENGTH 240 
 #DEFINE_CONSTANT MAX_SERIAL_STRING_LENGTH 250	// (equals 255 minus 5 characters for a delimiter) 
 #DEFINE_CONSTANT BUFFER_SIZE 32767		// Socket buffer size
@@ -138,6 +138,9 @@ Comments:
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_CLEARSLIDESHOW      42
 #DEFINE_CONSTANT REQUESTID_PLAYLIST_ADD					43 
 #DEFINE_CONSTANT REQUESTID_PLAYER_OPEN					44
+#DEFINE_CONSTANT REQUESTID_PLAYER_STOP_AUDIO			45
+#DEFINE_CONSTANT REQUESTID_PLAYER_STOP_VIDEO			46
+#DEFINE_CONSTANT REQUESTID_PLAYER_STOP_SLIDESHOW		47
 #DEFINE_CONSTANT REQUESTID_SKIPNEXT						50
 #DEFINE_CONSTANT REQUESTID_SKIPPREV						51
 #DEFINE_CONSTANT REQUESTID_SMALLSKIPFORWARD				52
@@ -315,7 +318,7 @@ DIGITAL_INPUT Connect; 						// When HIGH connect to the XBMC tcp socket.
 DIGITAL_INPUT   _SKIP_,_SKIP_,
 				Poll,						// Poll Xbmc for metadata about currently playing track
 				Poll_Time_Only,				// Poll Xbmc for now playing current time
-				_SKIP_,
+				Stop_Everything_Playing,	// Stop all active media.
 				List_RecentItems,			// When HIGH only show recently added Movies/Albums
 				List_UnWatchedOnly,			// When HIGH only show unwatched Movies/TvShows
 				List_TopPage,				// Go to 1st page
@@ -1367,6 +1370,7 @@ SOCKETSTATUS XBMC
 	{
 		IsConnected = ON;
 		Init();
+		SendJsonCommand(REQUESTID_PING,"JSONRPC.Ping","");
 		SendJsonCommand(REQUESTID_VERSION,"JSONRPC.Version","");
 	}
 	ELSE
@@ -3894,6 +3898,7 @@ FUNCTION Process_Version()
 			IF (name$ = "major")
 			{		
 				VersionID = GetInteger();
+				#IF_DEFINED DEBUG PRINT("Kodi JSON-RPC api version ID = %d", VersionID); #ENDIF
 				BREAK;			
 			}
             ELSE IF (name$ = "minor")
@@ -4390,6 +4395,8 @@ FUNCTION ProcessBasedOnResponseType()
  	INTEGER id;			// For Result/Error Objects
 	STRING method$[50]; // For Notifications
 	STRING name$[10];   // Name of the 
+
+	method$ = "";
 	
 	// Is first token an object?
 	IF (Tokens[0].type = JSMN_OBJECT)
@@ -4428,8 +4435,14 @@ FUNCTION ProcessBasedOnResponseType()
 				ProcessNotification(method$);
 				BREAK;
 			}
+			ELSE IF (name$ = "")
+			{
+				#IF_DEFINED DEBUG PRINT("ProcessBasedOnResponseType: Empty name for method=%s", method$); #ENDIF
+				BREAK;
+			}
 			ELSE
 			{
+				#IF_DEFINED DEBUG PRINT("ProcessBasedOnResponseType: Unknown property: %s", name$); #ENDIF
 				GenerateUserError("ProcessBasedOnResponseType: Unknown property: %s", name$);
 				BREAK;
 			}
@@ -4481,6 +4494,8 @@ STRING_FUNCTION ProcessResponse(STRING fromBuffer$, BYREF INTEGER numberBytes)
 	prevPosition = parser.currpos;
 
 	r = Jsmn_Tokenize(fromBuffer$, numberBytes);
+
+	//PRINT ("ProcessResponse %s", fromBuffer$);
     
 	CSWITCH(r)
 	{
@@ -5522,6 +5537,34 @@ PUSH Poll_Time_Only
 {
 	Player_GetTimeProperties();
 }
+
+PUSH Stop_Everything_Playing
+{
+	STRING BatchCommand$[850];
+               
+	MAKESTRING(BatchCommand$,"[ %s %s %s ]"
+					,"{\"id\":45,\"jsonrpc\":\"2.0\",\"method\":\"Player.Stop\",\"params\":{\"playerid\":0} }"
+					,"{\"id\":46,\"jsonrpc\":\"2.0\",\"method\":\"Player.Stop\",\"params\":{\"playerid\":1} }"
+					,"{\"id\":47,\"jsonrpc\":\"2.0\",\"method\":\"Player.Stop\",\"params\":{\"playerid\":2} }"
+				);
+
+	#IF_DEFINED DEBUG
+	PRINT("BatchCommand: (%d bytes) %s",LEN(BatchCommand$),LEFT(BatchCommand$,230));
+	IF (LEN(BatchCommand$) > 460)
+		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,230));
+	ELSE IF (LEN(BatchCommand$) > 230)
+		PRINT("BatchCommand: %s",RIGHT(BatchCommand$,LEN(BatchCommand$)-230));
+	#ENDIF
+
+	PauseFb = OFF;
+	PlayFb = OFF;
+	StopFb = ON;
+	IsPlaying = 0;	
+	
+	SendToSocket(BatchCommand$);
+
+}
+
 PUSH PlayNext
 {
 	STRING Params$[100];
@@ -5943,7 +5986,7 @@ THREADSAFE SOCKETRECEIVE XBMC
     IF (length)
 	{
 		Xbmc$ = GATHERBYLENGTH(length,XBMC.SocketRxBuf);
-
+                      
 		#IF_DEFINED DEBUG PRINT("Received: %u bytes, %s",length,LEFT(Xbmc$,220));
 			IF (LEN(Xbmc$) > 440)
 				PRINT("Received: %s",RIGHT(Xbmc$,220));
@@ -6053,4 +6096,5 @@ Function Main()
 	Stack[StackPosition].label = "";
 	ListContext_Pop();
 	List_Retrieve();
+	
 }

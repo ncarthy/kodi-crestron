@@ -1,4 +1,13 @@
-xbmc-crestron history
+kodi-crestron history
+(formerly xbmc-crestron)
+
+1.20 30 Sep 2016
+Change some filenames to Kodi from XBMC
+Exposes EventServer port parameter on XBMC.umc
+Bug Fixes:
+* EventServer connect/disconnect logic failed when more than one instance of kodi-crestron in program
+* JSON-RPC version check resulted in spurious upgrade message
+Remove obsolete files from repository
 
 1.12 12 Nov 2014
 Bug Fixes:

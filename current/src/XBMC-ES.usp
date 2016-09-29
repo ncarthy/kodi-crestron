@@ -223,6 +223,14 @@ Comments:
 #DEFINE_CONSTANT ACTION_PARTY_MODE					166
 #DEFINE_CONSTANT ACTION_CLOSE_DIALOGS				167
 
+#DEFINE_CONSTANT STATE_IDLE							0
+#DEFINE_CONSTANT STATE_CONNECTING					1
+#DEFINE_CONSTANT STATE_CONNECTED					2
+#DEFINE_CONSTANT STATE_DISCONNECTING				3
+#DEFINE_CONSTANT STATE_DROPPED						4
+#DEFINE_CONSTANT STATE_FAILED						5
+
+
 /*******************************************************************************************
   DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
   (Uncomment and declare inputs and outputs as needed)
@@ -271,12 +279,54 @@ INTEGER UniqueToken;				// Used by xbmc to identify each client, set to a random
 STRING Header$[HEADER_SIZE];		// The header that comes before the Payload of each packet 
 STRING Payload$[MAX_PACKET_SIZE];	// The payload buffer that is transferred to XBMC
 INTEGER PayloadLength;				// The actual length of the payload. (Payload$ is padded with zeros)
+INTEGER State;						// Records current state of socket communications
 
 /*******************************************************************************************
   Functions
   Note:  Functions must be physically placed before the location in
          the code that calls them.
 *******************************************************************************************/
+STRING_FUNCTION GetPacketType(INTEGER PacketType)
+{
+	STRING Return$[20];
+
+	CSWITCH (PacketType)
+	{
+     	CASE (PT_HELO): { Return$="Helo"; break; }
+     	CASE (PT_BYE): { Return$="Bye"; break; }
+     	CASE (PT_BUTTON): { Return$="Button"; break; }
+     	CASE (PT_MOUSE): { Return$="Mouse"; break; }
+     	CASE (PT_PING): { Return$="Ping"; break; }
+     	CASE (PT_BROADCAST): { Return$="Broadcast"; break; }
+     	CASE (PT_NOTIFICATION): { Return$="Notification"; break; }
+     	CASE (PT_BLOB): { Return$="Blob"; break; }
+     	CASE (PT_LOG): { Return$="Log"; break; }
+     	CASE (PT_ACTION): { Return$="Action"; break; }
+     	CASE (PT_DEBUG): { Return$="Debug"; break; }
+		DEFAULT: { Return$="Unknown"; break; }
+	}
+	RETURN (Return$);
+}
+
+
+FUNCTION PrintState(STRING Message)
+{
+	STRING State$[20];
+
+	CSWITCH (State)
+	{
+     	CASE (0): { State$ =  "STATE_IDLE"; break; }
+     	CASE (1): { State$ =  "STATE_CONNECTING"; break; }
+     	CASE (2): { State$ =  "STATE_CONNECTED"; break; }
+     	CASE (3): { State$ =  "STATE_DISCONNECTING"; break; }
+     	CASE (4): { State$ =  "STATE_DROPPED"; break; }
+     	CASE (5): { State$ =  "STATE_FAILED"; break; }
+	}
+
+	PRINT("%s %s. EventServer State = %s", XBMC_IPAddr$, Message, State$);
+}
+
+
 // Insert Header details into Header$
 FUNCTION GenerateHeader(INTEGER PacketType)
 {
@@ -302,6 +352,13 @@ FUNCTION Send(INTEGER PacketType)
 {
 	STRING Packet$[MAX_PACKET_SIZE];
 	SIGNED_INTEGER Return_Value;
+	SIGNED_INTEGER LocalStatus;
+	STRING Message$[100];
+
+#IF_DEFINED DEBUG
+	Message$ = "Send " + GetPacketType(PacketType);
+    PrintState(Message$);
+#ENDIF
 
     CALL GenerateHeader(PacketType);
     
@@ -313,18 +370,50 @@ FUNCTION Send(INTEGER PacketType)
 	Return_Value = SOCKETSEND(EventServerUdp, Packet$);
 	IF (Return_Value < 0)
 	{
-		IF (Connect = 0)
+		// Packet was not sent successfully
+		
+		IF (State = STATE_CONNECTED)
 		{
-          
+			// Connection failed after previously connecting successfully. 
+			// Maybe kodi rebooted?
+
+			PRINT ("%s","Kodi error: ES socket has disconnected, reconnecting in 10 seconds.");
+
+#IF_DEFINED DEBUG 
+			PRINT ("%s Changing to STATE_DROPPED. PacketType = %s", XBMC_IPAddr$, GetPacketType(PacketType));
+#ENDIF
+
+			// Update state
+			State = STATE_DROPPED;
+
+		 	LocalStatus = SocketUDP_Disable(EventServerUdp);
+			IF (LocalStatus != 0)
+			{
+		     	PRINT ("%s", "Unable to DISable EventServer Udp socket." );
+			}
+
 		}
 		ELSE
-		{			
-			PRINT ("Not connected to Xbmc at %s. Socket Error number is %d.", XBMC_IPAddr$, Return_Value);
-			PRINT ("%s","Check that your firewall allows inbound traffic on ports 80,8080,9090,9777 on Xbmc machine.");
-			PRINT ("%s","Also check everything is enabled in Settings>Services>Remote Control on XBMC.");
+		{
+			// Connection failed at first try. Probably a configuration issue.
+
+			// Update state
+			State = STATE_FAILED;
+
+			// Inform User	
+			PRINT ("Cannot connect to Kodi at %s:%d at first try. Possible configuration error (# %d).", XBMC_IPAddr$, EventServer_Port#, Return_Value);
+			PRINT ("%s","Check that your firewall allows inbound traffic on ports 80,8080,9090,9777 on Kodi machine.");
+			PRINT ("%s","Also check everything is enabled in Settings>Services>Remote Control on Kodi.");
 		}
 	}
+	ELSE
+	{
+		// Packet sent successfully
 
+		// Update state
+		IF (State <> STATE_DISCONNECTING)
+	     	State = STATE_CONNECTED;
+	}
 }
  
 /************************************************************************/
@@ -529,46 +618,77 @@ FUNCTION ProcessButton(STRING button_name)
 *******************************************************************************************/
 PUSH Connect
 {
-	INTEGER LocalStatus;
+	SIGNED_INTEGER LocalStatus;
+
+	State = STATE_CONNECTING; //Update state
+    
+    #IF_DEFINED DEBUG PrintState("Connect push"); 
+	Print("Kodi ES connecting to: %s:%d", XBMC_IPAddr$, EventServer_Port#); #ENDIF
 
  	LocalStatus = SocketUDP_Enable(EventServerUdp, XBMC_IPAddr$, EventServer_Port#);
     
 	IF (LocalStatus != 0)
 	{
-        #IF_DEFINED DEBUG PRINT("UDP Error: %s:%d", XBMC_IPAddr$, EventServer_Port#); #ENDIF
-     	GenerateUserError( "(%s) %s", GetSymbolInstanceName( ), "Unable to enable EventServer Udp socket." );
+     	GenerateUserError( "(%s) %s%s", GetSymbolInstanceName( ), 
+				"Kodi: Unable to enable EventServer Udp socket. IP=", XBMC_IPAddr$ );
+		State = STATE_IDLE;
+		TerminateEvent;
 	}
 
 	CALL SendHelo("Crestron System");
 
-	WHILE (Connect)
+	WHILE (State = STATE_CONNECTED || State = STATE_DROPPED)
 	{
-		// 30-sec wait        
-		DELAY(3000);
+		// 10-sec cycle, every 10seconds either send a Ping or attempt re-connect        
+		DELAY(1000);
 
 		// Ensure the release event is captured
 		PROCESSLOGIC();
           
-		// Check again just in case
-		IF (Connect)	     	
+
+		IF (State = STATE_CONNECTED)	     	
+		{
+			// Normal operation: send a keepalive packet
 			CALL SendPing();
+		}
+		ELSE IF (State = STATE_DROPPED)
+		{
+			// Error condition. Try to re-connect.
+           	LocalStatus = SocketUDP_Enable(EventServerUdp, XBMC_IPAddr$, EventServer_Port#);
+  
+			IF (LocalStatus != 0)
+			{
+		        PRINT("UDP Error on reconnect attempt: %s:%d, Number = %d", XBMC_IPAddr$, EventServer_Port#, LocalStatus); 
+			}
+
+			CALL SendHelo("Crestron System");
+		}
 	}
 }
 
 RELEASE Connect
 {
-	INTEGER LocalStatus;
+	SIGNED_INTEGER LocalStatus;
 
-	CALL SendLog(LOGNOTICE, "ES: Crestron System closed connection.");
-	Delay(50);
-	CALL SendBye();
+    #IF_DEFINED DEBUG PrintState("Connect release"); #ENDIF
 
+	IF (State = STATE_CONNECTED)
+	{
+		State = STATE_DISCONNECTING;		
+
+		CALL SendLog(LOGNOTICE, "ES: Crestron System closed connection.");
+		Delay(50);
+		CALL SendBye();
+	}
+              
  	LocalStatus = SocketUDP_Disable(EventServerUdp);
 	IF (LocalStatus != 0)
 	{
-     	GenerateUserError( "(%s) %s", GetSymbolInstanceName( ), "Unable to DISable EventServer Udp socket." );
+		IF (State = STATE_DISCONNECTING)
+     		GenerateUserError( "(%s) %s", GetSymbolInstanceName( ), "Unable to DISable EventServer Udp socket." );
 	}
-
+        
+	State = STATE_IDLE;
 }
 
 
@@ -576,43 +696,52 @@ RELEASE Connect
 PUSH Up
 {
 	// Keyboard Button names are CButtonTranslator::TranslateKeyboardString
-	// in XBMC source code
-
- 	CALL SendButton("up",0,"R1",BTN_DOWN, 0);
+	// in Kodi source code
+    IF (State = STATE_CONNECTED)
+	 	CALL SendButton("up",0,"R1",BTN_DOWN, 0);
 }
 
 PUSH Down
 {
-	CALL SendButton("down",0,"R1",BTN_DOWN, 0);
+    IF (State = STATE_CONNECTED)
+		CALL SendButton("down",0,"R1",BTN_DOWN, 0);
 }
 PUSH Lt
 {
-	CALL SendButton("left",0,"R1",BTN_DOWN, 0);
+	#IF_DEFINED DEBUG PrintState("Left PUSH"); #ENDIF
+    IF (State = STATE_CONNECTED)
+		CALL SendButton("left",0,"R1",BTN_DOWN, 0);
 }
 PUSH Rt
 {
-	CALL SendButton("right",0,"R1",BTN_DOWN, 0);
+    IF (State = STATE_CONNECTED)
+		CALL SendButton("right",0,"R1",BTN_DOWN, 0);
 }
 RELEASE Up
 {
- 	CALL SendButton("up",0,"R1",BTN_UP, 0);
+    IF (State = STATE_CONNECTED)
+	 	CALL SendButton("up",0,"R1",BTN_UP, 0);
 }
 
 RELEASE Down
 {
-	CALL SendButton("down",0,"R1",BTN_UP, 0);
+    IF (State = STATE_CONNECTED)
+		CALL SendButton("down",0,"R1",BTN_UP, 0);
 }
 RELEASE Lt
 {
-	CALL SendButton("left",0,"R1",BTN_UP, 0);
+    IF (State = STATE_CONNECTED)
+		CALL SendButton("left",0,"R1",BTN_UP, 0);
 }
 RELEASE Rt
 {
-	CALL SendButton("right",0,"R1",BTN_UP, 0);
+    IF (State = STATE_CONNECTED)
+		CALL SendButton("right",0,"R1",BTN_UP, 0);
 }
 
 CHANGE Command
 {
+	IF (State = STATE_CONNECTED)
 	Switch (Command)
 	{   
 		Case (BUTTON_UP)					: { ProcessButton("up"); }
@@ -747,55 +876,59 @@ CHANGE Command
 		Case (ACTION_SHOW_ASPECT_RATIO)		: { SendAction(ACTION_BUTTON, "aspectratio"); }
 		Case (ACTION_PARTY_MODE		)		: { SendAction(ACTION_EXECBUILTIN, "PlayerControl(PartyMode)"); }
 		Case (ACTION_CLOSE_DIALOGS	)		: { SendAction(ACTION_EXECBUILTIN, "Dialog.Close(all,true)"); }
-
 	}       
 }
 
 push Repeat
 {
-	IF ( RepeatCounter MOD 4 = 1)
+    IF (State = STATE_CONNECTED)
 	{
-    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(Repeat)");
-		RepeatStatus$ = "Repeat On";
+		IF ( RepeatCounter MOD 4 = 1)
+		{
+	    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(Repeat)");
+			RepeatStatus$ = "Repeat On";
+		}
+		ELSE IF ( RepeatCounter MOD 4 = 2)
+		{
+	    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RepeatOne)");
+			RepeatStatus$ = "Repeat One";
+		}
+		ELSE IF ( RepeatCounter MOD 4 = 3)
+		{
+	    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RepeatAll)");
+			RepeatStatus$ = "Repeat All";
+		}
+		ELSE	{
+	    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RepeatOff)");
+			RepeatStatus$ = "";
+		}
+	
+	    RepeatCounter = (RepeatCounter + 1) MOD 4;
 	}
-	ELSE IF ( RepeatCounter MOD 4 = 2)
-	{
-    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RepeatOne)");
-		RepeatStatus$ = "Repeat One";
-	}
-	ELSE IF ( RepeatCounter MOD 4 = 3)
-	{
-    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RepeatAll)");
-		RepeatStatus$ = "Repeat All";
-	}
-	ELSE	{
-    	CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RepeatOff)");
-		RepeatStatus$ = "";
-	}
-
-    RepeatCounter = (RepeatCounter + 1) MOD 4;
-
 }
 
 
 push Shuffle
 {
-	IF ( ShuffleCounter MOD 2)
+    IF (State = STATE_CONNECTED)
 	{
-		// OFF
-		CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RandomOff)");
-
-		ShuffleStatus$ = "";
-    }
-	ELSE
-	{
-		// ON
-		CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RandomOn)");
-
-		ShuffleStatus$ = "Shuffle";
+		IF ( ShuffleCounter MOD 2)
+		{
+			// OFF
+			CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RandomOff)");
+	
+			ShuffleStatus$ = "";
+	    }
+		ELSE
+		{
+			// ON
+			CALL SendAction(ACTION_EXECBUILTIN, "PlayerControl(RandomOn)");
+	
+			ShuffleStatus$ = "Shuffle";
+		}
+	
+		ShuffleCounter = (ShuffleCounter + 1) MOD 2;
 	}
-
-	ShuffleCounter = (ShuffleCounter + 1) MOD 2;
 }
 
 
@@ -809,8 +942,9 @@ CHANGE LogMessage$
         MAKESTRING(responseLine$, "%s", LogMessage$);
     
 	CLEARBUFFER(LogMessage$);
-
-	CALL SendLog(LOGNOTICE, responseLine$);
+          
+	IF (State = STATE_CONNECTED)
+		CALL SendLog(LOGNOTICE, responseLine$);
 }
 
 CHANGE Notification$
@@ -824,28 +958,31 @@ CHANGE Notification$
 
 	CLEARBUFFER(Notification$);
 	
-	CALL SendNotification("Crestron System says:", responseLine$);
+	IF (State = STATE_CONNECTED)
+		CALL SendNotification("Crestron System says:", responseLine$);
 }
 
 CHANGE WindowName#
 {
-	// ActivateWindow parameters: http://wiki.xbmc.org/index.php?title=Opening_Windows_and_Dialogs
-    // and http://wiki.xbmc.org/index.php?title=Window_IDs
+	// ActivateWindow parameters: http://wiki.kodi.tv/index.php?title=Opening_Windows_and_Dialogs
+    // and http://wiki.Kodi.tv/index.php?title=Window_IDs
 	String Command$[ 100 ];
 	
 	MAKESTRING(Command$, "ActivateWindow(%d)", WindowName#);
     
-	SendAction(ACTION_EXECBUILTIN, Command$);
+	IF (State = STATE_CONNECTED)
+		SendAction(ACTION_EXECBUILTIN, Command$);
 }
 CHANGE WindowName$
 {
-	// ActivateWindow parameters: http://wiki.xbmc.org/index.php?title=Opening_Windows_and_Dialogs
-    // and http://wiki.xbmc.org/index.php?title=Window_IDs
+	// ActivateWindow parameters: http://wiki.kodi.tv/index.php?title=Opening_Windows_and_Dialogs
+    // and http://wiki.kodi.tv/index.php?title=Window_IDs
 	String Command$[ 100 ];
 	
 	MAKESTRING(Command$, "ActivateWindow(%s)", WindowName$);
 
-	SendAction(ACTION_EXECBUILTIN, Command$);
+	IF (State = STATE_CONNECTED)
+		SendAction(ACTION_EXECBUILTIN, Command$);
 }
 
 

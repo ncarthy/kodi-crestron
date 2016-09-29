@@ -1,17 +1,18 @@
 PARAMETERS
 ----------
 Item_Count              - Amount of item to display on the Touch Panel at a time. Value of 1-10d
-Name                    - Name to identify module to XBMC.
-Address                 - IP Address of the XBMC
-httpport                - Port # of the HTTP Server on XBMC. Usually 8080 or 80
-tcpport                 - Port # of the JSON Server on XBMC. Almost always 9090
+Name                    - Name to identify module to Kodi.
+Address                 - IP Address of the Kodi
+httpport                - Port # of the HTTP Server on Kodi. Usually 8080 or 80
+tcpport                 - Port # of the JSON Server on Kodi. Almost always 9090
+esport                  - Port # of the EventServer on Kodi. Almost always 9777
 
 DIGITAL INPUTS
 --------------
 
-ENABLE               - Set High and keep High to communicate with XBMC.
+ENABLE               - Set High and keep High to communicate with Kodi.
 BUTTON_xxx           - Remote Control Functions
-ACTION_xxx           - XBMC Actions
+ACTION_xxx           - Kodi Actions
 
 Repeat_Playlist      - Press once to repeat playlist, twice to repeat current item and 
 					 - three times to clear. See RepeatStatus$ output.
@@ -19,10 +20,10 @@ Shuffle_Playlist     - Toggle shuffle on or off. See ShuffleStatus$ Output.
 
 Movies_List          - Pulse to start working with Movie Items
 TVShow_List          - Pulse to start working with TVShow Items
-Albums_List          - Pulse to see a list of music albums on Xbmc
-Artists_List         - Pulse to see a list of music artists on Xbmc
-Pictures_List        - Pulse to see a list of songs on Xbmc. NOT CURRENTLY IMPLEMETED.
-Addons_List        - Pulse to see a list of Addons on Xbmc. NOT CURRENTLY IMPLEMETED.
+Albums_List          - Pulse to see a list of music albums on Kodi
+Artists_List         - Pulse to see a list of music artists on Kodi
+Pictures_List        - Pulse to see a list of songs on Kodi. NOT CURRENTLY IMPLEMETED.
+Addons_List          - Pulse to see a list of Addons on Kodi. NOT CURRENTLY IMPLEMETED.
 
 List_Unwatched_Only  - High to display recently added items. ONly works for Movies and Albums.
 List_Unwatched_Only  - High to display items that have not yet been watched/listen to ONLY.
@@ -43,10 +44,10 @@ Search               - Pulse to bring up the search screen
 search_key_xxxx      - Keyboard for the search popup
 
 Poll 	             - Poll for currently playing time,position and percentage. Normally not required
-					 - as all metadata is now driven by notificaitons received from Xbmc.
+					 - as all metadata is now driven by notificaitons received from Kodi.
 
-Update_Movie_Library - Update Xbmc movie metadata library, looking for new content
-Update_Music_Library - Update Xbmc music metadata library, looking for new content
+Update_Movie_Library - Update Kodi movie metadata library, looking for new content
+Update_Music_Library - Update Kodi music metadata library, looking for new content
 
 Play_Next            - Skip to next item in Playlist
 Play_Prev            - Return to previous item in Playlist
@@ -58,20 +59,20 @@ Jump_Back_Large      - Move back 10% or 10 minutes in currently playing track/mo
 Seek_Time_Percentage# - Go to this percentage time played on the current track/movie. [0-100]
 Seek_Time_Seconds#    - Go to this exact point on the current track/movie. [0-65535]
 
-SendNotification$    - Make a popup message appear on the Xbmc Screen.
-LogMessage$          - Append message to Xbmc log file. Xbmc Log file is described at 
-							http://wiki.xbmc.org/index.php?title=Log_file
+SendNotification$    - Make a popup message appear on the Kodi Screen.
+LogMessage$          - Append message to Kodi log file. Kodi Log file is described at 
+							http://wiki.Kodi.tv/index.php?title=Log_file
  
 WindowName$          - Activate this window by name. List of names is at 
-							http://wiki.xbmc.org/index.php?title=Window_IDs  
+							http://wiki.Kodi.tv/index.php?title=Window_IDs  
 Window_xxxxx         - Pulse to activate the named window.
 
 
 
 ALL OUTPUTS
 -----------
-IsConnected          - High while connection to Xbmc is active
-Loading              - High if control system is receiving data from Xbmc. 
+IsConnected          - High while connection to Kodi is active
+Loading              - High if control system is receiving data from Kodi. 
 					 - NB: Other requests are suspended until loading finishes.
 LoadingAnimationIndex   - Cycles from 1-6 while Loading is High (Analog)
 
